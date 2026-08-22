@@ -1,0 +1,25 @@
+# Node / build
+node_modules/
+frontend/node_modules/
+frontend/dist/
+publish/
+
+# PHP deps (installed on the server, if ever needed)
+vendor/
+backend/vendor/
+
+# SECRETS — never commit these. dbConfig.php lives ONLY on the server,
+# in the subdomain docroot, and is excluded from every deploy.
+dbConfig.php
+backend/dbConfig.php
+config.secret.php
+backend/config.secret.php
+
+# Server-only data folders
+uploads/
+backend/uploads/
+
+# Scratch / misc
+.DS_Store
+*.log
+.env

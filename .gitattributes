@@ -1,0 +1,9 @@
+# Normalise to LF in the repository. The deploy runner is Linux and rsyncs
+# straight to the server, so PHP and SQL must not carry CRLF into the docroot.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.woff binary
+*.woff2 binary

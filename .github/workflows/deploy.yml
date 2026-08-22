@@ -1,0 +1,79 @@
+name: Build & Deploy to GreenGeeks (SSH)
+
+# Push-triggered runs are unreliable on this host, so the real deploy path
+# is always manual:
+#     gh workflow run deploy.yml
+#     gh run watch
+# then confirm the run headSha matches HEAD before believing anything is live.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  # The subdomain this install serves. Used for the rsync target path and
+  # the post-deploy OPcache flush. Change in ONE place.
+  SUBDOMAIN: SUBDOMAIN.thehistorians.org
+  OPCACHE_TOKEN: 7c4f1a9e2b6d43f0a8e5c1d7b93042fe
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # THE LINT GATE. There is no local PHP runtime, so this is the only
+      # thing standing between a stray apostrophe in a single-quoted string
+      # and a 500 on every page of the live site. Never make it non-blocking.
+      - name: Lint PHP (parse check every backend file)
+        run: |
+          for f in backend/*.php; do
+            php -l "$f" > /dev/null || { echo "PARSE ERROR in $f"; php -l "$f"; exit 1; }
+          done
+          echo "All backend PHP files parse cleanly."
+
+      - name: Install & build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble publish/
+        run: |
+          mkdir -p publish
+          cp -r frontend/dist/. publish/
+          cp backend/*.php publish/
+          # dbConfig.php and uploads/ are intentionally absent — they live
+          # only on the server and are excluded from the rsync below too.
+          ls -la publish/
+
+      - name: Deploy via SSH (rsync)
+        uses: easingthemes/ssh-deploy@v5.1.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST:     ${{ secrets.SSH_HOST }}
+          REMOTE_USER:     ${{ secrets.SSH_USERNAME }}
+          REMOTE_PORT:     ${{ secrets.SSH_PORT }}
+          SOURCE: "publish/"
+          TARGET: "public_html/${{ env.SUBDOMAIN }}/"
+          # NO --delete: server-only files are never removed by a deploy.
+          ARGS: "-rltgoDzvO --no-perms"
+          EXCLUDE: "dbConfig.php, uploads/"
+          # LiteSpeed serves new static assets immediately but can keep
+          # running stale compiled PHP. Flush it or the deploy is a lie.
+          SCRIPT_AFTER: |
+            curl -s "https://${{ env.SUBDOMAIN }}/_opcache_reset.php?token=${{ env.OPCACHE_TOKEN }}" >/dev/null 2>&1 || true
+
+      - name: Smoke check the live install
+        run: |
+          echo "Schema check:"
+          curl -s --max-time 30 "https://${{ env.SUBDOMAIN }}/admin_schemaCheck.php" || true
+          echo
