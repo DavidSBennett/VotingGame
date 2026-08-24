@@ -28,6 +28,39 @@ if (!hash_equals($EXPECTED_TOKEN, $token)) {
 
 header('Content-Type: application/json');
 
+/**
+ * ?probe=lib — include lib.php and report whatever killed it.
+ *
+ * display_errors is off on this host, so a fatal inside lib.php reaches
+ * the browser as a 500 with an empty body and no clue. A shutdown handler
+ * sees error_get_last() even for fatals, which turns that into a message
+ * without exposing errors to every visitor of the site.
+ */
+if (($_GET['probe'] ?? '') === 'lib') {
+  $GLOBALS['VG_PROBE_DONE'] = false;
+  register_shutdown_function(function () {
+    if (!empty($GLOBALS['VG_PROBE_DONE'])) return;
+    $err = error_get_last();
+    echo json_encode([
+      'probe'      => 'lib',
+      'fatal'      => $err ? $err : 'none recorded',
+      'db_source'  => $GLOBALS['VG_DB_SOURCE'] ?? null,
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+  });
+
+  require_once __DIR__ . '/lib.php';
+
+  // Reached only if lib.php neither fataled nor exited.
+  $GLOBALS['VG_PROBE_DONE'] = true;
+  echo json_encode([
+    'probe'     => 'lib',
+    'loaded'    => true,
+    'db_source' => $GLOBALS['VG_DB_SOURCE'] ?? null,
+    'connected' => isset($mysqli) && ($mysqli instanceof mysqli),
+  ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+  exit;
+}
+
 /** Shape of a config file, WITHOUT revealing its contents. Counts only. */
 function diag_shape($path) {
   if (!file_exists($path)) return ['exists' => false];
