@@ -37,7 +37,7 @@
  *                 tariff  -3 revenue only                 +3 high protection
  *                 federal -3 strict construction          +3 broad national power
  *
- *   stance_late   union   -3 perpetual Union              +3 a state may nullify or leave
+ *   stance_late   expansion -3 continental restraint      +3 Manifest Destiny
  *                 slavery -3 restriction                  +3 protection and expansion
  *                 states  -3 national supremacy           +3 state sovereignty
  */
@@ -57,9 +57,9 @@ function vg_issue_tracks() {
                     'high' => 'Broad national authority'],
     ],
     'late' => [
-      'union'   => ['name' => 'Nullification',
-                    'low'  => 'Perpetual Union',
-                    'high' => 'A state may nullify'],
+      'expansion' => ['name' => 'Expansion',
+                    'low'  => 'Continental restraint',
+                    'high' => 'Manifest Destiny'],
       'slavery' => ['name' => 'Slavery',
                     'low'  => 'Restriction',
                     'high' => 'Protection and expansion'],
@@ -86,11 +86,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'adams_1796', 'name' => 'John Adams', 'party' => 'Federalist',
         'stance_early' => ['market' => -2, 'tariff' => 1, 'federal' => 3],
-        'stance_late'  => ['union' => -3, 'slavery' => -1, 'states' => -3],
+        'stance_late'  => ['expansion' => -2, 'slavery' => -1, 'states' => -3],
         'note' => 'Atlantic commerce, a funded debt, and a strong executive.'],
        ['key' => 'jefferson_1796', 'name' => 'Thomas Jefferson', 'party' => 'Democratic-Republican',
         'stance_early' => ['market' => 2, 'tariff' => -2, 'federal' => -3],
-        'stance_late'  => ['union' => 1, 'slavery' => 2, 'states' => 3],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 2, 'states' => 3],
         'note' => 'An agrarian republic, free trade, and a government of enumerated powers.'],
      ]],
 
@@ -100,11 +100,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'jefferson_1800', 'name' => 'Thomas Jefferson', 'party' => 'Democratic-Republican',
         'stance_early' => ['market' => 2, 'tariff' => -2, 'federal' => -3],
-        'stance_late'  => ['union' => 1, 'slavery' => 2, 'states' => 3],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 2, 'states' => 3],
         'note' => 'Ran against the Alien and Sedition Acts and the standing army that paid for them.'],
        ['key' => 'adams_1800', 'name' => 'John Adams', 'party' => 'Federalist',
         'stance_early' => ['market' => -2, 'tariff' => 1, 'federal' => 3],
-        'stance_late'  => ['union' => -3, 'slavery' => -1, 'states' => -3],
+        'stance_late'  => ['expansion' => -2, 'slavery' => -1, 'states' => -3],
         'note' => 'Peace with France cost him his own party.'],
      ]],
 
@@ -114,11 +114,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'madison_1808', 'name' => 'James Madison', 'party' => 'Democratic-Republican',
         'stance_early' => ['market' => 3, 'tariff' => -1, 'federal' => -2],
-        'stance_late'  => ['union' => 0, 'slavery' => 1, 'states' => 1],
+        'stance_late'  => ['expansion' => 2, 'slavery' => 1, 'states' => 1],
         'note' => 'Architect of commercial coercion as an alternative to war.'],
        ['key' => 'pinckney_1808', 'name' => 'Charles C. Pinckney', 'party' => 'Federalist',
         'stance_early' => ['market' => -3, 'tariff' => 1, 'federal' => 2],
-        'stance_late'  => ['union' => -2, 'slavery' => 1, 'states' => -2],
+        'stance_late'  => ['expansion' => -2, 'slavery' => 1, 'states' => -2],
         'note' => 'A South Carolina Federalist carrying a New England grievance.'],
      ]],
 
@@ -128,11 +128,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'madison_1812', 'name' => 'James Madison', 'party' => 'Democratic-Republican',
         'stance_early' => ['market' => 3, 'tariff' => -1, 'federal' => -1],
-        'stance_late'  => ['union' => 0, 'slavery' => 1, 'states' => 1],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 1, 'states' => 1],
         'note' => 'War with Britain as the completion of independence.'],
        ['key' => 'clinton_1812', 'name' => 'DeWitt Clinton', 'party' => 'Federalist coalition',
         'stance_early' => ['market' => -3, 'tariff' => 0, 'federal' => 1],
-        'stance_late'  => ['union' => -2, 'slavery' => -1, 'states' => -1],
+        'stance_late'  => ['expansion' => -2, 'slavery' => -1, 'states' => -1],
         'note' => 'A Republican running on Federalist money to end the war.'],
      ]],
 
@@ -142,11 +142,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'jqadams_1824', 'name' => 'John Quincy Adams', 'party' => 'Democratic-Republican',
         'stance_early' => ['market' => 0, 'tariff' => 2, 'federal' => 3],
-        'stance_late'  => ['union' => -3, 'slavery' => -3, 'states' => -3],
+        'stance_late'  => ['expansion' => 2, 'slavery' => -3, 'states' => -3],
         'note' => 'Roads, canals, a national university, and the American System.'],
        ['key' => 'jackson_1824', 'name' => 'Andrew Jackson', 'party' => 'Democratic-Republican',
         'stance_early' => ['market' => 1, 'tariff' => 0, 'federal' => -1],
-        'stance_late'  => ['union' => -2, 'slavery' => 2, 'states' => 1],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 2, 'states' => 1],
         'note' => 'The military hero as the outsider against a Washington arrangement.'],
      ]],
 
@@ -156,11 +156,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'jackson_1828', 'name' => 'Andrew Jackson', 'party' => 'Democrat',
         'stance_early' => ['market' => 1, 'tariff' => -1, 'federal' => -1],
-        'stance_late'  => ['union' => -2, 'slavery' => 2, 'states' => 1],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 2, 'states' => 1],
         'note' => 'Rotation in office and hostility to concentrated financial power.'],
        ['key' => 'jqadams_1828', 'name' => 'John Quincy Adams', 'party' => 'National Republican',
         'stance_early' => ['market' => 0, 'tariff' => 3, 'federal' => 3],
-        'stance_late'  => ['union' => -3, 'slavery' => -3, 'states' => -3],
+        'stance_late'  => ['expansion' => 1, 'slavery' => -3, 'states' => -3],
         'note' => 'Defended the Tariff of Abominations he had not written.'],
      ]],
 
@@ -170,11 +170,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'jackson_1832', 'name' => 'Andrew Jackson', 'party' => 'Democrat',
         'stance_early' => ['market' => 1, 'tariff' => -1, 'federal' => 0],
-        'stance_late'  => ['union' => -3, 'slavery' => 2, 'states' => 0],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 2, 'states' => 0],
         'note' => 'Killed the Bank, then threatened to hang nullifiers.'],
        ['key' => 'clay_1832', 'name' => 'Henry Clay', 'party' => 'National Republican',
         'stance_early' => ['market' => -1, 'tariff' => 3, 'federal' => 3],
-        'stance_late'  => ['union' => -2, 'slavery' => -1, 'states' => -1],
+        'stance_late'  => ['expansion' => -1, 'slavery' => -1, 'states' => -1],
         'note' => 'Forced the Bank question early and lost on it.'],
      ]],
 
@@ -184,11 +184,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'vanburen_1836', 'name' => 'Martin Van Buren', 'party' => 'Democrat',
         'stance_early' => ['market' => 1, 'tariff' => -2, 'federal' => -2],
-        'stance_late'  => ['union' => -1, 'slavery' => 0, 'states' => -1],
+        'stance_late'  => ['expansion' => 0, 'slavery' => 0, 'states' => -1],
         'note' => 'The party manager who built the machine, inheriting it.'],
        ['key' => 'harrison_1836', 'name' => 'William Henry Harrison', 'party' => 'Whig',
         'stance_early' => ['market' => -1, 'tariff' => 2, 'federal' => 2],
-        'stance_late'  => ['union' => -1, 'slavery' => 0, 'states' => 0],
+        'stance_late'  => ['expansion' => 1, 'slavery' => 0, 'states' => 0],
         'note' => 'Tippecanoe, tried out as a national candidate for the first time.'],
      ]],
 
@@ -198,11 +198,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'harrison_1840', 'name' => 'William Henry Harrison', 'party' => 'Whig',
         'stance_early' => ['market' => -1, 'tariff' => 2, 'federal' => 2],
-        'stance_late'  => ['union' => -1, 'slavery' => 0, 'states' => 0],
+        'stance_late'  => ['expansion' => 1, 'slavery' => 0, 'states' => 0],
         'note' => 'A campaign of image with almost no platform, and it worked.'],
        ['key' => 'vanburen_1840', 'name' => 'Martin Van Buren', 'party' => 'Democrat',
         'stance_early' => ['market' => 1, 'tariff' => -2, 'federal' => -2],
-        'stance_late'  => ['union' => -1, 'slavery' => 0, 'states' => -1],
+        'stance_late'  => ['expansion' => 0, 'slavery' => 0, 'states' => -1],
         'note' => 'Van Ruin, blamed for a depression he did not cause.'],
      ]],
 
@@ -212,11 +212,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'polk_1844', 'name' => 'James K. Polk', 'party' => 'Democrat',
         'stance_early' => ['market' => 2, 'tariff' => -3, 'federal' => -2],
-        'stance_late'  => ['union' => -1, 'slavery' => 2, 'states' => 1],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 2, 'states' => 1],
         'note' => 'The first dark horse: Texas, Oregon, and a lower tariff.'],
        ['key' => 'clay_1844', 'name' => 'Henry Clay', 'party' => 'Whig',
         'stance_early' => ['market' => -1, 'tariff' => 3, 'federal' => 3],
-        'stance_late'  => ['union' => -2, 'slavery' => -1, 'states' => -1],
+        'stance_late'  => ['expansion' => -2, 'slavery' => -1, 'states' => -1],
         'note' => 'Tried to hold North and South together on annexation and satisfied neither.'],
      ]],
 
@@ -226,11 +226,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'taylor_1848', 'name' => 'Zachary Taylor', 'party' => 'Whig',
         'stance_early' => ['market' => 0, 'tariff' => 1, 'federal' => 1],
-        'stance_late'  => ['union' => -2, 'slavery' => 1, 'states' => -1],
+        'stance_late'  => ['expansion' => 1, 'slavery' => 1, 'states' => -1],
         'note' => 'A Louisiana slaveholder who turned out to be an unbending Unionist.'],
        ['key' => 'cass_1848', 'name' => 'Lewis Cass', 'party' => 'Democrat',
         'stance_early' => ['market' => 1, 'tariff' => -2, 'federal' => -2],
-        'stance_late'  => ['union' => -1, 'slavery' => 1, 'states' => 1],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 1, 'states' => 1],
         'note' => 'Invented popular sovereignty as a way of not answering the question.'],
      ]],
 
@@ -240,11 +240,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'pierce_1852', 'name' => 'Franklin Pierce', 'party' => 'Democrat',
         'stance_early' => ['market' => 1, 'tariff' => -2, 'federal' => -2],
-        'stance_late'  => ['union' => -1, 'slavery' => 2, 'states' => 2],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 2, 'states' => 2],
         'note' => 'A northern man of southern principles, nominated on the forty-ninth ballot.'],
        ['key' => 'scott_1852', 'name' => 'Winfield Scott', 'party' => 'Whig',
         'stance_early' => ['market' => -1, 'tariff' => 2, 'federal' => 2],
-        'stance_late'  => ['union' => -2, 'slavery' => -1, 'states' => -1],
+        'stance_late'  => ['expansion' => 0, 'slavery' => -1, 'states' => -1],
         'note' => 'A general the southern Whigs would not run on.'],
      ]],
 
@@ -254,11 +254,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'buchanan_1856', 'name' => 'James Buchanan', 'party' => 'Democrat',
         'stance_early' => ['market' => 1, 'tariff' => -2, 'federal' => -1],
-        'stance_late'  => ['union' => -1, 'slavery' => 3, 'states' => 2],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 3, 'states' => 2],
         'note' => 'Chosen largely because he had been abroad during Kansas-Nebraska.'],
        ['key' => 'fremont_1856', 'name' => 'John C. Fremont', 'party' => 'Republican',
         'stance_early' => ['market' => 0, 'tariff' => 2, 'federal' => 2],
-        'stance_late'  => ['union' => -3, 'slavery' => -3, 'states' => -3],
+        'stance_late'  => ['expansion' => 2, 'slavery' => -3, 'states' => -3],
         'note' => 'Free soil, free men, and no southern ballot access at all.'],
      ]],
 
@@ -268,11 +268,11 @@ function vg_elections() {
      'candidates' => [
        ['key' => 'lincoln_1860', 'name' => 'Abraham Lincoln', 'party' => 'Republican',
         'stance_early' => ['market' => 0, 'tariff' => 3, 'federal' => 3],
-        'stance_late'  => ['union' => -3, 'slavery' => -3, 'states' => -3],
+        'stance_late'  => ['expansion' => 0, 'slavery' => -3, 'states' => -3],
         'note' => 'Not one southern state placed him on the ballot.'],
        ['key' => 'douglas_1860', 'name' => 'Stephen A. Douglas', 'party' => 'Democrat',
         'stance_early' => ['market' => 1, 'tariff' => -1, 'federal' => -1],
-        'stance_late'  => ['union' => -2, 'slavery' => 1, 'states' => 1],
+        'stance_late'  => ['expansion' => 3, 'slavery' => 1, 'states' => 1],
         'note' => 'Campaigned in the South against secession once he knew he had lost.'],
      ]],
   ];
