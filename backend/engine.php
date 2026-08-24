@@ -285,11 +285,8 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
     $players[$seat]['conceded'] = 1;
     $msg = $players[$seat]['player_name'] . ' shut down the presses.';
     engine_log($mysqli, $game, $seat, 'concede', $msg, null, $players[$seat]['player_name']);
-    if (engine_active_seats($players) < 1) {
-      engine_end_game($game, $players, 'all_conceded', $mysqli);
-    } elseif ((int) $game['current_seat'] === $seat) {
-      engine_end_turn($game, $players, $mysqli);
-    }
+    // engine_end_turn ends the game outright if that was the last human.
+    engine_end_turn($game, $players, $mysqli);
     return $msg;
   }
 
@@ -461,10 +458,26 @@ function engine_require_turn($game, $seat) {
   }
 }
 
-/** Seats still playing. */
+/** Seats still playing, bots included. */
 function engine_active_seats($players) {
   $n = 0;
   foreach ($players as $p) if (empty($p['conceded'])) $n++;
+  return $n;
+}
+
+/**
+ * Seats still playing that are actually people.
+ *
+ * The distinction matters: a game whose only human has conceded is over,
+ * however many rival papers are still willing to print. Counting bots as
+ * active let the first live game run thirteen elections after its only
+ * player left.
+ */
+function engine_human_seats($players) {
+  $n = 0;
+  foreach ($players as $p) {
+    if (empty($p['conceded']) && empty($p['is_bot'])) $n++;
+  }
   return $n;
 }
 
@@ -500,6 +513,14 @@ function engine_adjust_stability(&$game, $delta, $mysqli) {
  */
 function engine_end_turn(&$game, &$players, $mysqli) {
   if ($game['status'] !== 'active') return;
+
+  // No people left at the table: the game is over regardless of how many
+  // bots would still happily play on. Checked here rather than in the
+  // concede branch so it covers every path that can empty the table.
+  if (engine_human_seats($players) < 1) {
+    engine_end_game($game, $players, 'all_humans_left', $mysqli);
+    return;
+  }
 
   // Stability collapse is checked here rather than inside the card play,
   // so the acting player always completes the action that caused it.
@@ -729,9 +750,18 @@ function engine_resolve_election(&$game, &$players, $mysqli) {
  * The bot plays through engine_play_card like anybody else, so it can
  * never do something a player could not.
  */
-function engine_run_bots(&$game, &$players, $mysqli, $limit = 40) {
+function engine_run_bots(&$game, &$players, $mysqli, $limit = null) {
+  // One full round of the current space, plus a small margin for the
+  // rollover into the next one. This is a bound on NORMAL play, not just
+  // an anti-infinite-loop backstop: the previous limit of 40 let a single
+  // request play thirteen elections once every seat was a bot.
+  if ($limit === null) {
+    $limit = count($players) * (int) $game['config']['turns_per_space'] + 4;
+  }
   $steps = 0;
   while ($game['status'] === 'active' && $steps < $limit) {
+    // Never play on behalf of a table nobody is sitting at.
+    if (engine_human_seats($players) < 1) break;
     $seat = $game['current_seat'];
     if ($seat === null || !isset($players[$seat])) break;
     if (empty($players[$seat]['is_bot']) || !empty($players[$seat]['conceded'])) break;
@@ -899,6 +929,7 @@ function engine_end_game(&$game, &$players, $reason, $mysqli) {
     'the_union_breaks'  => 'The Union breaks. The presses stop where they stand.',
     'board_exhausted'   => 'The board ran out.',
     'all_conceded'      => 'Every paper has shut down.',
+    'all_humans_left'   => 'The last editor walked away.',
     'no_active_players' => 'Nobody is left to print.',
   ];
 
