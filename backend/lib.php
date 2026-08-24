@@ -33,6 +33,53 @@
  * this reason. Prefer wording without apostrophes in message strings.
  */
 
+/**
+ * PHP 8.1 and later default mysqli to MYSQLI_REPORT_ERROR |
+ * MYSQLI_REPORT_STRICT, which makes every mysqli call THROW instead of
+ * returning false. Every endpoint here is written in the explicit
+ * `if (!$stmt) error(...)` style, so switching reporting off is what makes
+ * those checks actually work — and what turns a missing table into a clean
+ * JSON message rather than an uncaught exception.
+ *
+ * Errors are still never ignored: they are checked at each call site and
+ * reported, and anything that slips past is caught by the handlers below.
+ */
+mysqli_report(MYSQLI_REPORT_OFF);
+
+/**
+ * Nothing may answer a request with an empty body.
+ *
+ * display_errors is off on this host, so before these handlers existed an
+ * uncaught exception reached the browser as a 500 with zero content and no
+ * clue anywhere — which cost a deploy cycle to diagnose the first time it
+ * happened. The message is included because a playtest install needs to be
+ * debuggable from a curl; the file and line are not, because those would
+ * publish server paths to anyone who pokes at an endpoint.
+ */
+set_exception_handler(function (Throwable $e) {
+  if (!headers_sent()) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+  }
+  echo json_encode([
+    'error' => 'Server error: ' . $e->getMessage(),
+    'type'  => get_class($e),
+  ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+});
+
+register_shutdown_function(function () {
+  $err = error_get_last();
+  if (!$err) return;
+  if (!in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR,
+                               E_USER_ERROR], true)) return;
+  if (headers_sent()) return;
+  http_response_code(500);
+  header('Content-Type: application/json; charset=utf-8');
+  echo json_encode([
+    'error' => 'Fatal error: ' . $err['message'],
+  ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+});
+
 require_once __DIR__ . '/dbConfig.php';
 
 /**
