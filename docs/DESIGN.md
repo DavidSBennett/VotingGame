@@ -1,73 +1,243 @@
 # VotingGame — design
 
-Status: **scaffold complete, rules pending.**
+**Working title:** *The Fourth Estate* (placeholder).
+
+Status: rules drafted from the design brief, awaiting confirmation on four
+points. Scaffold deployed-ready; engine implementation begins once those land.
+
+Everything in §1–§7 marked **[stated]** comes from the brief verbatim.
+Everything marked **[inferred]** is my reconstruction of how the stated parts
+fit together — those are the parts to push back on.
 
 ---
 
-## 1. The game
+## 1. The premise
 
-> **AWAITING THE BRIEF.** The `## The game` section of the kickoff brief
-> arrived as the unfilled template — the one-paragraph description of theme,
-> core loop, player count, solo-first vs multiplayer-first, victory condition,
-> and any mechanics already decided was never filled in.
->
-> Nothing in this section is invented in the meantime. The repo name suggests
-> voting is central, but a guess written down here would read as a decision
-> three sessions from now, and design documents that quietly contain fiction
-> are worse than design documents with a hole in them.
->
-> **This section gets written the moment that paragraph lands**, and the
-> engine rules follow from it.
+**[stated]** Players are the **media apparatus** of the early republic —
+partisan newspaper networks, pamphleteers, the men who decided what a
+national argument sounded like. You do not run for office. You lend your
+power to whoever is running, and you take your cut.
 
-### Open questions (answer with the paragraph, or as a follow-up)
+The subject is the *behind-the-scenes* political process of electing a
+president between 1796 and 1860, and the fantasy is manipulating historical
+events to shape elections.
 
-These are the questions the paragraph usually settles. Anything it does not
-cover, I will ask about individually rather than assume.
+**[stated]** **The player with the most wealth at the end wins.** Not the
+player whose candidates won most often — winning elections is instrumental.
+You back a candidate because a president you control makes you rich.
 
-1. **Theme.** What is being voted on, by whom, and in what setting?
-2. **Core loop.** What does one player do on one turn, in one sentence?
-3. **Player count and shape.** Solo-first (with a scripted opponent) or
-   multiplayer-first? Best-at count? Does it need to work at 2?
-4. **Victory.** Points at the end, a race to a threshold, elimination,
-   or a hidden-role style "your side wins"?
-5. **Turn structure.** Sequential seat rotation, simultaneous commit-then-
-   reveal, or phase-based rounds? *(This one has the largest effect on the
-   engine and the polling UI — simultaneous play needs a barrier, sequential
-   does not.)*
-6. **Hidden information.** Is anything secret — hands, roles, sealed votes?
-   Hidden information is cheap to add now and expensive to retrofit, because
-   it sets where the public/private boundary sits in the state blob.
-7. **Game length.** Target minutes per session, and roughly how many rounds.
-8. **Mechanics already decided.** Anything you already know you want, even
-   if it does not fit yet.
+That inversion is the game's best idea, and §8 flags the balance risk it
+carries.
 
-### Working assumptions baked into the scaffold
+---
 
-These are placeholders chosen so the plumbing could be finished and tested.
-Each is a one-file change; none is a commitment.
+## 2. The board
 
-| Assumption | Where it lives | Cost to change |
+**[stated]** Fourteen presidential spaces, played in order. Each space offers
+two historical options for the office: 1796 is Adams and Jefferson, and so on.
+
+**[inferred]** 1796 to 1860 inclusive is *seventeen* elections, so three come
+out. I dropped the three that were not contests — 1804 (Jefferson 162–14),
+1816 (Monroe 183–34) and 1820 (Monroe unopposed) — which keeps both endpoints
+the brief names and leaves fourteen races a newspaper could plausibly have
+swung. The board is in [`backend/history_data.php`](../backend/history_data.php).
+
+| # | Year | Candidates | Historically |
+| --- | --- | --- | --- |
+| 1 | 1796 | John Adams · Thomas Jefferson | Adams, 71–68 |
+| 2 | 1800 | Thomas Jefferson · John Adams | Jefferson, 73–65 |
+| 3 | 1808 | James Madison · C.C. Pinckney | Madison, 122–47 |
+| 4 | 1812 | James Madison · DeWitt Clinton | Madison, 128–89 |
+| 5 | 1824 | John Quincy Adams · Andrew Jackson | Adams, in the House |
+| 6 | 1828 | Andrew Jackson · John Quincy Adams | Jackson, 178–83 |
+| 7 | 1832 | Andrew Jackson · Henry Clay | Jackson, 219–49 |
+| 8 | 1836 | Martin Van Buren · W.H. Harrison | Van Buren, 170–73 |
+| 9 | 1840 | W.H. Harrison · Martin Van Buren | Harrison, 234–60 |
+| 10 | 1844 | James K. Polk · Henry Clay | Polk, 170–105 |
+| 11 | 1848 | Zachary Taylor · Lewis Cass | Taylor, 163–127 |
+| 12 | 1852 | Franklin Pierce · Winfield Scott | Pierce, 254–42 |
+| 13 | 1856 | James Buchanan · John C. Frémont | Buchanan, 174–114 |
+| 14 | 1860 | Abraham Lincoln · Stephen A. Douglas | Lincoln |
+
+Historical outcomes are flavour and confer nothing. The premise is that they
+were contingent.
+
+---
+
+## 3. The three issue tracks
+
+**[stated]** Three tracks determine whether a candidate wins. They begin as
+**Independence from European Markets**, **Tariffs**, and **Federal Power**.
+
+**[inferred]** Each is a slider running −5 to +5, starting at 0 — the current
+centre of national opinion, which is what a press apparatus actually moves.
+
+| Track | −5 | +5 |
 | --- | --- | --- |
-| 2–6 players, no solo mode | `engine_default_config()` | trivial |
-| 8 rounds, fixed | `config.total_rounds` | trivial |
-| Sequential seat rotation | `engine_advance_turn()` | moderate — a simultaneous design replaces it |
-| Highest score wins | `engine_score_player()` | trivial |
-| Everything visible except an empty `private_state` | `engine_public_state()` | trivial to populate |
+| Independence from European markets | Bound to Atlantic commerce | Economic self-sufficiency |
+| Tariffs | Revenue only | High protection |
+| Federal Power | Strict construction | Broad national authority |
+
+**[stated]** When a transition card is played the issues shift: Independence →
+**Nullification**, Tariffs → **Slavery**, Federal Power → **States Rights**.
+
+**[inferred]** Each candidate carries a stance on all three tracks, on the
+same −3…+3 scale, in both the early and the late regime — a candidate has to
+be resolvable under whichever regime is live when their election comes up.
+Stances are in `history_data.php` and are a first draft written to be argued
+with.
 
 ---
 
-## 2. Architecture (locked — proven on this host)
+## 4. Cards
 
-### Server-authoritative, client presentation-only
+**[stated]** Cards in hand are **historical forces** the players navigate.
+Each card can be played in one of two ways:
 
-`backend/engine.php` holds every rule as pure functions over the `$game` and
-`$players` arrays. Endpoints do no rules work: they authenticate, lock, call
-the engine, save, commit, bump. Anything the browser computes is an advisory
-mirror — when the two disagree, the client is stale and the server is right.
+**A. Sway.** Spend money to push support toward one of the two candidates on
+the current space. This generates **control points** on that candidate.
 
-### The mutation contract
+**B. Finance.** Play the card for money instead. **If you control the
+president elected last time, you get more.**
 
-Every mutating endpoint, without exception:
+**[inferred]** Sway also moves the issue tracks — a card is a historical force,
+and forces move opinion. This is what makes the two uses a real dilemma rather
+than a pure rate comparison: swaying spends money *and* shifts the ground
+every future election is fought on, including in directions that help your
+rivals. A card would carry:
+
+```
+name, era, cost to play for sway, money if played for finance,
+track deltas applied on sway, stability delta
+```
+
+**[open]** The card list itself is not written yet — it waits on §9 Q1,
+because whether sway moves tracks or only accumulates control points changes
+what a card needs to say.
+
+---
+
+## 5. Elections, control, and income
+
+This is the part the brief specifies least and the engine depends on most.
+**[inferred]**, and §9 Q1 asks about it directly.
+
+My reading, which makes both stated mechanics load-bearing rather than
+redundant:
+
+1. **The issue tracks decide which candidate wins.** Compare each candidate's
+   three stances against where the three tracks currently sit; whoever is
+   closer to the national mood takes the office.
+2. **Control points decide which *player* owns that president.** The player
+   with the most control points on the winning candidate controls the
+   presidency until the next election.
+3. **[stated]** Controlling the sitting president means your Finance plays pay
+   more, for the whole of the next era.
+4. Control points on the losing candidate are wasted. That is the risk: you
+   can spend heavily on a candidate and have the country move out from under
+   them before election day.
+
+The alternative reading — control points decide the election outright, issues
+only modify — is a different and also playable game. It makes the press
+*directly* decisive rather than indirectly so, and it makes the issue tracks a
+tiebreaker rather than the board's centre of gravity. §9 Q1.
+
+---
+
+## 6. The transition and the endgame
+
+**[stated]** Three key cards sit in the deck. Playing one transitions the
+United States toward the endgame, shifting the issues to Nullification,
+Slavery and States Rights.
+
+**[open]** Three cards, one transition — or three cards, three staggered
+transitions? §9 Q2. The staggered reading is the more interesting game (you
+choose *which* crisis arrives first, and when), and it explains the number
+three without needing them to be redundant copies.
+
+**[stated]** The game ends when the board is played out, **or** when the
+nation's stability track decays too far.
+
+**[inferred]** Stability starts at 10 and falls when the press inflames the
+country: swaying hard on a track already at an extreme, and — after the
+transition — any play on the Slavery track. At zero the Union breaks, the game
+ends immediately, and wealth is counted where it stands. There is no bonus for
+causing it and no penalty for it happening; you simply might not have banked
+your winnings yet.
+
+**[open]** What exactly decays stability is unspecified in the brief. The
+above is my proposal, and it is the knob most likely to need a simulation
+before it is right.
+
+---
+
+## 7. A turn
+
+**[inferred]** Sequential seat rotation.
+
+1. Play one card from hand — Sway or Finance.
+2. Resolve its effects (money, control points, track movement, stability).
+3. Draw back up to hand size.
+4. When every player has played into the current space, the election resolves,
+   control is awarded, and the board advances one space.
+
+---
+
+## 8. Design risks, logged now
+
+**Money is both the resource and the score.** Swaying spends victory points to
+buy an income stream. That is a genuinely elegant tension — and it is exactly
+the kind of tension that collapses if mistuned. If the control bonus is too
+small, the dominant strategy is to never sway at all, let others fight over
+the presidency, and bank every card as Finance. The control bonus has to
+comfortably exceed the cost of winning control, over a realistic number of
+turns, or the game has a boring solved line.
+
+**This is the first thing to simulate**, before any of it is tuned by feel.
+
+**Two of the three late tracks may be the same axis.** Nullification (may a
+state defy the nation) and States Rights (is sovereignty state or national)
+measure nearly the same thing, so after the transition the board risks having
+two tracks that always move together — which flattens exactly the part of the
+game the whole arc builds toward. §9 Q3 offers two ways out.
+
+**Fourteen spaces × N players may be short or long.** Unknown until played;
+the round count is config, not code.
+
+---
+
+## 9. Open questions
+
+**Q1. How does an election resolve?** Do the issue tracks pick the winning
+candidate while control points decide which player owns them (§5), or do
+control points pick the winner with the issue tracks as a modifier?
+
+**Q2. The three transition cards** — does each one shift a single issue
+(staggered crises, player-chosen order), or does any one of them shift all
+three at once?
+
+**Q3. The late-track overlap** — Nullification and States Rights are close to
+the same axis. Split them (Nullification becomes Union-vs-Secession as an
+outcome, States Rights stays about federal authority over banks, improvements
+and territories), or re-map one of them entirely?
+
+**Q4. Player count, and is there a solo mode?** Not stated. Affects whether
+the engine needs a scripted opponent from the start.
+
+**Q5. The subdomain.** Still unanswered from the last round, and it blocks the
+first deploy.
+
+---
+
+## 10. Architecture (locked — proven on this host)
+
+Server-authoritative. `backend/engine.php` holds every rule as pure functions
+over `$game`/`$players`; endpoints authenticate, lock, call the engine, save,
+commit, bump. The client is presentation-only — anything the browser computes
+is an advisory mirror.
+
+**The mutation contract**, followed by every mutating endpoint without
+exception:
 
 ```
 authenticate()                       per-seat player_token
@@ -77,141 +247,68 @@ load_players()
 engine_*()                           mutates the arrays in place
 save_game() + save_player()
 commit()
-bump_state_version()                 AFTER the commit, so no poller
+bump_state_version()                 AFTER the commit, so no 1.5s poller
                                      ever sees a half-written state
 ```
 
-`playAction.php` is the one action endpoint; the engine dispatches on an
-action key. One endpoint rather than one per move, because a second place to
-enforce a rule is a second place for it to drift.
+**State as JSON in TEXT columns.** Columns exist only for what must be
+indexed, sorted or locked on. Everything else — tracks, control points, hands,
+the deck — lives in `vg_games.state` and the players' `public_state` /
+`private_state`. This is what lets a rules change be a one-file diff. With
+migrations run by hand, keeping rules out of the schema is the whole game.
 
-### State as JSON in TEXT columns
+**Hidden information.** `engine_public_state()` is the boundary; exactly one
+seat's `private_state` is ever serialised. Hands are private — publish counts,
+never contents.
 
-Columns exist only for what must be **indexed, sorted, or locked on**
-(status, phase, round, current seat, state_version). Everything else lives in
-`vg_games.state` and the players' `public_state` / `private_state`. This is
-the decision that lets rules change every playtest without a migration —
-and, with iteration this fast, migrations are the main source of "new code
-against an old schema" outages.
+**Realtime.** 1.5 s polling with `?since=<state_version>`; unchanged state
+answers `{ changed: false }` without building anything. No websockets on
+shared hosting.
 
-### Hidden information
+**Auth.** Standalone per-seat `player_token` in localStorage, plus a
+4-character join code. No accounts.
 
-`engine_public_state()` is the boundary. Exactly one seat's `private_state`
-is ever serialised: the asking seat's. Secrets must never be copied into the
-public half, not even temporarily for the UI. Publish *counts* of hidden
-things (hand size, votes cast) instead of contents.
+**Event log from day one.** Every action, with seat, type, message, JSON
+detail, round, phase. The in-game feed and the export read the same rows.
 
-### Realtime
-
-1.5 s polling of full public state, with `?since=<state_version>`: when
-nothing changed the server answers `{ changed: false }` without building any
-state. No websockets — shared hosting. Polling pauses on a hidden tab and
-fires immediately on return.
-
-### Auth
-
-Standalone per-seat `player_token`, minted at create/join, stored in
-localStorage. No accounts, no sessions, nothing shared with any other site on
-the domain. A 4-character join code (alphabet excludes `0/O/1/I/L`) lets a
-player at the same table join from their own phone.
-
-### Event log from day one
-
-Every action writes to `vg_event_log` with seat, type, pre-rendered message,
-JSON detail, round, phase, timestamp. The in-game feed and the export read the
-same rows, so what a player saw during the game and what I read afterwards are
-the same record. Exports and all playtest analysis depend on this.
-
----
-
-## 3. Data model
+### Data model
 
 | Table | Holds |
 | --- | --- |
-| `vg_games` | one row per playthrough; `state` JSON is the shared board |
-| `vg_game_players` | one row per seat; `player_token`, public + private state |
+| `vg_games` | one row per playthrough; `state` JSON is the board |
+| `vg_game_players` | one row per seat; token, public + private state |
 | `vg_event_log` | every action, forever |
 | `vg_playtest_reports` | notes + 1–5 rating + a snapshot of the position |
 | `vg_scores` | the lobby board; survives clearing finished games |
 
-Migrations are numbered `database/NN_description.sql` and run **by hand in
-phpMyAdmin**. `admin_schemaCheck.php` reports which tables and columns are
-missing and names the file to run. **Every migration adds its expectations to
-that file in the same commit** — that list is the migration checklist.
+Migrations are numbered `database/NN_description.sql`, run by hand in
+phpMyAdmin. `admin_schemaCheck.php` names what has not been run, and **every
+migration adds its expectations to that file in the same commit**.
 
----
+### Deploy
 
-## 4. Endpoints
+`gh workflow run deploy.yml`, then `gh run watch`, then confirm headSha
+matches HEAD. Push-triggered runs are unreliable here, so a green push proves
+nothing. The blocking `php -l` gate over every backend file is the only PHP
+syntax check in the project — there is no local runtime. rsync runs with no
+`--delete` and excludes `dbConfig.php`.
 
-| File | Method | Purpose |
-| --- | --- | --- |
-| `createGame.php` | POST | open a table, caller takes seat 0 |
-| `joinGame.php` | POST | take the next free seat by join code |
-| `startGame.php` | POST | host deals the opening position |
-| `getState.php` | GET | the poll endpoint; public state + recent log |
-| `playAction.php` | POST | every rules-affecting move |
-| `listOpenGames.php` | GET | lobby list |
-| `exportGame.php` | GET | one playthrough, verbatim JSON |
-| `submitReport.php` | POST | playtest note + rating + snapshot |
-| `highScores.php` | GET | lobby board |
-| `admin_schemaCheck.php` | GET | which migrations have run (not gated) |
-| `admin_exportAll.php` | GET | the entire playthrough database |
-| `admin_clearFinished.php` | POST | purge finished games (scores survive) |
-| `_opcache_reset.php` | GET | token-guarded OPcache flush after deploy |
+### Conventions
 
-Admin endpoints need `ADMIN_TOKEN`, defined in the server-only `dbConfig.php`.
-Absent that constant they stay closed rather than open.
-
----
-
-## 5. Deploy
-
-`gh workflow run deploy.yml`, then `gh run watch`, then confirm the run's
-headSha matches HEAD. Push-triggered runs are unreliable on this host, so a
-green push is not evidence of a deploy.
-
-The `php -l` gate over every `backend/*.php` runs before anything is uploaded
-and fails the build on a parse error. There is no local PHP runtime, so this
-gate is the only thing between a stray apostrophe in a single-quoted string
-and a 500 on every page. It stays blocking.
-
-rsync runs with **no `--delete`** and excludes `dbConfig.php` and `uploads/`,
-so a deploy can never remove a server-only file. The workflow then curls
-`_opcache_reset.php`, because LiteSpeed serves new static assets immediately
-but will happily keep running stale compiled PHP.
-
----
-
-## 6. Playtest loop
-
-design → implement → deploy → play → export → review → repeat.
-
-- **Download playthrough** on the game screen writes the verbatim JSON.
-- **Playtest note** files a rating and notes with a snapshot of the position
-  at filing time — a complaint about the endgame is unreadable six games
-  later without the board that produced it.
-- Exports shared with me get archived to `docs/playtests/` and reviewed in a
-  table: VP, turns, endings, key lines.
-- **Balance questions get a simulation before a rule change**: a Python
-  playout harness of the current rules, calibrated against real exports,
-  then the counterfactual.
-
----
-
-## 7. Conventions
-
-- One commit per design decision, with the evidence (sim result or playtest
-  export) in the message.
+- One commit per design decision, with the evidence in the message.
+- Balance questions get a simulation before a rule change: a Python playout
+  harness of the current rules, calibrated against real exports, then the
+  counterfactual.
+- Tailwind: literal class strings only.
 - PHP single-quoted strings: escape apostrophes, or word around them.
-- Tailwind: **literal class strings only**. `bg-${color}-500` is absent from
-  the built CSS and renders unstyled.
-- Multi-file source edits go through an assert-guarded Python script run with
-  `py -X utf8`, never a bash heredoc.
+- Multi-file edits: assert-guarded Python via `py -X utf8`, never a heredoc.
 
 ---
 
-## 8. Changelog
+## 11. Changelog
 
 | Date | Decision | Evidence |
 | --- | --- | --- |
 | 2026-08-22 | Scaffold: schema, engine skeleton, endpoints, lobby, deploy | — |
+| 2026-08-24 | Board fixed at 14 spaces by cutting 1804, 1816, 1820 | The three uncontested races; keeps 1796 and 1860 |
+| 2026-08-24 | Rules drafted from the brief; four questions raised | — |
