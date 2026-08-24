@@ -13,6 +13,7 @@ export default function Lobby({ onSeated }) {
     () => localStorage.getItem('votinggame.name') || ''
   );
   const [joinCode, setJoinCode] = useState('');
+  const [rivals, setRivals] = useState(1);
   const [games, setGames] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -54,7 +55,11 @@ export default function Lobby({ onSeated }) {
     setBusy(true);
     setError(null);
     try {
-      const data = await createGame({ player_name: playerName.trim() });
+      const data = await createGame({
+        player_name: playerName.trim(),
+        max_players: 1,
+        bots: rivals,
+      });
       onSeated({
         game_id: data.game_id,
         join_code: data.join_code,
@@ -95,9 +100,12 @@ export default function Lobby({ onSeated }) {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-100">VotingGame</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-100">
+          The Fourth Estate
+        </h1>
         <p className="mt-1 text-sm text-slate-400">
-          Scaffold build — the rules engine is a stub until the design lands.
+          You are a partisan press, 1796 to 1860. Back the candidates who make you rich.
+          Fourteen elections; the richest paper wins.
         </p>
       </header>
 
@@ -119,6 +127,31 @@ export default function Lobby({ onSeated }) {
           placeholder="Name at the table"
           className="mt-1 w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-amber-500"
         />
+
+        <div className="mt-4">
+          <span className="block text-xs uppercase tracking-wide text-slate-400">
+            Rival papers
+          </span>
+          <div className="mt-1 flex gap-2">
+            {[1, 2, 3, 4].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setRivals(n)}
+                className={
+                  n === rivals
+                    ? 'h-9 w-9 rounded border border-amber-500 bg-amber-600 font-mono text-slate-950'
+                    : 'h-9 w-9 rounded border border-slate-600 bg-slate-900 font-mono text-slate-300 hover:border-amber-500'
+                }
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Solo play against computer-run papers. One rival is the balanced setting.
+          </p>
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
