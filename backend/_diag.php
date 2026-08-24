@@ -139,4 +139,38 @@ foreach ($pairs as $label => $names) {
   }
 }
 
+// Can the MyDatabase wrapper give us working credentials? Reports only
+// whether the resulting connection opens, never the credentials.
+if (class_exists('MyDatabase')) {
+  try {
+    $rc = new ReflectionClass('MyDatabase');
+    $vals = [];
+    $defaults = $rc->getDefaultProperties();
+    foreach (['host', 'user', 'pass', 'dbname'] as $w) {
+      if (!$rc->hasProperty($w)) { $vals = null; break; }
+      if (isset($defaults[$w]) && $defaults[$w] !== '') { $vals[$w] = $defaults[$w]; continue; }
+      $inst = isset($inst) ? $inst : $rc->newInstance();
+      $p = $rc->getProperty($w);
+      $p->setAccessible(true);
+      $vals[$w] = $p->getValue($inst);
+    }
+    if ($vals && count($vals) === 4) {
+      $probe = @new mysqli($vals['host'], $vals['user'], $vals['pass'], $vals['dbname']);
+      $report['connect_via_wrapper'] = $probe->connect_errno
+        ? ('failed: ' . $probe->connect_error) : 'ok';
+      if (!$probe->connect_errno) {
+        $r = $probe->query('SELECT DATABASE() AS db');
+        $rw = $r ? $r->fetch_assoc() : null;
+        $report['database'] = $rw ? $rw['db'] : null;
+        $t = $probe->query("SHOW TABLES LIKE 'vg_%'");
+        $report['vg_tables_present'] = $t ? $t->num_rows : null;
+      }
+    } else {
+      $report['connect_via_wrapper'] = 'wrapper did not expose the expected properties';
+    }
+  } catch (Throwable $e) {
+    $report['connect_via_wrapper'] = 'reflection failed: ' . $e->getMessage();
+  }
+}
+
 echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

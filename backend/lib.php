@@ -36,40 +36,124 @@
 require_once __DIR__ . '/dbConfig.php';
 
 /**
- * dbConfig.php may hand us a ready $mysqli, or it may only define the
- * DB_* constants and expose the connection some other way (the sibling
- * install defines a PDO wrapper, for instance). Take the connection if it
- * is offered; otherwise build one from the constants.
+ * Obtain a mysqli connection from whatever shape the server-only config
+ * file happens to take.
  *
- * Doing this here means every endpoint gets a working mysqli regardless of
- * which shape the server-only config file happens to take, and the
- * credentials still never appear in this repository.
+ * On this host dbConfig.php declares a PDO wrapper class (MyDatabase)
+ * holding the credentials as properties — it defines no constants and
+ * leaves no $mysqli. Other installs on the same account use SECRET_DB_*
+ * constants in a config.secret.php instead. Rather than require the
+ * credentials be re-typed into a second file, where they would eventually
+ * drift out of sync with the first, we accept every shape:
+ *
+ *   1. a $mysqli that dbConfig.php already built
+ *   2. DB_HOST / DB_USER / DB_PASS / DB_NAME constants
+ *   3. SECRET_DB_* constants
+ *   4. the credentials inside MyDatabase, read by reflection
+ *
+ * The engine speaks mysqli throughout (FOR UPDATE row locks, transactional
+ * single-writer turns), so we build a mysqli rather than borrow the PDO.
+ *
+ * $VG_DB_SOURCE records which step won, so _diag.php can report how this
+ * install is actually connecting instead of leaving it to folklore.
  */
-if (!isset($mysqli) || !($mysqli instanceof mysqli)) {
-  if (defined('DB_HOST') && defined('DB_NAME') && defined('DB_USER') && defined('DB_PASS')) {
-    $mysqli = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-    if ($mysqli->connect_errno) {
-      http_response_code(500);
-      header('Content-Type: application/json');
-      echo json_encode([
-        'error' => 'Database connection failed: ' . $mysqli->connect_error,
-      ]);
-      exit;
+
+$VG_DB_SOURCE = null;
+
+if (isset($mysqli) && $mysqli instanceof mysqli && !$mysqli->connect_errno) {
+  $VG_DB_SOURCE = 'dbConfig.php $mysqli';
+}
+
+if ($VG_DB_SOURCE === null) {
+  foreach ([
+    ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME'],
+    ['SECRET_DB_HOST', 'SECRET_DB_USER', 'SECRET_DB_PASS', 'SECRET_DB_NAME'],
+  ] as $names) {
+    $complete = true;
+    foreach ($names as $n) { if (!defined($n)) { $complete = false; break; } }
+    if (!$complete) continue;
+    $candidate = @new mysqli(constant($names[0]), constant($names[1]),
+                             constant($names[2]), constant($names[3]));
+    if (!$candidate->connect_errno) {
+      $mysqli = $candidate;
+      $VG_DB_SOURCE = $names[0] . ' constants';
+      break;
     }
-  } else {
-    http_response_code(500);
-    header('Content-Type: application/json');
-    echo json_encode([
-      'error' => 'Database connection unavailable: dbConfig.php defined no $mysqli '
-               . 'and no DB_HOST/DB_NAME/DB_USER/DB_PASS constants. '
-               . 'See _diag.php for what it did define.',
-    ]);
-    exit;
   }
+}
+
+/**
+ * Pull host / user / pass / dbname out of the MyDatabase wrapper.
+ *
+ * Tries the declared defaults first, and only instantiates the class if the
+ * credentials are assigned in its constructor instead. Returns null rather
+ * than throwing if the class is not the shape we expect, so the caller can
+ * fall through to a clean error.
+ *
+ * These values are used to open a connection and are never logged, echoed,
+ * or returned in any response.
+ */
+function vg_credentials_from_wrapper($class = 'MyDatabase') {
+  if (!class_exists($class)) return null;
+  $wanted = ['host', 'user', 'pass', 'dbname'];
+  try {
+    $rc = new ReflectionClass($class);
+    foreach ($wanted as $w) {
+      if (!$rc->hasProperty($w)) return null;
+    }
+
+    $out = [];
+    $defaults = $rc->getDefaultProperties();
+    foreach ($wanted as $w) {
+      if (isset($defaults[$w]) && $defaults[$w] !== '') $out[$w] = $defaults[$w];
+    }
+    if (count($out) === count($wanted)) return $out;
+
+    // Assigned in the constructor rather than declared: build one and read.
+    $instance = $rc->newInstance();
+    $out = [];
+    foreach ($wanted as $w) {
+      $p = $rc->getProperty($w);
+      $p->setAccessible(true);
+      $value = $p->getValue($instance);
+      if ($value === null || $value === '') return null;
+      $out[$w] = $value;
+    }
+    return $out;
+  } catch (Throwable $e) {
+    return null;
+  }
+}
+
+if ($VG_DB_SOURCE === null) {
+  $creds = vg_credentials_from_wrapper();
+  if ($creds) {
+    $candidate = @new mysqli($creds['host'], $creds['user'], $creds['pass'], $creds['dbname']);
+    if (!$candidate->connect_errno) {
+      $mysqli = $candidate;
+      $VG_DB_SOURCE = 'MyDatabase wrapper';
+    } else {
+      $VG_DB_CONNECT_ERROR = $candidate->connect_error;
+    }
+  }
+}
+
+if ($VG_DB_SOURCE === null) {
+  http_response_code(500);
+  header('Content-Type: application/json');
+  echo json_encode([
+    'error' => 'No database connection could be established. dbConfig.php left no '
+             . '$mysqli, defined no DB_* or SECRET_DB_* constants, and no usable '
+             . 'MyDatabase wrapper was found'
+             . (isset($VG_DB_CONNECT_ERROR) ? ' (' . $VG_DB_CONNECT_ERROR . ')' : '')
+             . '. See _diag.php for what this install actually declares.',
+  ]);
+  exit;
 }
 
 // Card flavour and candidate names carry em dashes and accents.
 @$mysqli->set_charset('utf8mb4');
+
 
 // ---------------------------------------------------------------------
 // Response helpers
