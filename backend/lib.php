@@ -33,14 +33,43 @@
  * this reason. Prefer wording without apostrophes in message strings.
  */
 
-require_once __DIR__ . '/dbConfig.php';   // provides $mysqli
+require_once __DIR__ . '/dbConfig.php';
 
+/**
+ * dbConfig.php may hand us a ready $mysqli, or it may only define the
+ * DB_* constants and expose the connection some other way (the sibling
+ * install defines a PDO wrapper, for instance). Take the connection if it
+ * is offered; otherwise build one from the constants.
+ *
+ * Doing this here means every endpoint gets a working mysqli regardless of
+ * which shape the server-only config file happens to take, and the
+ * credentials still never appear in this repository.
+ */
 if (!isset($mysqli) || !($mysqli instanceof mysqli)) {
-  http_response_code(500);
-  header('Content-Type: application/json');
-  echo json_encode(['error' => 'Database connection unavailable']);
-  exit;
+  if (defined('DB_HOST') && defined('DB_NAME') && defined('DB_USER') && defined('DB_PASS')) {
+    $mysqli = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    if ($mysqli->connect_errno) {
+      http_response_code(500);
+      header('Content-Type: application/json');
+      echo json_encode([
+        'error' => 'Database connection failed: ' . $mysqli->connect_error,
+      ]);
+      exit;
+    }
+  } else {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode([
+      'error' => 'Database connection unavailable: dbConfig.php defined no $mysqli '
+               . 'and no DB_HOST/DB_NAME/DB_USER/DB_PASS constants. '
+               . 'See _diag.php for what it did define.',
+    ]);
+    exit;
+  }
 }
+
+// Card flavour and candidate names carry em dashes and accents.
+@$mysqli->set_charset('utf8mb4');
 
 // ---------------------------------------------------------------------
 // Response helpers
