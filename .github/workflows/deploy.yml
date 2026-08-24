@@ -13,7 +13,7 @@ on:
 env:
   # The subdomain this install serves. Used for the rsync target path and
   # the post-deploy OPcache flush. Change in ONE place.
-  SUBDOMAIN: SUBDOMAIN.thehistorians.org
+  SUBDOMAIN: voting.thehistorians.org
   OPCACHE_TOKEN: 7c4f1a9e2b6d43f0a8e5c1d7b93042fe
 
 jobs:
