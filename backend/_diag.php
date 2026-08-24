@@ -2,17 +2,20 @@
 /**
  * _diag.php — what does this install actually have?
  *
- * Token-guarded, and reports only PRESENCE, never values: whether
- * dbConfig.php exists, which DB_* constants it defines, whether it left a
- * $mysqli behind, and whether a connection can be opened at all. No
- * credential is ever printed, and the token is the same one the deploy
- * uses for the OPcache flush.
+ * Token-guarded, and reports only SHAPE, never values: whether
+ * dbConfig.php exists, how big it is, when it changed, how many define()
+ * calls it contains, whether it left a $mysqli behind, and whether a
+ * connection can be opened. No credential is ever printed, no line of the
+ * file is ever echoed, and the token is the same one the deploy uses for
+ * the OPcache flush.
  *
  *   https://voting.thehistorians.org/_diag.php?token=<TOKEN>
  *
- * Written after the first deploy came back "Database connection
- * unavailable" and the only way to tell WHY was to guess. One curl now
- * answers it instead.
+ * The size / modified / define_calls fields exist to separate the three
+ * ways this can look identical from outside:
+ *   - the file is genuinely empty            -> size 0, old mtime
+ *   - it was edited but is not taking effect -> defines > 0, recent mtime
+ *   - the edit landed on a DIFFERENT copy    -> see other_dbconfig_files
  */
 
 $EXPECTED_TOKEN = '7c4f1a9e2b6d43f0a8e5c1d7b93042fe';
@@ -26,19 +29,58 @@ if (!hash_equals($EXPECTED_TOKEN, $token)) {
 
 header('Content-Type: application/json');
 
+/**
+ * Shape of a config file, WITHOUT revealing its contents. Counts only.
+ */
+function diag_shape($path) {
+  if (!file_exists($path)) return ['exists' => false];
+  $size = filesize($path);
+  $raw = @file_get_contents($path);
+  $out = [
+    'exists'   => true,
+    'readable' => is_readable($path),
+    'size'     => $size,
+    'modified' => @gmdate('c', filemtime($path)),
+    'lines'    => ($raw === false) ? null : substr_count($raw, "\n") + 1,
+  ];
+  if ($raw !== false) {
+    $out['starts_with_php_tag'] = (substr(ltrim($raw), 0, 5) === '<?php');
+    $out['define_calls']  = substr_count($raw, 'define(');
+    $out['mentions_mysqli'] = substr_count($raw, 'mysqli');
+    $out['mentions_DB_'] = substr_count($raw, 'DB_');
+    // Which config KEYS appear, by name only. Never the values.
+    $keys = [];
+    foreach (['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS', 'ADMIN_TOKEN'] as $k) {
+      if (strpos($raw, $k) !== false) $keys[] = $k;
+    }
+    $out['key_names_present'] = $keys;
+  }
+  return $out;
+}
+
 $configPath = __DIR__ . '/dbConfig.php';
+
 $report = [
   'ok'               => true,
   'php_version'      => PHP_VERSION,
   'docroot'          => __DIR__,
-  'dbconfig_exists'  => file_exists($configPath),
-  'dbconfig_readable'=> is_readable($configPath),
   'mysqli_extension' => class_exists('mysqli'),
+  'dbconfig'         => diag_shape($configPath),
 ];
 
-if ($report['dbconfig_exists'] && $report['dbconfig_readable']) {
-  // Include inside a try so a fatal in the config file becomes a report
-  // rather than a blank 500.
+// Other copies elsewhere in the account, so an edit that landed on the
+// wrong one is obvious. PATHS AND SHAPE ONLY.
+$others = [];
+$parent = dirname(__DIR__);
+foreach (array_merge([$parent . '/dbConfig.php'],
+                     (array) glob($parent . '/*/dbConfig.php')) as $candidate) {
+  if ($candidate === $configPath) continue;
+  if (!file_exists($candidate)) continue;
+  $others[$candidate] = diag_shape($candidate);
+}
+$report['other_dbconfig_files'] = $others ? $others : 'none found';
+
+if (!empty($report['dbconfig']['exists']) && !empty($report['dbconfig']['readable'])) {
   try {
     require_once $configPath;
     $report['included'] = true;
@@ -47,22 +89,20 @@ if ($report['dbconfig_exists'] && $report['dbconfig_readable']) {
     $report['include_error'] = $e->getMessage();
   }
 
-  // PRESENCE ONLY — never the values.
   foreach (['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS', 'ADMIN_TOKEN'] as $c) {
-    $report['defines'][$c] = defined($c);
+    $report['defined_after_include'][$c] = defined($c);
   }
 
   $report['left_a_mysqli'] = isset($mysqli) && ($mysqli instanceof mysqli);
 
-  // Which other variables did it leave behind? Names only, and the type,
-  // so a differently-named handle is obvious at a glance.
   $interesting = [];
   foreach (get_defined_vars() as $name => $value) {
-    if (in_array($name, ['report', 'configPath', 'token', 'EXPECTED_TOKEN',
-                         'c', 'interesting', 'name', 'value', 'e'], true)) continue;
+    if (in_array($name, ['report', 'configPath', 'token', 'EXPECTED_TOKEN', 'others',
+                         'parent', 'candidate', 'c', 'interesting', 'name', 'value',
+                         'e', 'probe', 'res', 'row'], true)) continue;
     $interesting[$name] = is_object($value) ? get_class($value) : gettype($value);
   }
-  $report['variables_left_by_dbconfig'] = $interesting;
+  $report['variables_left_by_dbconfig'] = $interesting ? $interesting : 'none';
 
   if (!$report['left_a_mysqli'] && defined('DB_HOST') && defined('DB_NAME')
       && defined('DB_USER') && defined('DB_PASS')) {
