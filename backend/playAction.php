@@ -4,8 +4,11 @@
  * a player makes arrives here and is dispatched by the engine.
  *
  * Body: { player_token, action, params: { … } }
- *   cash        params { card }
- *   print       params { card, side: 'nation' | 'states' }
+ *   commit      params { plays: [{ card, action: 'cash' | 'print',
+ *                                      side?: 'nation' | 'states' }],
+ *                        reserve?: card }
+ *               Sealed until every paper has committed; the last one in
+ *               resolves the round. Committing again before then replaces it.
  *   concede     params {}
  *
  * Response: { ok, message, state_version }
@@ -14,9 +17,8 @@
  * to validate turn ownership and legality centrally: a second place to
  * enforce a rule is a second place for it to drift.
  *
- * Rival papers play inside the SAME transaction, so a solo player gets
- * the whole round back in one response rather than watching seats tick
- * over on the poll.
+ * Rival papers commit inside the SAME transaction, so a solo player's
+ * commitment resolves the round in one response.
  */
 require_once __DIR__ . '/engine.php';
 

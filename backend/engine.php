@@ -16,31 +16,34 @@
  * ---------------------------------------------------------------------
  * THE RULES IN ONE PLACE  (docs/DESIGN.md has the reasoning)
  *
- * You are a newspaper, 1796 to 1860. Fourteen presidential races, each a
- * Nation candidate against a States candidate. Most MONEY at the end wins.
+ * You are a newspaper, 1796 to 1860. Fourteen elections, one ROUND each,
+ * every race a Nation candidate against a States candidate. Most MONEY at
+ * the end wins.
  *
- * One track, Nation (+5) to States (-5), back to 0 at every election.
+ * Each round, every paper commits BLIND, all at once:
  *
- * Each turn you play one card, one of two ways, then draw back to five:
+ *   Choose any number of cards from your hand (at least one). For each,
+ *   choose CASH (take its value, +patron_bonus if you are the Patron) or
+ *   PRINT (its push goes on the track, and its value is staked as
+ *   influence on the candidate you name). Mark one committed card to
+ *   reserve.
  *
- *   CASH    take the card value, +patron_bonus if you are the Patron.
- *   PRINT   move the track by the card push (its direction is fixed by
- *           history, not by you), and stake the card value on EITHER
- *           candidate.
+ * When every paper has committed, all reveal:
  *
- * When every seat still playing has had turns_per_space turns:
- *
- *   1. The side the track leans toward wins. At 0, the bigger total stake
+ *   1. Every printed push is added up on a track from States -5 to Nation
+ *      +5. The side it leans toward wins. At 0, the bigger total stake
  *      wins; failing that, whoever won in history.
  *   2. Stakes on the winner pay back payout_num/payout_den times. Stakes on
  *      the loser are gone.
- *   3. The single largest stake on the winner makes that seat the Patron
- *      until the next election. A tie leaves nobody Patron.
+ *   3. The largest stake on the winner makes that paper the PATRON until
+ *      the next election. A tie leaves nobody Patron.
+ *   4. Every paper except the new Patron takes its reserved card back into
+ *      hand. Every other committed card is spent.
+ *   5. Everyone draws draw_per_round cards.
  *
- * Cards are dated. Each campaign shuffles in the events of the years since
+ * Cards are dated: each round shuffles in the events of the years since
  * the last one, so the deck opens on the Revolution and reaches Kansas in
- * the 1850s; nothing turns up before it happened. After 1860 the richest
- * paper wins.
+ * the 1850s. After 1860 the richest paper wins.
  * ---------------------------------------------------------------------
  */
 
@@ -52,7 +55,7 @@ require_once __DIR__ . '/game_data.php';
  * carries another version cannot be played by this engine; it is shown as
  * ended instead (see engine_is_current).
  */
-define('ENGINE_STATE_VERSION', 4);
+define('ENGINE_STATE_VERSION', 5);
 
 // ---------------------------------------------------------------------
 // Configuration
@@ -70,16 +73,21 @@ function engine_default_config() {
   return [
     'engine_version'  => ENGINE_STATE_VERSION,
     'total_spaces'    => 14,
-    'turns_per_space' => 2,
-    'hand_size'       => 5,
+    'start_hand'      => 5,
+    'draw_per_round'  => 2,
+    'hand_limit'      => 10,
     'start_money'     => 12,
+    // Paid on EACH card the Patron cashes, the round after winning it. The
+    // lever on cash against print: at 0 a pure casher beat the bot 89%, at
+    // 3 it won 15%; at 2 it wins ~40%.
     'patron_bonus'    => 2,
     // Winning stakes pay stake * payout_num / payout_den, rounded down per
-    // seat. A fraction rather than 1.5 so the money stays integer.
+    // paper. A fraction rather than 1.5 so the money stays integer.
     'payout_num'      => 3,
     'payout_den'      => 2,
     'track_min'       => -5,
     'track_max'       => 5,
+    'min_commit'      => 1,
     'min_players'     => 1,
     'max_players'     => 5,
     'bots'            => 1,
@@ -88,16 +96,15 @@ function engine_default_config() {
 
 /**
  * Host-adjustable knobs and their legal ranges. createGame.php accepts only
- * these, clamped, so a request cannot set turns_per_space to 0 and resolve
- * every election after a single card.
+ * these, clamped.
  */
 function engine_config_knobs() {
   return [
-    'total_spaces'    => [1, 14],
-    'turns_per_space' => [1, 4],
-    'hand_size'       => [2, 8],
-    'start_money'     => [0, 50],
-    'patron_bonus'    => [0, 6],
+    'total_spaces'   => [1, 14],
+    'start_hand'     => [3, 8],
+    'draw_per_round' => [1, 4],
+    'start_money'    => [0, 50],
+    'patron_bonus'   => [0, 6],
   ];
 }
 
@@ -127,8 +134,9 @@ function engine_setup(&$game, &$players, $mysqli = null) {
   $game['config'] = $config;
 
   $game['status']       = 'active';
-  $game['phase']        = 'campaign';
+  $game['phase']        = 'commit';
   $game['round_number'] = 1;
+  $game['current_seat'] = null;          // simultaneous: nobody is "on turn"
   $game['winner_seat']  = null;
   $game['ended_reason'] = null;
 
@@ -138,22 +146,17 @@ function engine_setup(&$game, &$players, $mysqli = null) {
   $deck = $opening;
   shuffle($deck);
 
-  $first = engine_first_seat($players);
-  $game['current_seat'] = $first;
-
   $game['state'] = [
-    'engine_version'         => ENGINE_STATE_VERSION,
-    'space'                  => 1,
-    'track'                  => 0,
-    'stakes'                 => ['nation' => [], 'states' => []],
-    'patron_seat'            => null,
-    'last_released'          => $opening,
-    'deck'                   => $deck,
-    'discard'                => [],
-    'turns_taken_this_space' => 0,
-    'start_seat'             => $first,
-    'president'              => null,
-    'history'                => [],
+    'engine_version' => ENGINE_STATE_VERSION,
+    'space'          => 1,
+    'commits'        => [],       // seat => {plays, reserve}. HIDDEN until reveal.
+    'patron_seat'    => null,
+    'last_released'  => $opening,
+    'last_reveal'    => null,
+    'deck'           => $deck,
+    'discard'        => [],
+    'president'      => null,
+    'history'        => [],
   ];
 
   foreach ($players as $seat => $p) {
@@ -164,6 +167,7 @@ function engine_setup(&$game, &$players, $mysqli = null) {
       'cards_played' => 0,
       'prints'       => 0,
       'hand_count'   => 0,
+      'committed'    => false,
     ];
     $players[$seat]['private_state'] = ['hand' => []];
     $players[$seat]['score'] = (int) $config['start_money'];
@@ -171,12 +175,11 @@ function engine_setup(&$game, &$players, $mysqli = null) {
 
   // Deal after every seat exists, so the deck depletes in seat order.
   foreach ($players as $seat => $p) {
-    engine_draw_up($game, $players[$seat], (int) $config['hand_size']);
+    engine_draw($game, $players[$seat], (int) $config['start_hand']);
   }
 
-  if ($mysqli) {
-    engine_log_campaign($mysqli, $game);
-  }
+  if ($mysqli) engine_log_campaign($mysqli, $game);
+  engine_run_bots($game, $players, $mysqli);
 }
 
 // ---------------------------------------------------------------------
@@ -194,10 +197,11 @@ function engine_draw_one(&$game) {
   return array_shift($game['state']['deck']);
 }
 
-/** Refill one player up to the hand size. */
-function engine_draw_up(&$game, &$player, $handSize) {
-  $hand = isset($player['private_state']['hand']) ? $player['private_state']['hand'] : [];
-  while (count($hand) < $handSize) {
+/** Draw up to $n cards, never past the hand limit. */
+function engine_draw(&$game, &$player, $n) {
+  $limit = (int) ($game['config']['hand_limit'] ?? 10);
+  $hand = $player['private_state']['hand'] ?? [];
+  for ($i = 0; $i < $n && count($hand) < $limit; $i++) {
     $card = engine_draw_one($game);
     if ($card === null) break;
     $hand[] = $card;
@@ -206,95 +210,39 @@ function engine_draw_up(&$game, &$player, $handSize) {
   $player['public_state']['hand_count'] = count($hand);
 }
 
-// ---------------------------------------------------------------------
-// Track and race helpers
-// ---------------------------------------------------------------------
-
-/** Where the track would sit after printing this card. */
-function engine_track_after($game, $cardKey) {
-  $card = vg_card($cardKey);
-  $push = $card ? (int) $card['push'] : 0;
-  return max((int) $game['config']['track_min'],
-             min((int) $game['config']['track_max'], (int) $game['state']['track'] + $push));
-}
-
-/** Total stake on one side. */
-function engine_stake_total($game, $side) {
-  $total = 0;
-  foreach (($game['state']['stakes'][$side] ?? []) as $amount) $total += (int) $amount;
-  return $total;
-}
-
 /**
- * Which side would win if the election were held now, and why.
- *
- * @return array [side, decided_by]
+ * Shuffle into the deck every card dated after $previousYear and no later
+ * than the campaign now opening. Events enter the game when they happened.
  */
-function engine_leading_side($game, $track = null) {
-  $t = ($track === null) ? (int) $game['state']['track'] : (int) $track;
-  if ($t > 0) return ['nation', 'track'];
-  if ($t < 0) return ['states', 'track'];
-  $n = engine_stake_total($game, 'nation');
-  $s = engine_stake_total($game, 'states');
-  if ($n !== $s) return [($n > $s) ? 'nation' : 'states', 'stakes'];
+function engine_release_cards(&$game, $previousYear, $mysqli) {
   $e = vg_election_at((int) $game['state']['space']);
-  return [$e ? $e['historical_winner'] : 'nation', 'history'];
-}
+  if (!$e) return;
+  $fresh = vg_cards_released($previousYear, (int) $e['year']);
+  $game['state']['last_released'] = $fresh;
+  if (!$fresh) return;
+  foreach ($fresh as $k) $game['state']['deck'][] = $k;
+  shuffle($game['state']['deck']);
 
-function engine_other_side($side) {
-  return $side === 'nation' ? 'states' : 'nation';
+  $names = [];
+  foreach ($fresh as $k) $names[] = vg_card($k)['name'];
+  $msg = 'News reaches the presses: ' . implode(', ', $names) . '.';
+  if (mb_strlen($msg) > 480) $msg = mb_substr($msg, 0, 477) . '...';
+  engine_log($mysqli, $game, null, 'cards_released', $msg,
+    ['space' => (int) $game['state']['space'], 'cards' => $fresh]);
 }
 
 // ---------------------------------------------------------------------
-// Seats and turn order
+// Seats
 // ---------------------------------------------------------------------
 
-/**
- * Seat numbers need not be contiguous: bots take the last seats when a
- * table is opened, and the host may start before every human seat fills.
- * Turn order therefore walks the seats that EXIST, in order, never
- * `(seat + 1) % count` — which silently skipped the bot in seat 3 of a
- * table seated 0, 1, 3.
- */
+/** Seat numbers need not be contiguous; always walk the seats that exist. */
 function engine_seat_list($players) {
   $seats = array_map('intval', array_keys($players));
   sort($seats);
   return $seats;
 }
 
-/** The seat after $seat in table order, optionally skipping conceded seats. */
-function engine_seat_after($players, $seat, $skipConceded = true) {
-  $seats = engine_seat_list($players);
-  $n = count($seats);
-  if ($n === 0) return null;
-  $at = array_search((int) $seat, $seats, true);
-  if ($at === false) $at = -1;
-  for ($step = 1; $step <= $n; $step++) {
-    $next = $seats[($at + $step) % $n];
-    if (!$skipConceded || empty($players[$next]['conceded'])) return $next;
-  }
-  return null;
-}
-
-/** The lowest seat still playing. */
-function engine_first_seat($players) {
-  foreach (engine_seat_list($players) as $s) {
-    if (empty($players[$s]['conceded'])) return $s;
-  }
-  return null;
-}
-
-/** Seats still playing, bots included. */
-function engine_active_seats($players) {
-  $n = 0;
-  foreach ($players as $p) if (empty($p['conceded'])) $n++;
-  return $n;
-}
-
-/**
- * Seats still playing that are actually people. A game whose only human
- * has conceded is over, however many rival papers would print on.
- */
+/** Seats still playing that are actually people. */
 function engine_human_seats($players) {
   $n = 0;
   foreach ($players as $p) {
@@ -303,17 +251,13 @@ function engine_human_seats($players) {
   return $n;
 }
 
-/** Turns this election needs before it resolves. */
-function engine_turns_needed($game, $players) {
-  return engine_active_seats($players) * (int) $game['config']['turns_per_space'];
-}
-
-/** Reject an out-of-turn action. */
-function engine_require_turn($game, $seat) {
-  if ($game['current_seat'] === null) return;
-  if ((int) $game['current_seat'] !== (int) $seat) {
-    throw new Exception('It is not your turn.');
+/** Has every paper still playing committed this round? */
+function engine_all_committed($game, $players) {
+  foreach ($players as $seat => $p) {
+    if (!empty($p['conceded'])) continue;
+    if (!isset($game['state']['commits'][$seat])) return false;
   }
+  return true;
 }
 
 // ---------------------------------------------------------------------
@@ -338,21 +282,79 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
   if ($action === 'concede') {
     return engine_concede($game, $players, $seat, $mysqli);
   }
+  if ($action !== 'commit') throw new Exception('Unknown action: ' . $action);
 
-  engine_require_turn($game, $seat);
-  $msg = engine_play_card($game, $players, $seat, $action, $params, $mysqli);
-  engine_end_turn($game, $players, $mysqli);
+  $commit = engine_validate_commit($game, $players[$seat], $params);
+  $replacing = isset($game['state']['commits'][$seat]);
+  $game['state']['commits'][$seat] = $commit;
+  $players[$seat]['public_state']['committed'] = true;
+
+  $n = count($commit['plays']);
+  $msg = $players[$seat]['player_name'] . ($replacing ? ' changed its commitment.' : ' committed '
+       . $n . ' ' . ($n === 1 ? 'card' : 'cards') . '.');
+  engine_log($mysqli, $game, $seat, 'commit', $msg, ['cards' => $n, 'replaced' => $replacing],
+    $players[$seat]['player_name']);
+
+  engine_run_bots($game, $players, $mysqli);
   return $msg;
 }
 
 /**
- * Leave the table. Conceding on your own turn passes it on; conceding on
- * someone else's turn leaves that turn alone. (The first engine ended the
- * current turn either way, so a player leaving could cost a rival a move.)
+ * Check one commitment against the hand and normalise it.
+ *
+ * params: { plays: [{card, action: 'cash'|'print', side?: 'nation'|'states'}],
+ *           reserve?: card }
  */
+function engine_validate_commit($game, $player, $params) {
+  $hand = $player['private_state']['hand'] ?? [];
+  $plays = $params['plays'] ?? null;
+  if (!is_array($plays)) throw new Exception('Choose the cards you are committing.');
+
+  $min = min((int) ($game['config']['min_commit'] ?? 1), count($hand));
+  if (count($plays) < $min) throw new Exception('Commit at least one card.');
+
+  $out = [];
+  $seen = [];
+  foreach ($plays as $pl) {
+    if (!is_array($pl)) throw new Exception('Malformed commitment.');
+    $card = (string) ($pl['card'] ?? '');
+    if (!in_array($card, $hand, true)) throw new Exception('A committed card is not in your hand.');
+    if (isset($seen[$card])) throw new Exception('Each card can be committed once.');
+    $seen[$card] = true;
+    $mode = (string) ($pl['action'] ?? '');
+    if ($mode === 'cash') {
+      $out[] = ['card' => $card, 'action' => 'cash', 'side' => null];
+    } elseif ($mode === 'print') {
+      $side = (string) ($pl['side'] ?? '');
+      if ($side !== 'nation' && $side !== 'states') {
+        throw new Exception('Choose which candidate each printed card backs.');
+      }
+      $out[] = ['card' => $card, 'action' => 'print', 'side' => $side];
+    } else {
+      throw new Exception('Each committed card must be cashed or printed.');
+    }
+  }
+
+  $reserve = isset($params['reserve']) ? (string) $params['reserve'] : null;
+  if ($reserve !== null && $reserve !== '' && !isset($seen[$reserve])) {
+    throw new Exception('The reserved card must be one you committed.');
+  }
+  if ($reserve === null || $reserve === '') {
+    // Unmarked: keep back the most valuable committed card.
+    foreach ($out as $pl) {
+      if ($reserve === null || (int) vg_card($pl['card'])['value'] > (int) vg_card($reserve)['value']) {
+        $reserve = $pl['card'];
+      }
+    }
+  }
+  return ['plays' => $out, 'reserve' => $reserve];
+}
+
+/** Leave the table. The round resolves at once if everyone left has committed. */
 function engine_concede(&$game, &$players, $seat, $mysqli) {
-  $wasOnTurn = ($game['current_seat'] !== null && (int) $game['current_seat'] === (int) $seat);
   $players[$seat]['conceded'] = 1;
+  unset($game['state']['commits'][$seat]);
+  $players[$seat]['public_state']['committed'] = false;
   $msg = $players[$seat]['player_name'] . ' shut down the presses.';
   engine_log($mysqli, $game, $seat, 'concede', $msg, null, $players[$seat]['player_name']);
 
@@ -360,188 +362,243 @@ function engine_concede(&$game, &$players, $seat, $mysqli) {
     engine_end_game($game, $players, 'all_humans_left', $mysqli);
     return $msg;
   }
-  if ($wasOnTurn) {
-    engine_end_turn($game, $players, $mysqli);
-    return $msg;
-  }
-  // One seat fewer means fewer turns this election; it may already be due.
-  if ((int) $game['state']['turns_taken_this_space'] >= engine_turns_needed($game, $players)) {
-    engine_resolve_election($game, $players, $mysqli);
-  }
-  return $msg;
-}
-
-/**
- * Play one card, CASH or PRINT. Shared by human turns and the bot, so a bot
- * can never do something a player could not.
- */
-function engine_play_card(&$game, &$players, $seat, $action, $params, $mysqli) {
-  $player = &$players[$seat];
-  $config = $game['config'];
-
-  $cardKey = isset($params['card']) ? (string) $params['card'] : '';
-  $hand = isset($player['private_state']['hand']) ? $player['private_state']['hand'] : [];
-  $at = array_search($cardKey, $hand, true);
-  if ($at === false) throw new Exception('That card is not in your hand.');
-
-  $card = vg_card($cardKey);
-  if (!$card) throw new Exception('Unknown card.');
-
-  $name = $player['player_name'];
-  $election = vg_election_at((int) $game['state']['space']);
-  $value = (int) $card['value'];
-
-  switch ($action) {
-
-    case 'cash': {
-      $bonus = (!empty($player['public_state']['is_patron'])) ? (int) $config['patron_bonus'] : 0;
-      $player['public_state']['money'] = (int) $player['public_state']['money'] + $value + $bonus;
-      $msg = $name . ' ran ' . $card['name'] . ' for ' . ($value + $bonus) . ' money'
-           . ($bonus ? ' (including ' . $bonus . ' as Patron).' : '.');
-      engine_log($mysqli, $game, $seat, 'cash', $msg,
-        ['card' => $cardKey, 'value' => $value, 'patron_bonus' => $bonus,
-         'money' => $player['public_state']['money']], $name);
-      break;
-    }
-
-    case 'print': {
-      $side = isset($params['side']) ? (string) $params['side'] : '';
-      if ($side !== 'nation' && $side !== 'states') {
-        throw new Exception('Choose which candidate to back.');
-      }
-      $candidate = $election[$side];
-
-      $before = (int) $game['state']['track'];
-      $game['state']['track'] = engine_track_after($game, $cardKey);
-
-      if (!isset($game['state']['stakes'][$side]) || !is_array($game['state']['stakes'][$side])) {
-        $game['state']['stakes'][$side] = [];
-      }
-      $current = (int) ($game['state']['stakes'][$side][$seat] ?? 0);
-      $game['state']['stakes'][$side][$seat] = $current + $value;
-      $player['public_state']['prints'] = 1 + (int) ($player['public_state']['prints'] ?? 0);
-
-      $msg = $name . ' printed ' . $card['name'] . ' and staked ' . $value . ' on '
-           . $candidate['name'] . '.';
-      engine_log($mysqli, $game, $seat, 'print', $msg,
-        ['card' => $cardKey, 'side' => $side, 'candidate' => $candidate['key'],
-         'stake' => $value, 'push' => (int) $card['push'],
-         'track_from' => $before, 'track_to' => (int) $game['state']['track']], $name);
-      break;
-    }
-
-    default:
-      throw new Exception('Unknown action: ' . $action);
-  }
-
-  array_splice($hand, $at, 1);
-  $player['private_state']['hand'] = $hand;
-  $player['public_state']['cards_played'] = 1 + (int) $player['public_state']['cards_played'];
-  $game['state']['discard'][] = $cardKey;
-
-  engine_draw_up($game, $player, (int) $config['hand_size']);
-  $player['score'] = (int) $player['public_state']['money'];
+  engine_run_bots($game, $players, $mysqli);
   return $msg;
 }
 
 // ---------------------------------------------------------------------
-// Turn order and the election
+// Bots, and resolving the round once everyone is in
 // ---------------------------------------------------------------------
 
 /**
- * End the current turn: either pass to the next seat, or — when every
- * seat has had its turns for this election — resolve it.
+ * Commit for every bot that has not yet, then resolve the round if every
+ * paper is in. Bots decide from their own hand and the public table only —
+ * never from a commitment already on file.
  */
-function engine_end_turn(&$game, &$players, $mysqli) {
+function engine_run_bots(&$game, &$players, $mysqli) {
+  // Bound: one resolution per call. A round only resolves when a person
+  // has committed, so this can never run the board unattended.
   if ($game['status'] !== 'active') return;
+  if (engine_human_seats($players) < 1) return;
 
-  if (engine_human_seats($players) < 1) {
-    engine_end_game($game, $players, 'all_humans_left', $mysqli);
-    return;
+  foreach (engine_seat_list($players) as $seat) {
+    $p = $players[$seat];
+    if (empty($p['is_bot']) || !empty($p['conceded'])) continue;
+    if (isset($game['state']['commits'][$seat])) continue;
+    if (empty($p['private_state']['hand'])) {
+      $players[$seat]['conceded'] = 1;       // nothing left to print
+      continue;
+    }
+    $game['state']['commits'][$seat] = engine_bot_commit($game, $players[$seat]);
+    $players[$seat]['public_state']['committed'] = true;
   }
 
-  $game['state']['turns_taken_this_space'] = 1 + (int) $game['state']['turns_taken_this_space'];
-  if ($game['state']['turns_taken_this_space'] >= engine_turns_needed($game, $players)) {
-    engine_resolve_election($game, $players, $mysqli);
-    return;
+  if (engine_all_committed($game, $players)) {
+    engine_resolve_round($game, $players, $mysqli);
+    if ($game['status'] === 'active') {
+      // The next round opens with the bots already in.
+      foreach (engine_seat_list($players) as $seat) {
+        $p = $players[$seat];
+        if (empty($p['is_bot']) || !empty($p['conceded']) || empty($p['private_state']['hand'])) continue;
+        $game['state']['commits'][$seat] = engine_bot_commit($game, $players[$seat]);
+        $players[$seat]['public_state']['committed'] = true;
+      }
+    }
   }
-  $game['current_seat'] = engine_seat_after($players, $game['current_seat']);
 }
 
 /**
- * Resolve the election on the current space, pay the stakes, name the
- * Patron, and advance the board.
+ * The bot. Kept in step with strat_bot in tools/simulate.py — the tuning
+ * was validated against it, so change them together.
+ *
+ *   1. Keep four cards in hand; commit the rest (at least one).
+ *   2. Patron? Cash them all: the bonus pays on every card cashed.
+ *   3. Otherwise print the cards that push the way the hand leans (history
+ *      breaks a tie) and cash the ones that push nobody. Cards pushing the
+ *      other way stay in hand.
+ *   4. Reserve the most valuable card printed.
  */
-function engine_resolve_election(&$game, &$players, $mysqli) {
+function engine_bot_commit($game, $player) {
+  $hand = $player['private_state']['hand'] ?? [];
+  $byValue = $hand;
+  usort($byValue, function ($a, $b) { return (int) vg_card($b)['value'] - (int) vg_card($a)['value']; });
+  $n = max(1, count($hand) - 4 + (int) ($game['config']['draw_per_round'] ?? 2));
+
+  if (!empty($player['public_state']['is_patron'])) {
+    $plays = [];
+    foreach (array_slice($byValue, 0, $n) as $k) $plays[] = ['card' => $k, 'action' => 'cash', 'side' => null];
+    return ['plays' => $plays, 'reserve' => $plays[0]['card']];
+  }
+
+  $net = 0;
+  foreach ($hand as $k) $net += (int) vg_card($k)['push'];
+  if ($net > 0) $side = 'nation';
+  elseif ($net < 0) $side = 'states';
+  else {
+    $e = vg_election_at((int) $game['state']['space']);
+    $side = $e ? $e['historical_winner'] : 'nation';
+  }
+  $want = ($side === 'nation') ? 1 : -1;
+
+  $plays = [];
+  foreach ($byValue as $k) {
+    if (count($plays) >= $n) break;
+    $push = (int) vg_card($k)['push'];
+    if ($push * $want > 0) $plays[] = ['card' => $k, 'action' => 'print', 'side' => $side];
+  }
+  foreach ($byValue as $k) {
+    if (count($plays) >= $n) break;
+    if ((int) vg_card($k)['push'] === 0) $plays[] = ['card' => $k, 'action' => 'cash', 'side' => null];
+  }
+  if (!$plays) $plays[] = ['card' => $byValue[0], 'action' => 'cash', 'side' => null];
+
+  $reserve = null;
+  foreach ($plays as $pl) {
+    if ($pl['action'] === 'print') { $reserve = $pl['card']; break; }   // byValue order
+  }
+  return ['plays' => $plays, 'reserve' => $reserve ?? $plays[0]['card']];
+}
+
+/**
+ * Reveal every commitment, hold the election, and open the next round.
+ */
+function engine_resolve_round(&$game, &$players, $mysqli) {
   $space = (int) $game['state']['space'];
   $election = vg_election_at($space);
   if (!$election) {
     engine_end_game($game, $players, 'board_completed', $mysqli);
     return;
   }
+  $config = $game['config'];
+  $bonus = (int) $config['patron_bonus'];
+  $commits = $game['state']['commits'];
 
-  list($side, $decidedBy) = engine_leading_side($game);
+  // 1. Reveal. Cash pays now; prints push and stake.
+  $track = 0;
+  $stakes = ['nation' => [], 'states' => []];
+  $reveal = [];
+  foreach (engine_seat_list($players) as $seat) {
+    if (!isset($commits[$seat])) continue;
+    $p = &$players[$seat];
+    $hand = $p['private_state']['hand'] ?? [];
+    $wasPatron = !empty($p['public_state']['is_patron']);
+    $cashed = 0;
+    $shown = [];
+    foreach ($commits[$seat]['plays'] as $pl) {
+      $card = vg_card($pl['card']);
+      $at = array_search($pl['card'], $hand, true);
+      if (!$card || $at === false) continue;          // defensive: never double-spend
+      array_splice($hand, $at, 1);
+      $value = (int) $card['value'];
+      if ($pl['action'] === 'cash') {
+        $gain = $value + ($wasPatron ? $bonus : 0);
+        $p['public_state']['money'] = (int) $p['public_state']['money'] + $gain;
+        $cashed += $gain;
+        $shown[] = ['card' => $pl['card'], 'name' => $card['name'], 'action' => 'cash',
+                    'side' => null, 'value' => $gain, 'push' => 0];
+      } else {
+        $track += (int) $card['push'];
+        $stakes[$pl['side']][$seat] = (int) ($stakes[$pl['side']][$seat] ?? 0) + $value;
+        $p['public_state']['prints'] = 1 + (int) ($p['public_state']['prints'] ?? 0);
+        $shown[] = ['card' => $pl['card'], 'name' => $card['name'], 'action' => 'print',
+                    'side' => $pl['side'], 'value' => $value, 'push' => (int) $card['push']];
+      }
+      $p['public_state']['cards_played'] = 1 + (int) $p['public_state']['cards_played'];
+    }
+    $p['private_state']['hand'] = $hand;
+    $reveal[$seat] = ['seat' => (int) $seat, 'plays' => $shown, 'cashed' => $cashed,
+                      'reserve' => $commits[$seat]['reserve'], 'paid' => 0, 'kept' => null];
+    unset($p);
+  }
+  $track = max((int) $config['track_min'], min((int) $config['track_max'], $track));
+
+  // 2. The election.
+  if ($track > 0)      { $side = 'nation'; $decidedBy = 'track'; }
+  elseif ($track < 0)  { $side = 'states'; $decidedBy = 'track'; }
+  else {
+    $n = array_sum($stakes['nation']);
+    $s = array_sum($stakes['states']);
+    if ($n !== $s) { $side = ($n > $s) ? 'nation' : 'states'; $decidedBy = 'stakes'; }
+    else { $side = $election['historical_winner']; $decidedBy = 'history'; }
+  }
   $winner = $election[$side];
-  $loser = $election[engine_other_side($side)];
-  $track = (int) $game['state']['track'];
-  $stakes = $game['state']['stakes'];
-  $num = max(1, (int) $game['config']['payout_num']);
-  $den = max(1, (int) $game['config']['payout_den']);
+  $loser = $election[$side === 'nation' ? 'states' : 'nation'];
 
-  // Winning stakes pay back. Losing stakes are simply gone.
-  $payouts = [];
-  foreach (($stakes[$side] ?? []) as $s => $stake) {
-    if (!isset($players[$s])) continue;
+  $num = max(1, (int) $config['payout_num']);
+  $den = max(1, (int) $config['payout_den']);
+  foreach ($stakes[$side] as $s => $stake) {
     $paid = intdiv((int) $stake * $num, $den);
-    if ($paid <= 0) continue;
     $players[$s]['public_state']['money'] = (int) $players[$s]['public_state']['money'] + $paid;
-    $players[$s]['score'] = (int) $players[$s]['public_state']['money'];
-    $payouts[(int) $s] = $paid;
+    if (isset($reveal[$s])) $reveal[$s]['paid'] = $paid;
   }
 
-  // The Patron: the single largest stake on the winner.
+  // 3. The Patron: the single largest stake on the winner.
   $patron = null;
   $best = 0;
   $tied = false;
-  foreach (($stakes[$side] ?? []) as $s => $stake) {
+  foreach ($stakes[$side] as $s => $stake) {
     $stake = (int) $stake;
     if ($stake > $best) { $best = $stake; $patron = (int) $s; $tied = false; }
     elseif ($stake === $best && $stake > 0) { $tied = true; }
   }
   if ($tied || $best <= 0) $patron = null;
-
   foreach ($players as $s => $p) {
     $is = ($patron !== null && (int) $s === $patron);
     $players[$s]['public_state']['is_patron'] = $is;
     if ($is) {
-      $players[$s]['public_state']['patronages'] =
-        1 + (int) ($players[$s]['public_state']['patronages'] ?? 0);
+      $players[$s]['public_state']['patronages'] = 1 + (int) ($players[$s]['public_state']['patronages'] ?? 0);
     }
   }
   $game['state']['patron_seat'] = $patron;
-  $patronName = ($patron !== null && isset($players[$patron])) ? $players[$patron]['player_name'] : null;
+  $patronName = ($patron !== null) ? $players[$patron]['player_name'] : null;
 
-  $msg = $election['year'] . ': ' . $winner['name'] . ' wins'
-       . ($patronName ? ', and ' . $patronName . ' is his Patron.' : ', and no paper can claim him.');
-
-  engine_log($mysqli, $game, null, 'election', $msg, [
-    'space' => $space, 'year' => $election['year'],
-    'winner_side' => $side, 'winner' => $winner['key'], 'decided_by' => $decidedBy,
-    'track' => $track, 'stakes' => $stakes, 'payouts' => $payouts,
-    'patron_seat' => $patron,
-    'historical_winner' => $election['historical_winner'],
-  ]);
-  foreach ($payouts as $s => $paid) {
-    engine_log($mysqli, $game, $s, 'payout',
-      $players[$s]['player_name'] . ' collected ' . $paid . ' on ' . $winner['name'] . '.',
-      ['paid' => $paid, 'stake' => (int) $stakes[$side][$s]], $players[$s]['player_name']);
+  // 4. Everyone but the Patron keeps its reserved card; the rest is spent.
+  foreach ($commits as $s => $c) {
+    if (!isset($reveal[$s])) continue;
+    foreach ($c['plays'] as $pl) {
+      if ($pl['card'] === $c['reserve'] && (int) $s !== $patron && empty($players[$s]['conceded'])) {
+        $players[$s]['private_state']['hand'][] = $pl['card'];
+        $reveal[$s]['kept'] = vg_card($pl['card'])['name'];
+      } else {
+        $game['state']['discard'][] = $pl['card'];
+      }
+    }
   }
 
+  // 5. Everyone draws.
+  foreach ($players as $s => $p) {
+    if (!empty($p['conceded'])) continue;
+    engine_draw($game, $players[$s], (int) $config['draw_per_round']);
+    $players[$s]['score'] = (int) $players[$s]['public_state']['money'];
+    $players[$s]['public_state']['committed'] = false;
+  }
+
+  // The log: one line per paper, then the result.
+  foreach ($reveal as $s => $r) {
+    engine_log($mysqli, $game, $s, 'reveal',
+      engine_reveal_text($players[$s]['player_name'], $r, $election), $r, $players[$s]['player_name']);
+  }
+  $msg = $election['year'] . ': ' . $winner['name'] . ' wins'
+       . ($patronName ? ', and ' . $patronName . ' is his Patron.' : ', and no paper can claim him.');
+  engine_log($mysqli, $game, null, 'election', $msg, [
+    'space' => $space, 'year' => $election['year'], 'winner_side' => $side,
+    'winner' => $winner['key'], 'decided_by' => $decidedBy, 'track' => $track,
+    'stakes' => $stakes, 'patron_seat' => $patron,
+    'historical_winner' => $election['historical_winner'],
+  ]);
+
+  $game['state']['last_reveal'] = [
+    'space' => $space, 'year' => $election['year'],
+    'winner_side' => $side, 'winner_name' => $winner['name'], 'loser_name' => $loser['name'],
+    'decided_by' => $decidedBy, 'track' => $track,
+    'stake_totals' => ['nation' => array_sum($stakes['nation']), 'states' => array_sum($stakes['states'])],
+    'patron_seat' => $patron, 'patron_name' => $patronName,
+    'seats' => array_values($reveal),
+  ];
   $game['state']['history'][] = [
     'space' => $space, 'year' => $election['year'],
     'winner_side' => $side, 'winner' => $winner['key'], 'winner_name' => $winner['name'],
-    'loser_name' => $loser['name'],
-    'decided_by' => $decidedBy, 'track' => $track,
+    'loser_name' => $loser['name'], 'decided_by' => $decidedBy, 'track' => $track,
     'patron_seat' => $patron, 'patron_name' => $patronName,
     'matched_history' => ($side === $election['historical_winner']),
   ];
@@ -550,47 +607,36 @@ function engine_resolve_election(&$game, &$players, $mysqli) {
     'patron_seat' => $patron,
   ];
 
-  // Clear the slate. The country starts every campaign undecided.
-  $game['state']['stakes'] = ['nation' => [], 'states' => []];
-  $game['state']['track'] = 0;
-  $game['state']['turns_taken_this_space'] = 0;
+  // Open the next round.
+  $game['state']['commits'] = [];
   $game['state']['space'] = $space + 1;
   $game['round_number'] = $space + 1;
-
-  if ($game['state']['space'] > (int) $game['config']['total_spaces']) {
+  if ($game['state']['space'] > (int) $config['total_spaces']) {
     engine_end_game($game, $players, 'board_completed', $mysqli);
     return;
   }
-
   engine_log_campaign($mysqli, $game);
   engine_release_cards($game, (int) $election['year'], $mysqli);
-
-  // Rotate who opens the campaign, walking the seats that exist.
-  $start = engine_seat_after($players, (int) ($game['state']['start_seat'] ?? 0), false);
-  $game['state']['start_seat'] = $start;
-  $game['current_seat'] = empty($players[$start]['conceded'])
-    ? $start : engine_seat_after($players, $start);
 }
 
-/**
- * Shuffle into the deck every card dated after $previousYear and no later
- * than the campaign now opening. Events enter the game when they happened.
- */
-function engine_release_cards(&$game, $previousYear, $mysqli) {
-  $e = vg_election_at((int) $game['state']['space']);
-  if (!$e) return;
-  $fresh = vg_cards_released($previousYear, (int) $e['year']);
-  $game['state']['last_released'] = $fresh;
-  if (!$fresh) return;
-  foreach ($fresh as $k) $game['state']['deck'][] = $k;
-  shuffle($game['state']['deck']);
-
-  $names = [];
-  foreach ($fresh as $k) $names[] = vg_card($k)['name'];
-  $msg = 'News reaches the presses: ' . implode(', ', $names) . '.';
+/** "Name cashed X (+5); printed Y and Z for Jefferson; kept Y." */
+function engine_reveal_text($name, $r, $election) {
+  $cash = [];
+  $print = ['nation' => [], 'states' => []];
+  foreach ($r['plays'] as $pl) {
+    if ($pl['action'] === 'cash') $cash[] = $pl['name'];
+    else $print[$pl['side']][] = $pl['name'];
+  }
+  $parts = [];
+  if ($cash) $parts[] = 'cashed ' . implode(', ', $cash) . ' (+' . $r['cashed'] . ')';
+  foreach (['nation', 'states'] as $side) {
+    if ($print[$side]) $parts[] = 'printed ' . implode(', ', $print[$side]) . ' for ' . $election[$side]['name'];
+  }
+  $msg = $name . ' ' . implode('; ', $parts) . '.';
+  if ($r['paid'] > 0) $msg .= ' Collected ' . $r['paid'] . '.';
+  if ($r['kept']) $msg .= ' Kept ' . $r['kept'] . '.';
   if (mb_strlen($msg) > 480) $msg = mb_substr($msg, 0, 477) . '...';
-  engine_log($mysqli, $game, null, 'cards_released', $msg,
-    ['space' => (int) $game['state']['space'], 'cards' => $fresh]);
+  return $msg;
 }
 
 function engine_log_campaign($mysqli, $game) {
@@ -600,80 +646,6 @@ function engine_log_campaign($mysqli, $game) {
     'The campaign of ' . $e['year'] . ' opens: ' .
     $e['nation']['name'] . ' against ' . $e['states']['name'] . '.',
     ['space' => (int) $game['state']['space'], 'year' => $e['year']]);
-}
-
-// ---------------------------------------------------------------------
-// The bot — solo play
-// ---------------------------------------------------------------------
-
-/**
- * Run every consecutive bot seat until a human is on turn or the game
- * ends. Called after each human action, inside the same transaction, so
- * a solo player sees the whole round resolve in one response.
- */
-function engine_run_bots(&$game, &$players, $mysqli, $limit = null) {
-  // One full election plus a margin: a bound on NORMAL play, so a table
-  // of bots can never play the whole board inside one request.
-  if ($limit === null) {
-    $limit = count($players) * (int) $game['config']['turns_per_space'] + 4;
-  }
-  $steps = 0;
-  while ($game['status'] === 'active' && $steps < $limit) {
-    if (engine_human_seats($players) < 1) break;
-    $seat = $game['current_seat'];
-    if ($seat === null || !isset($players[$seat])) break;
-    if (empty($players[$seat]['is_bot']) || !empty($players[$seat]['conceded'])) break;
-
-    $hand = $players[$seat]['private_state']['hand'] ?? [];
-    if (empty($hand)) { $players[$seat]['conceded'] = 1; engine_end_turn($game, $players, $mysqli); $steps++; continue; }
-
-    list($action, $params) = engine_bot_choice($game, $players, $seat);
-    try {
-      engine_play_card($game, $players, $seat, $action, $params, $mysqli);
-    } catch (Exception $e) {
-      // A bot must never wedge the game: fall back to the always-legal move.
-      engine_play_card($game, $players, $seat, 'cash', ['card' => $hand[0]], $mysqli);
-    }
-    engine_end_turn($game, $players, $mysqli);
-    $steps++;
-  }
-}
-
-/**
- * The bot decision. Kept in step with strat_bot in tools/simulate.py — the
- * tuning was validated against it, so change them together.
- *
- *   1. Patron? Cash the best card; the bonus is the point of the office.
- *   2. Otherwise print the most valuable card that leaves the track off
- *      zero, staking it on whichever side then leads.
- *   3. No such card? Cash the best card.
- */
-function engine_bot_choice($game, $players, $seat) {
-  $player = $players[$seat];
-  $hand = $player['private_state']['hand'] ?? [];
-
-  $bestCash = $hand[0];
-  foreach ($hand as $key) {
-    if ((int) vg_card($key)['value'] > (int) vg_card($bestCash)['value']) $bestCash = $key;
-  }
-  if (!empty($player['public_state']['is_patron'])) {
-    return ['cash', ['card' => $bestCash]];
-  }
-
-  $bestPrint = null;
-  $bestSide = null;
-  foreach ($hand as $key) {
-    $track = engine_track_after($game, $key);
-    if ($track === 0) continue;
-    if ($bestPrint === null || (int) vg_card($key)['value'] > (int) vg_card($bestPrint)['value']) {
-      $bestPrint = $key;
-      $bestSide = ($track > 0) ? 'nation' : 'states';
-    }
-  }
-  if ($bestPrint !== null) {
-    return ['print', ['card' => $bestPrint, 'side' => $bestSide]];
-  }
-  return ['cash', ['card' => $bestCash]];
 }
 
 // ---------------------------------------------------------------------
@@ -720,10 +692,7 @@ function engine_ended_text($reason) {
   return $text[$reason] ?? 'The game ended.';
 }
 
-/**
- * Final score. Money IS the score; nothing else is added. Patronages are
- * reported because they explain the money, not because they score.
- */
+/** Final score. Money IS the score; nothing else is added. */
 function engine_score_player($players, $seat) {
   $p = $players[$seat];
   $money = (int) ($p['public_state']['money'] ?? 0);
@@ -742,28 +711,18 @@ function engine_score_player($players, $seat) {
 // Public projection — the ONLY thing getState.php serialises
 // ---------------------------------------------------------------------
 
-/** A side's stakes as a list, so JSON never has to guess list-or-object. */
-function engine_stake_list($game, $side) {
-  $out = [];
-  foreach (($game['state']['stakes'][$side] ?? []) as $s => $amount) {
-    $out[] = ['seat' => (int) $s, 'amount' => (int) $amount];
-  }
-  return $out;
-}
-
 /**
  * Build the state blob the client polls. Every seat sees the same public
  * payload; exactly one private block is included, for the asking seat.
  *
  * This function is the hidden-information boundary. Hands are private —
- * other seats get a COUNT, never the contents.
+ * other seats get a COUNT. Commitments are private until the reveal —
+ * other seats see only WHETHER a paper has committed, never what.
  */
 function engine_public_state($game, $players, $viewerSeat = null) {
   $current = engine_is_current($game);
   $status = $game['status'];
   $endedReason = $game['ended_reason'];
-  // An active game from an older engine cannot be played: show it as over
-  // rather than feed its state to a UI that expects this shape.
   if ($status === 'active' && !$current) {
     $status = 'ended';
     $endedReason = 'rules_changed';
@@ -784,6 +743,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'patronages'      => (int) ($p['public_state']['patronages'] ?? 0),
       'prints'          => (int) ($p['public_state']['prints'] ?? 0),
       'hand_count'      => (int) ($p['public_state']['hand_count'] ?? 0),
+      'committed'       => $current && isset($state['commits'][$seat]),
       'score'           => (int) $p['score'],
       'final_score'     => $p['final_score'],
       'score_breakdown' => ($status === 'ended') ? $p['score_breakdown'] : null,
@@ -793,33 +753,22 @@ function engine_public_state($game, $players, $viewerSeat = null) {
 
   $space = (int) ($state['space'] ?? 1);
   $election = $current ? vg_election_at($space) : null;
-  $track = (int) ($state['track'] ?? 0);
 
   $race = null;
   if ($election && $status === 'active') {
-    list($leading, $decidedBy) = engine_leading_side($game);
     $cands = [];
     foreach (['nation', 'states'] as $side) {
       $c = $election[$side];
-      $cands[$side] = [
-        'key' => $c['key'], 'name' => $c['name'], 'party' => $c['party'],
-        'note' => $c['note'], 'side' => $side,
-        'stakes' => engine_stake_list($game, $side),
-        'total' => engine_stake_total($game, $side),
-      ];
+      $cands[$side] = ['key' => $c['key'], 'name' => $c['name'], 'party' => $c['party'],
+                       'note' => $c['note'], 'side' => $side];
     }
     $race = [
       'space' => $space, 'year' => $election['year'], 'note' => $election['note'],
       'nation' => $cands['nation'], 'states' => $cands['states'],
-      'leading' => $leading, 'decided_by' => $decidedBy,
       'historical_winner' => $election['historical_winner'],
-      'turns_taken' => (int) ($state['turns_taken_this_space'] ?? 0),
-      'turns_needed' => engine_turns_needed($game, $players),
     ];
   }
 
-  // The viewer hand, with what each card would do worked out server-side
-  // so the UI never reimplements a rule.
   $you = null;
   if ($viewerSeat !== null && isset($players[$viewerSeat])) {
     $me = $players[$viewerSeat];
@@ -828,18 +777,19 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     foreach (($current ? ($me['private_state']['hand'] ?? []) : []) as $key) {
       $c = vg_card($key);
       if (!$c) continue;
-      $after = engine_track_after($game, $key);
       $hand[] = [
         'key' => $key, 'name' => $c['name'], 'year' => $c['year'],
         'flavor' => $c['flavor'], 'kind' => $c['kind'],
         'value' => (int) $c['value'],
         'cash_value' => (int) $c['value'] + $bonus,
         'push' => (int) $c['push'],
-        'track_after' => $after,
-        'leads_after' => engine_leading_side($game, $after)[0],
       ];
     }
-    $you = ['seat' => (int) $viewerSeat, 'hand' => $hand];
+    $you = [
+      'seat' => (int) $viewerSeat,
+      'hand' => $hand,
+      'commit' => $current ? ($state['commits'][$viewerSeat] ?? null) : null,
+    ];
   }
 
   $num = max(1, (int) ($config['payout_num'] ?? 3));
@@ -853,31 +803,28 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     'phase'         => $game['phase'],
     'space'         => $space,
     'total_spaces'  => (int) ($config['total_spaces'] ?? 14),
-    'current_seat'  => ($status === 'active') ? $game['current_seat'] : null,
+    'current_seat'  => null,
     'max_players'   => (int) $game['max_players'],
     'winner_seat'   => $game['winner_seat'],
     'ended_reason'  => $endedReason,
     'ended_text'    => $endedReason ? engine_ended_text($endedReason) : null,
     'state_version' => (int) $game['state_version'],
     'rules'         => [
-      'turns_per_space' => (int) ($config['turns_per_space'] ?? 2),
-      'patron_bonus'    => (int) ($config['patron_bonus'] ?? 2),
-      'payout'          => $num / $den,
+      'draw_per_round' => (int) ($config['draw_per_round'] ?? 2),
+      'patron_bonus'   => (int) ($config['patron_bonus'] ?? 2),
+      'payout'         => $num / $den,
+      'hand_limit'     => (int) ($config['hand_limit'] ?? 10),
     ],
-    'track'         => [
-      'value' => $track,
-      'min' => (int) ($config['track_min'] ?? -5),
-      'max' => (int) ($config['track_max'] ?? 5),
-    ],
-    // What this campaign added to the deck, so the UI can announce it.
+    'track'         => ['min' => (int) ($config['track_min'] ?? -5), 'max' => (int) ($config['track_max'] ?? 5)],
+    'patron_seat'   => $state['patron_seat'] ?? null,
+    'president'     => $state['president'] ?? null,
+    'race'          => $race,
+    'last_reveal'   => $state['last_reveal'] ?? null,
     'news'          => array_values(array_filter(array_map(function ($k) {
                          $c = vg_card($k);
                          return $c ? ['key' => $k, 'name' => $c['name'], 'year' => (int) $c['year'],
                                       'kind' => $c['kind']] : null;
                        }, $state['last_released'] ?? []))),
-    'patron_seat'   => $state['patron_seat'] ?? null,
-    'president'     => $state['president'] ?? null,
-    'race'          => $race,
     'history'       => $state['history'] ?? [],
     'deck_count'    => count($state['deck'] ?? []),
     'players'       => $seats,
@@ -886,21 +833,12 @@ function engine_public_state($game, $players, $viewerSeat = null) {
   ];
 }
 
-/**
- * Legal actions for one seat. The advisory mirror the UI renders from;
- * the server re-checks every one of them anyway.
- */
+/** Legal actions for one seat: the advisory mirror the UI renders from. */
 function engine_available_actions($game, $players, $seat) {
   if ($seat === null || !isset($players[$seat])) return [];
   if ($game['status'] !== 'active' || !engine_is_current($game)) return [];
   if (!empty($players[$seat]['conceded'])) return [];
-
-  $actions = ['concede'];
-  if ($game['current_seat'] === null || (int) $game['current_seat'] === (int) $seat) {
-    $actions[] = 'cash';
-    $actions[] = 'print';
-  }
-  return $actions;
+  return ['commit', 'concede'];
 }
 
 // ---------------------------------------------------------------------
@@ -920,8 +858,8 @@ function engine_log($mysqli, $game, $seat, $type, $message = '', $data = null, $
  * fields, never trim them.
  *
  * $viewerSeat: the seated player asking, or null for operator access.
- * While a game is still running a player gets only their OWN private
- * state; otherwise a mid-game download would show them every rival hand.
+ * While a game is still running a player gets only their OWN hand and
+ * commitment, and no draw order.
  */
 function engine_build_export($mysqli, $game, $players, $viewerSeat = null) {
   $hideOthers = ($viewerSeat !== null && $game['status'] !== 'ended');
@@ -943,12 +881,13 @@ function engine_build_export($mysqli, $game, $players, $viewerSeat = null) {
 
   $board = $game['state'];
   if ($hideOthers && is_array($board)) {
-    // The draw order is hidden information too.
     $board['deck'] = count($board['deck'] ?? []);
+    $mine = $board['commits'][$viewerSeat] ?? null;
+    $board['commits'] = ($mine === null) ? [] : [$viewerSeat => $mine];
   }
 
   return [
-    'export_version' => 3,
+    'export_version' => 4,
     'exported_at'    => gmdate('c'),
     'summary' => [
       'game_id'       => (int) $game['game_id'],

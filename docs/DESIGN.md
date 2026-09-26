@@ -2,7 +2,7 @@
 
 **Working title:** *The Fourth Estate* (placeholder).
 
-Status: v2, the simplified ruleset, is live. v1 (three tracks, stability,
+Status: v2 with sealed rounds is live. v1 (three tracks, stability,
 key cards) was played once and retired; §8 keeps what it taught. Not yet
 playtested by a human beyond that first game.
 
@@ -87,34 +87,47 @@ and every number is a first draft worth arguing with.
 
 ---
 
-## 5. A turn
+## 5. A round
 
-Play one card, then draw back to five:
+Each election is **one round**, played by every paper **at once, blind**.
+Everyone starts with 5 cards.
 
-- **Cash** — take its value. **+2 if you are the Patron.**
-- **Print** — move the track by its push, and stake its value on
-  **either** candidate.
+**Commit.** Choose any number of cards from your hand (at least one). For
+each, choose:
 
-## 6. The election
+- **Cash** — take its value. **+2 on each card cashed if you are the
+  Patron.**
+- **Print** — its push goes on the track, and its value is staked as
+  influence on the candidate you name.
 
-Held once every seat still playing has had **2 turns**.
+Mark one committed card to **reserve**. Others see only *that* you have
+committed. Bots commit the moment a round opens, from their own hand and
+the public table only.
 
-1. The side the track leans toward wins. At 0, the bigger total stake
-   wins; failing that, the historical winner.
-2. Stakes on the winner pay back **1.5×** (rounded down per seat). Stakes
+## 6. The reveal
+
+When every paper still playing has committed:
+
+1. Every printed push is added up on a track from States −5 to Nation +5.
+   The side it leans toward wins. At 0, the bigger total stake wins;
+   failing that, the historical winner.
+2. Stakes on the winner pay back **1.5×** (rounded down per paper). Stakes
    on the loser are lost.
-3. The single largest stake on the winner makes that seat **Patron** until
-   the next election. A tie leaves nobody Patron.
-4. The track returns to 0, stakes clear, and the opening seat rotates.
+3. The single largest stake on the winner makes that paper **Patron**
+   until the next election. A tie leaves nobody Patron.
+4. Everyone **except the new Patron** takes its reserved card back into
+   hand. Every other committed card is spent.
+5. Everyone draws **2** (hand limit 10), and the next round's cards are
+   released.
 
 ## 7. The end
 
 After 1860 the richest paper wins; conceded seats cannot. If every human
 concedes, the game ends where it stands.
 
-**The bot**: Patron? Cash the best card. Otherwise print the most valuable
-card that leaves the track off 0, staking on whichever side then leads.
-Nothing to print? Cash the best card.
+**The bot**: keep four cards and commit the rest. Patron? Cash them all.
+Otherwise print every card that pushes the way the hand leans (history
+breaks a tie) and cash the cards that push nobody.
 
 ---
 
@@ -124,6 +137,32 @@ Nothing to print? Cash the best card.
 times per setting. It parses the content **out of the PHP**, so the data
 cannot drift; the rules are a hand-port of `engine.php`, kept in step by
 hand. Every number in `engine_default_config()` came from a run.
+
+### Sealed rounds (2026-09-26)
+
+One blind round per election replaced two sequential turns each. Heads-up
+round robin, 800 games per pairing, bot's win rate against:
+
+| hoarder | casher | all-in | blind printer | contrarian |
+| --- | --- | --- | --- | --- |
+| 100% | 60% | 93% | 98.5% | 100% |
+
+- **Cash against print is a live choice** — at equal card throughput a
+  pure casher still wins ~40% against the bot. The Patron bonus is the
+  lever: at 0 the casher won 89%, at 3 it won 15%. Kept at +2 per card.
+- **The push on each card matters**: printing every card for your side
+  regardless of its push loses 98.5%.
+- **The Patron cashes, so the Patron never repeats** (0% back-to-back in
+  bot mirrors) — a structural brake on a runaway leader. Banking as Patron
+  alone was worth 96% against an otherwise identical line.
+- **The first bot** (print up to three, cash one) lost 89% to a sharper
+  line, which became the bot.
+- Simultaneous play removes turn order, so seat bias is gone by
+  construction.
+- **Open:** at 4–5 seats a pure casher wins above its fair share (40%
+  against 25%) while the printers crowd each other. The ±5 clamp is hit
+  far more at big tables (44–56%), which matters less now that the track
+  resolves once, but may argue for a wider track.
 
 ### v2 (2026-09-26)
 
@@ -267,3 +306,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-26 | v2: the bot prints its best card that leaves a side ahead | The first bot lost to the EV player 91% heads-up; now 61% |
 | 2026-09-26 | v2 goes live: engine rewritten, v1 data and simulator deleted, games from v1 shown as ended | — |
 | 2026-09-26 | Cards released by date; 40 new cards (the founding, the gap years, profit cards); the crisis rule removed | Opening deck of 30 deals five hands; pinned races stay under 10% |
+| 2026-09-26 | Sealed rounds: one blind commitment per election, any number of cards, cash or print; Patron keeps no reserve; draw 2 | Round robin above; the Patron bonus sets cash against print |

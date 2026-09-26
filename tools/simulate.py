@@ -164,21 +164,21 @@ SIDES = ("nation", "states")
 
 
 # =====================================================================
-# The rules
+# The rules -- one sealed round per election
 # =====================================================================
 
 DEFAULTS = dict(
     total_spaces=14,
-    turns_per_space=2,
-    hand_size=5,
+    start_hand=5,
+    draw_per_round=2,
+    hand_limit=10,
     start_money=12,
-    patron_bonus=2,
-    # Winning stakes pay back stake * payout_num / payout_den, rounded
-    # down per seat. Kept as a fraction so the engine can stay integer.
+    patron_bonus=2,          # per card the Patron cashes, the round after
     payout_num=3,
     payout_den=2,
     track_min=-5,
     track_max=5,
+    min_commit=1,
 )
 
 
@@ -194,38 +194,30 @@ class Player:
         self.hand = []
         self.patron = False
         self.patronages = 0
+        self.committed = 0
         self.prints = 0
         self.cashes = 0
-        self.staked = 0
-        self.returned = 0
 
 
 class Game:
+    """One round per election. Every seat commits blind, then all reveal."""
+
     def __init__(self, strategies, config=None, rng=None):
         self.cfg = dict(DEFAULTS)
         if config:
             self.cfg.update(config)
         self.rng = rng or random.Random()
-        self.track = 0
         self.space = 1
-        self.stakes = {"nation": {}, "states": {}}
-        self.turns_this_space = 0
-        self.start_seat = 0
-        self.ended = None
         self.history = []
-
         self.deck = list(OPENING)
         self.rng.shuffle(self.deck)
         self.discard = []
-
         self.players = [Player(i, s) for i, s in enumerate(strategies)]
         for p in self.players:
             p.money = self.cfg["start_money"]
         for p in self.players:
-            self.draw_up(p)
-        self.current = 0
-
-    # ---- deck ----
+            self.draw(p, self.cfg["start_hand"])
+        self.ended = None
 
     def draw_one(self):
         if not self.deck:
@@ -235,110 +227,107 @@ class Game:
             self.rng.shuffle(self.deck)
         return self.deck.pop(0)
 
-    def draw_up(self, p):
-        while len(p.hand) < self.cfg["hand_size"]:
-            card = self.draw_one()
-            if card is None:
-                break
-            p.hand.append(card)
-
-    # ---- queries a strategy may use ----
+    def draw(self, p, n):
+        for _ in range(n):
+            if len(p.hand) >= self.cfg["hand_limit"]:
+                return
+            c = self.draw_one()
+            if c is None:
+                return
+            p.hand.append(c)
 
     def election(self):
         return ELECTIONS[self.space - 1]
 
-    def track_after(self, key):
-        return max(self.cfg["track_min"],
-                   min(self.cfg["track_max"], self.track + CARDS[key]["push"]))
-
-    def leading_side(self, track=None):
-        """Who would win if the election were held now."""
-        t = self.track if track is None else track
-        if t > 0:
-            return "nation"
-        if t < 0:
-            return "states"
-        n = sum(self.stakes["nation"].values())
-        s = sum(self.stakes["states"].values())
-        if n != s:
-            return "nation" if n > s else "states"
-        return self.election()["historical_winner"]
-
     def payout(self, stake):
         return stake * self.cfg["payout_num"] // self.cfg["payout_den"]
 
-    # ---- play ----
+    def validate(self, p, plays, reserve):
+        keys = [pl[0] for pl in plays]
+        assert len(keys) >= min(self.cfg["min_commit"], len(p.hand)), (p.strategy, "commit too few")
+        assert len(set(keys)) == len(keys) and all(k in p.hand for k in keys), (p.strategy, keys)
+        for key, mode, side in plays:
+            assert mode in ("cash", "print") and (mode == "cash" or side in SIDES)
+        assert reserve is None or reserve in keys
 
-    def play(self, p, action, key, side=None):
-        card = CARDS[key]
-        if action == "cash":
-            p.money += card["value"] + (self.cfg["patron_bonus"] if p.patron else 0)
-            p.cashes += 1
-        elif action == "print":
-            assert side in SIDES
-            self.track = self.track_after(key)
-            self.stakes[side][p.seat] = self.stakes[side].get(p.seat, 0) + card["value"]
-            p.prints += 1
-            p.staked += card["value"]
-        else:
-            raise ValueError(action)
-        p.hand.remove(key)
-        self.discard.append(key)
-        self.draw_up(p)
+    def play_round(self):
+        # 1. Everyone commits blind -- a strategy sees the table, never the
+        #    other commitments.
+        commits = {}
+        for p in self.players:
+            plays, reserve = STRATEGIES[p.strategy](self, p)
+            self.validate(p, plays, reserve)
+            if reserve is None and plays:
+                reserve = max((pl[0] for pl in plays), key=lambda k: CARDS[k]["value"])
+            commits[p.seat] = (plays, reserve)
 
-    def end_turn(self):
-        self.turns_this_space += 1
-        if self.turns_this_space >= len(self.players) * self.cfg["turns_per_space"]:
-            self.resolve_election()
-            return
-        self.current = (self.current + 1) % len(self.players)
+        # 2. Reveal. Cash pays now; prints push and stake.
+        track = 0
+        stakes = {"nation": {}, "states": {}}
+        for p in self.players:
+            plays, _ = commits[p.seat]
+            for key, mode, side in plays:
+                card = CARDS[key]
+                p.hand.remove(key)
+                p.committed += 1
+                if mode == "cash":
+                    p.money += card["value"] + (self.cfg["patron_bonus"] if p.patron else 0)
+                    p.cashes += 1
+                else:
+                    track += card["push"]
+                    stakes[side][p.seat] = stakes[side].get(p.seat, 0) + card["value"]
+                    p.prints += 1
+        track = max(self.cfg["track_min"], min(self.cfg["track_max"], track))
 
-    def resolve_election(self):
+        # 3. The election.
         e = self.election()
-        if self.track != 0:
-            decided_by = "track"
-        elif sum(self.stakes["nation"].values()) != sum(self.stakes["states"].values()):
-            decided_by = "stakes"
+        if track != 0:
+            winner, decided_by = ("nation" if track > 0 else "states"), "track"
         else:
-            decided_by = "history"
-        winner = self.leading_side()
+            n, s = sum(stakes["nation"].values()), sum(stakes["states"].values())
+            if n != s:
+                winner, decided_by = ("nation" if n > s else "states"), "stakes"
+            else:
+                winner, decided_by = e["historical_winner"], "history"
         loser = "states" if winner == "nation" else "nation"
+        for seat, stake in stakes[winner].items():
+            self.players[seat].money += self.payout(stake)
 
-        for seat, stake in self.stakes[winner].items():
-            paid = self.payout(stake)
-            self.players[seat].money += paid
-            self.players[seat].returned += paid
-
-        # The Patron: the single largest stake on the winner. A tie, or
-        # nobody backing him, leaves the office unowned.
         patron, best, tied = None, 0, False
-        for seat, stake in self.stakes[winner].items():
+        for seat, stake in stakes[winner].items():
             if stake > best:
                 patron, best, tied = seat, stake, False
             elif stake == best:
                 tied = True
         if tied:
             patron = None
-        prev_patron = next((p.seat for p in self.players if p.patron), None)
+        prev = next((p.seat for p in self.players if p.patron), None)
         for p in self.players:
             p.patron = (p.seat == patron)
-            if p.patron:
-                p.patronages += 1
+            p.patronages += p.patron
 
-        backers = set(self.stakes[winner]) | set(self.stakes[loser])
+        # 4. Everyone but the Patron takes one committed card back; the
+        #    rest are spent. Then everyone draws two.
+        for p in self.players:
+            plays, reserve = commits[p.seat]
+            for key, _, _ in plays:
+                if key == reserve and p.seat != patron:
+                    p.hand.append(key)
+                else:
+                    self.discard.append(key)
+        for p in self.players:
+            self.draw(p, self.cfg["draw_per_round"])
+
         self.history.append(dict(
-            space=self.space, winner=winner, decided_by=decided_by,
-            patron=patron, repeat_patron=(patron is not None and patron == prev_patron),
-            track=self.track,
-            contested_patron=len(self.stakes[winner]) > 1,
-            both_sides_backed=bool(self.stakes[winner]) and bool(self.stakes[loser]),
-            anyone_backed=bool(backers),
+            space=self.space, winner=winner, decided_by=decided_by, track=track,
+            patron=patron, repeat_patron=(patron is not None and patron == prev),
+            contested_patron=len(stakes[winner]) > 1,
+            both_sides_backed=bool(stakes[winner]) and bool(stakes[loser]),
+            anyone_backed=bool(stakes[winner]) or bool(stakes[loser]),
             matched=(winner == e["historical_winner"]),
+            committed=sum(len(commits[s][0]) for s in commits),
         ))
 
-        self.stakes = {"nation": {}, "states": {}}
-        self.track = 0
-        self.turns_this_space = 0
         self.space += 1
         if self.space > self.cfg["total_spaces"]:
             self.ended = "board_completed"
@@ -347,107 +336,106 @@ class Game:
         if fresh:
             self.deck.extend(fresh)
             self.rng.shuffle(self.deck)
-        self.start_seat = (self.start_seat + 1) % len(self.players)
-        self.current = self.start_seat
 
     def run(self):
-        guard = 0
-        while self.ended is None and guard < 5000:
-            guard += 1
-            p = self.players[self.current]
-            action, key, side = STRATEGIES[p.strategy](self, p)
-            self.play(p, action, key, side)
-            self.end_turn()
+        while self.ended is None:
+            self.play_round()
         return self
 
 
 # =====================================================================
-# Strategies
+# Strategies: f(game, player) -> ([(card, 'cash'|'print', side)], reserve)
 # =====================================================================
 
-def best_cash(game, p):
-    return ("cash", max(p.hand, key=lambda k: CARDS[k]["value"]), None)
+def by_value(keys):
+    return sorted(keys, key=lambda k: -CARDS[k]["value"])
+
+
+def hand_side(game, hand):
+    """The side this hand can push hardest; history breaks a tie."""
+    net = sum(CARDS[k]["push"] for k in hand)
+    if net > 0:
+        return "nation"
+    if net < 0:
+        return "states"
+    return game.election()["historical_winner"]
+
+
+def spare(game, p):
+    """Cards to commit while keeping four in hand after the draw."""
+    return max(1, len(p.hand) - 4 + game.cfg["draw_per_round"])
 
 
 def strat_hoarder(game, p):
-    """Never prints. The degenerate line the economy has to beat."""
-    return best_cash(game, p)
+    """Cashes one card a round and never prints: the line to beat."""
+    return [(by_value(p.hand)[0], "cash", None)], None
+
+
+def strat_casher(game, p):
+    """Commits as many cards as the bot does, but only ever cashes. Tests
+    whether printing earns its risk at equal card throughput."""
+    return [(k, "cash", None) for k in by_value(p.hand)[:spare(game, p)]], None
 
 
 def strat_bot(game, p):
-    """The server bot -- keep in step with engine_bot_choice.
+    """The server bot -- keep in step with engine_bot_commit.
 
-      1. Patron? Cash the best card; the bonus is the point of the office.
-      2. Otherwise print the most valuable card that leaves the track off
-         zero, staking it on whichever side then leads.
-      3. No such card? Cash the best card.
+      1. Keep four cards in hand; commit the rest (at least one).
+      2. Patron? Cash them all: the bonus pays on every card cashed.
+      3. Otherwise print the cards that push the way the hand leans (history
+         breaks a tie), and cash the ones that push nobody. Cards pushing
+         the other way stay in hand.
+      4. Reserve the most valuable card printed.
 
-    An earlier draft printed only cards already pushing toward the leader.
-    A shark beat that bot 91% heads-up and 78% at a three-seat table (fair
-    is 33%); this one holds it to ~61% and ~39%.
+    A first draft that printed up to three and cashed one lost 89% heads-up
+    to this line; banking as Patron alone was worth 96% against an otherwise
+    identical player.
     """
+    n = spare(game, p)
     if p.patron:
-        return best_cash(game, p)
-    best = None
-    for k in p.hand:
-        track = game.track_after(k)
-        if track == 0:
-            continue
-        if best is None or CARDS[k]["value"] > CARDS[best[0]]["value"]:
-            best = (k, "nation" if track > 0 else "states")
-    if best:
-        return ("print", best[0], best[1])
-    return best_cash(game, p)
+        return [(k, "cash", None) for k in by_value(p.hand)[:n]], None
+    side = hand_side(game, p.hand)
+    want = 1 if side == "nation" else -1
+    helpers = by_value([k for k in p.hand if sign(CARDS[k]["push"]) == want])
+    zeros = by_value([k for k in p.hand if CARDS[k]["push"] == 0])
+    plays = [(k, "print", side) for k in helpers[:n]]
+    for k in zeros[:max(0, n - len(plays))]:
+        plays.append((k, "cash", None))
+    if not plays:
+        plays = [(by_value(p.hand)[0], "cash", None)]
+    printed = [k for k, m, _ in plays if m == "print"]
+    return plays, (by_value(printed)[0] if printed else None)
 
 
-def strat_zealot(game, p):
-    """Always prints, backing whichever side its best card pushes toward."""
-    key = max(p.hand, key=lambda k: CARDS[k]["value"])
-    push = CARDS[key]["push"]
-    side = "nation" if push > 0 else "states" if push < 0 else game.leading_side()
-    return ("print", key, side)
+def strat_all_in(game, p):
+    """Commits the whole hand every round, printing all of it."""
+    side = hand_side(game, p.hand)
+    return [(k, "print", side) for k in p.hand], None
 
 
-def win_chance(game, side, track, turns_after):
-    """Crude read of how safe a lead is: the margin on the track, discounted
-    by how many turns rivals still have to move it."""
-    margin = track if side == "nation" else -track
-    if margin == 0:
-        return 0.5
-    swing = 1.5 * max(1, turns_after) ** 0.5
-    return max(0.05, min(0.95, 0.5 + 0.5 * margin / (abs(margin) + swing)))
+def strat_blind(game, p):
+    """Prints as many cards as the bot commits, all for its hand's side,
+    whatever each card pushes. Tests that the push on each card matters."""
+    side = hand_side(game, p.hand)
+    return [(k, "print", side) for k in by_value(p.hand)[:spare(game, p)]], None
 
 
-def strat_shark(game, p):
-    """Expected-value player: print when the stake's expected return, plus
-    the chance of taking the Patron, beats cashing the card."""
-    n = len(game.players)
-    turns_after = n * game.cfg["turns_per_space"] - game.turns_this_space - 1
-    bonus_now = game.cfg["patron_bonus"] if p.patron else 0
-    patron_worth = game.cfg["patron_bonus"] * game.cfg["turns_per_space"]
-    best = best_cash(game, p)
-    best_ev = CARDS[best[1]]["value"] + bonus_now
-
-    for key in p.hand:
-        value = CARDS[key]["value"]
-        track = game.track_after(key)
-        for side in SIDES:
-            chance = win_chance(game, side, track, turns_after)
-            mine = game.stakes[side].get(p.seat, 0) + value
-            rival = max([v for s, v in game.stakes[side].items() if s != p.seat] or [0])
-            ev = chance * game.payout(value)
-            if mine > rival and game.space < game.cfg["total_spaces"]:
-                ev += chance * patron_worth
-            if ev > best_ev:
-                best, best_ev = ("print", key, side), ev
-    return best
+def strat_contrarian(game, p):
+    """Backs the side its hand pushes AGAINST. Tests whether stake and push
+    should ever be split."""
+    side = hand_side(game, p.hand)
+    other = "states" if side == "nation" else "nation"
+    plays = [(k, "print", other) for k in by_value(p.hand)[:2]]
+    return plays, plays[0][0]
 
 
 STRATEGIES = {
     "hoarder": strat_hoarder,
+    "casher": strat_casher,
     "bot": strat_bot,
-    "zealot": strat_zealot,
-    "shark": strat_shark,
+    "all_in": strat_all_in,
+    "blind": strat_blind,
+    "contrarian": strat_contrarian,
 }
 
 
@@ -459,37 +447,17 @@ def run_matchup(strategies, games, config=None, seed=0):
     rng = random.Random(seed)
     wins = [0.0] * len(strategies)
     money = [[] for _ in strategies]
-    prints = [[] for _ in strategies]
     history = []
     for _ in range(games):
-        # Rotate seats so no strategy is always first to act.
-        shift = rng.randrange(len(strategies))
-        order = strategies[shift:] + strategies[:shift]
-        g = Game(order, config, random.Random(rng.randrange(1 << 30))).run()
+        g = Game(list(strategies), config, random.Random(rng.randrange(1 << 30))).run()
         top = max(p.money for p in g.players)
         leaders = [p for p in g.players if p.money == top]
         for p in g.players:
-            i = (p.seat + shift) % len(strategies)
-            money[i].append(p.money)
-            prints[i].append(p.prints / max(1, p.prints + p.cashes))
+            money[p.seat].append(p.money)
             if p in leaders:
-                wins[i] += 1 / len(leaders)
+                wins[p.seat] += 1 / len(leaders)
         history.extend(g.history)
-    return dict(strategies=strategies, games=games, wins=wins, money=money,
-                prints=prints, history=history)
-
-
-def seat_bias(strategy, seats, games, config=None, seed=0):
-    """Identical strategies at every seat, seats NOT rotated: seat 0 edge."""
-    rng = random.Random(seed)
-    wins = [0.0] * seats
-    for _ in range(games):
-        g = Game([strategy] * seats, config, random.Random(rng.randrange(1 << 30))).run()
-        top = max(p.money for p in g.players)
-        leaders = [p for p in g.players if p.money == top]
-        for p in leaders:
-            wins[p.seat] += 1 / len(leaders)
-    return [w / games for w in wins]
+    return dict(strategies=strategies, games=games, wins=wins, money=money, history=history)
 
 
 def pct(x):
@@ -499,13 +467,11 @@ def pct(x):
 def report_matchup(r):
     print("  " + "  vs  ".join(r["strategies"]))
     for i, s in enumerate(r["strategies"]):
-        print("    %-8s wins %s   mean wealth %6.1f   prints %s of turns"
-              % (s, pct(r["wins"][i] / r["games"]), statistics.mean(r["money"][i]),
-                 pct(statistics.mean(r["prints"][i]))))
+        print("    %-10s wins %s   mean money %6.1f"
+              % (s, pct(r["wins"][i] / r["games"]), statistics.mean(r["money"][i])))
 
 
 def report_elections(history):
-    n = len(history)
     early = [h for h in history if h["space"] < LATE_SPACE]
     late = [h for h in history if h["space"] >= LATE_SPACE]
 
@@ -520,65 +486,65 @@ def report_elections(history):
     print("    nation won     before 1848 %s   after %s"
           % (share(early, lambda h: h["winner"] == "nation"),
              share(late, lambda h: h["winner"] == "nation")))
-    print("    track at +-5   before 1848 %s   after %s"
-          % (share(early, lambda h: abs(h["track"]) >= 5),
-             share(late, lambda h: abs(h["track"]) >= 5)))
-    print("    nobody backed anyone                   %s" % share(history, lambda h: not h["anyone_backed"]))
+    print("    track at +-5                           %s" % share(history, lambda h: abs(h["track"]) >= 5))
     print("    both candidates backed                 %s" % share(history, lambda h: h["both_sides_backed"]))
     print("    two+ seats bid for the Patron          %s" % share(history, lambda h: h["contested_patron"]))
-    print("    same Patron as last era                %s" % share(history, lambda h: h["repeat_patron"]))
+    print("    same Patron as last round              %s" % share(history, lambda h: h["repeat_patron"]))
+    print("    cards committed per round (table)      %.1f"
+          % statistics.mean(h["committed"] for h in history))
 
 
 def standard(games, seed, config=None):
+    field = ["hoarder", "casher", "bot", "all_in", "blind", "contrarian"]
     print("=" * 76)
-    print("v2 HEADS-UP, %d games each, seats rotated" % games)
+    print("HEADS-UP ROUND ROBIN: row strategy's win rate against column (%d games)" % games)
     print("=" * 76)
-    for pair in (["hoarder", "bot"], ["hoarder", "shark"], ["hoarder", "zealot"],
-                 ["bot", "shark"], ["shark", "shark"]):
-        r = run_matchup(pair, games, config, seed)
-        report_matchup(r)
-        if pair == ["shark", "shark"]:
-            report_elections(r["history"])
-        print()
-
-    print("=" * 76)
-    print("TABLE SIZE: one shark against bots / hoarders")
-    print("=" * 76)
-    for n in (3, 4, 5):
-        report_matchup(run_matchup(["shark"] + ["bot"] * (n - 1), games, config, seed))
-        report_matchup(run_matchup(["shark"] + ["hoarder"] * (n - 1), games, config, seed))
-        print()
-
-    print("=" * 76)
-    print("SEAT BIAS: identical sharks, seats fixed (fair = 1/n each)")
-    print("=" * 76)
-    for n in (2, 3, 4):
-        print("  %d seats: %s" % (n, "  ".join(pct(w) for w in seat_bias("shark", n, games, config, seed))))
+    print("  %-11s" % "" + "".join("%11s" % c for c in field))
+    for a in field:
+        row = "  %-11s" % a
+        for b in field:
+            if a == b:
+                row += "%11s" % "-"
+                continue
+            r = run_matchup([a, b], games, config, seed)
+            row += "%11s" % pct(r["wins"][0] / games)
+        print(row)
     print()
-
     print("=" * 76)
-    print("SOLO AS SHIPPED: shark (standing in for a human) vs the server bot")
+    print("TABLES OF BOTS, and one casher among bots (fair = 1/n)")
     print("=" * 76)
-    for n in (2, 3):
-        r = run_matchup(["shark"] + ["bot"] * (n - 1), games, config, seed)
-        report_matchup(r)
+    for n in (2, 3, 4, 5):
+        r = run_matchup(["bot"] * n, games, config, seed)
+        print("  %d bots" % n)
         report_elections(r["history"])
+        c = run_matchup(["casher"] + ["bot"] * (n - 1), games, config, seed)
+        print("    one casher among them wins            %s (fair %s)"
+              % (pct(c["wins"][0] / games), pct(1 / n)))
         print()
+    print("=" * 76)
+    print("MIRROR: bot vs bot, heads-up")
+    print("=" * 76)
+    r = run_matchup(["bot", "bot"], games, config, seed)
+    report_matchup(r)
+    report_elections(r["history"])
+    print()
 
 
 def sweep(games, seed):
     print("=" * 76)
-    print("SWEEP: shark wealth minus hoarder wealth, heads-up (+ = printing pays)")
+    print("SWEEP: bot win rate vs casher / vs all_in, heads-up")
     print("=" * 76)
-    payouts = [(1, 1), (5, 4), (3, 2), (2, 1)]
-    print("  patron |" + "".join("  payout %-5s" % ("%g" % (a / b)) for a, b in payouts))
-    for bonus in (0, 1, 2, 3, 4):
-        row = "  %6d |" % bonus
-        for num, den in payouts:
-            r = run_matchup(["hoarder", "shark"], games,
-                            dict(patron_bonus=bonus, payout_num=num, payout_den=den), seed)
-            row += "  %+12.1f" % (statistics.mean(r["money"][1]) - statistics.mean(r["money"][0]))
-        print(row)
+    for knob, values in (("patron_bonus", (0, 1, 2, 3)),
+                         ("draw_per_round", (1, 2, 3)),
+                         ("start_hand", (4, 5, 7))):
+        for v in values:
+            cfg = {knob: v}
+            a = run_matchup(["bot", "casher"], games, cfg, seed)
+            b = run_matchup(["bot", "all_in"], games, cfg, seed)
+            m = run_matchup(["bot", "bot"], games, cfg, seed)
+            print("  %-15s %d   vs casher %s   vs all_in %s   repeat Patron %s"
+                  % (knob, v, pct(a["wins"][0] / games), pct(b["wins"][0] / games),
+                     pct(sum(h["repeat_patron"] for h in m["history"]) / len(m["history"]))))
     print()
 
 

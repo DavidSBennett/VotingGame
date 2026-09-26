@@ -3,7 +3,7 @@ import { usePolledState } from '../hooks/usePolledState.js';
 import { startGame, playAction, downloadExport } from '../api/client.js';
 import EventLog from '../components/EventLog.jsx';
 import PlaytestReportModal from '../components/PlaytestReportModal.jsx';
-import Track from '../components/Track.jsx';
+import Reveal from '../components/Reveal.jsx';
 import Rules from '../components/Rules.jsx';
 import News from '../components/News.jsx';
 import RacePanel from '../components/RacePanel.jsx';
@@ -27,7 +27,6 @@ export default function GameShell({ seat, onLeave }) {
   const [message, setMessage] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [reportOpen, setReportOpen] = useState(false);
-  const [preview, setPreview] = useState(null);
 
   const act = async (action, params) => {
     setBusy(true);
@@ -90,10 +89,8 @@ export default function GameShell({ seat, onLeave }) {
     );
   }
 
-  const yourTurn = state.status === 'active' && state.current_seat === seat.seat;
   const ended = state.status === 'ended';
   const seatName = (n) => state.players.find((p) => p.seat === n)?.player_name || 'a rival';
-  const onTurn = state.players.find((p) => p.seat === state.current_seat);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -188,29 +185,21 @@ export default function GameShell({ seat, onLeave }) {
 
           {state.status === 'active' && (
             <>
-              {!yourTurn && onTurn && (
-                <div className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-400">
-                  Waiting for {onTurn.player_name}…
-                </div>
-              )}
+              <Reveal reveal={state.last_reveal} seats={state.players} track={state.track} />
               <News news={state.news} space={state.space} />
-              <Track track={state.track} race={state.race} preview={preview} />
-              <RacePanel
-                race={state.race}
-                seats={state.players}
-                mySeat={seat.seat}
-                payout={state.rules.payout}
-              />
+              <RacePanel race={state.race} seats={state.players} />
               <Hand
                 hand={state.you ? state.you.hand : []}
                 race={state.race}
-                yourTurn={yourTurn}
+                commit={state.you ? state.you.commit : null}
                 busy={busy}
-                onPlay={act}
-                onPreview={setPreview}
+                onCommit={(params) => act('commit', params)}
+                payout={state.rules.payout}
               />
             </>
           )}
+
+          {ended && <Reveal reveal={state.last_reveal} seats={state.players} track={state.track} />}
 
           {state.status === 'lobby' && (
             <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
