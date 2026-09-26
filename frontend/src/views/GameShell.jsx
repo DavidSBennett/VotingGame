@@ -3,7 +3,8 @@ import { usePolledState } from '../hooks/usePolledState.js';
 import { startGame, playAction, downloadExport } from '../api/client.js';
 import EventLog from '../components/EventLog.jsx';
 import PlaytestReportModal from '../components/PlaytestReportModal.jsx';
-import IssueTracks from '../components/IssueTracks.jsx';
+import Track from '../components/Track.jsx';
+import Rules from '../components/Rules.jsx';
 import RacePanel from '../components/RacePanel.jsx';
 import Hand from '../components/Hand.jsx';
 import BoardStrip from '../components/BoardStrip.jsx';
@@ -25,6 +26,7 @@ export default function GameShell({ seat, onLeave }) {
   const [message, setMessage] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [preview, setPreview] = useState(null);
 
   const act = async (action, params) => {
     setBusy(true);
@@ -38,6 +40,22 @@ export default function GameShell({ seat, onLeave }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  // Leaving an active game concedes it: otherwise the game sits "in
+  // progress" forever and the seat token is gone from this browser.
+  const leave = async () => {
+    const stillPlaying =
+      state && state.status === 'active' && !state.players.find((p) => p.is_you)?.conceded;
+    if (stillPlaying) {
+      if (!window.confirm('Leaving concedes this game. Leave anyway?')) return;
+      try {
+        await playAction(seat.player_token, 'concede');
+      } catch {
+        /* leave regardless: the seat is being dropped either way */
+      }
+    }
+    onLeave();
   };
 
   const doStart = async () => {
@@ -71,12 +89,10 @@ export default function GameShell({ seat, onLeave }) {
     );
   }
 
-  const me = state.players.find((p) => p.is_you);
-  const yourTurn = state.current_seat === null || state.current_seat === seat.seat;
+  const yourTurn = state.status === 'active' && state.current_seat === seat.seat;
   const ended = state.status === 'ended';
-  const stabilityPct = state.stability_max
-    ? (state.stability / state.stability_max) * 100
-    : 0;
+  const seatName = (n) => state.players.find((p) => p.seat === n)?.player_name || 'a rival';
+  const onTurn = state.players.find((p) => p.seat === state.current_seat);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -91,8 +107,8 @@ export default function GameShell({ seat, onLeave }) {
           <p className="text-sm text-slate-400">
             {state.status === 'lobby' && 'Waiting for the other papers'}
             {state.status === 'active' &&
-              `Space ${state.space} of ${state.total_spaces}`}
-            {ended && `Ended — ${state.ended_reason}`}
+              `Election ${state.space} of ${state.total_spaces}${state.crisis ? ' · the sectional crisis' : ''}`}
+            {ended && (state.ended_text || 'The game is over.')}
             {' · '}
             <span className="font-mono text-xs text-slate-600">v{state.state_version}</span>
           </p>
@@ -114,10 +130,10 @@ export default function GameShell({ seat, onLeave }) {
           </button>
           <button
             type="button"
-            onClick={onLeave}
+            onClick={leave}
             className="rounded border border-slate-600 px-3 py-1.5 text-sm text-slate-400 hover:border-red-500"
           >
-            Leave
+            {ended ? 'Back to the lobby' : 'Leave'}
           </button>
         </div>
       </header>
@@ -136,15 +152,9 @@ export default function GameShell({ seat, onLeave }) {
       {ended && (
         <section className="mb-5 rounded-lg border border-amber-700 bg-slate-800 p-5">
           <h2 className="text-lg font-semibold text-amber-300">
-            {state.ended_reason === 'the_union_breaks'
-              ? 'The Union breaks.'
-              : state.ended_reason === 'board_completed'
-                ? 'It is 1860.'
-                : 'The game is over.'}
+            {state.ended_text || 'The game is over.'}
           </h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Wealth is counted where it stands.
-          </p>
+          <p className="mt-1 text-sm text-slate-400">The richest paper wins.</p>
           <ol className="mt-3 space-y-1">
             {[...state.players]
               .sort((a, b) => (b.final_score ?? 0) - (a.final_score ?? 0))
@@ -155,7 +165,7 @@ export default function GameShell({ seat, onLeave }) {
                     {p.player_name}
                     {p.is_you && <span className="ml-2 text-xs text-amber-400">you</span>}
                     <span className="ml-2 text-xs text-slate-500">
-                      {p.presidencies} president{p.presidencies === 1 ? '' : 's'}
+                      Patron {p.patronages} time{p.patronages === 1 ? '' : 's'}
                     </span>
                   </span>
                   <span className="font-mono text-lg text-slate-100">{p.final_score}</span>
@@ -175,19 +185,25 @@ export default function GameShell({ seat, onLeave }) {
 
           {state.status === 'active' && (
             <>
-              <IssueTracks
-                tracks={state.tracks}
-                min={state.config.track_min}
-                max={state.config.track_max}
+              {!yourTurn && onTurn && (
+                <div className="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-400">
+                  Waiting for {onTurn.player_name}…
+                </div>
+              )}
+              <Track track={state.track} race={state.race} preview={preview} />
+              <RacePanel
+                race={state.race}
+                seats={state.players}
+                mySeat={seat.seat}
+                payout={state.rules.payout}
               />
-              <RacePanel race={state.race} seats={state.players} mySeat={seat.seat} />
               <Hand
                 hand={state.you ? state.you.hand : []}
                 race={state.race}
-                money={me ? me.money : 0}
                 yourTurn={yourTurn}
                 busy={busy}
                 onPlay={act}
+                onPreview={setPreview}
               />
             </>
           )}
@@ -214,32 +230,6 @@ export default function GameShell({ seat, onLeave }) {
         </div>
 
         <aside className="space-y-5">
-          <section className="rounded-lg border border-slate-700 bg-slate-800 p-4">
-            <div className="mb-1 flex items-baseline justify-between">
-              <h2 className="text-xs uppercase tracking-widest text-slate-400">
-                Stability of the Union
-              </h2>
-              <span className="font-mono text-sm text-slate-300">
-                {state.stability}/{state.stability_max}
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded bg-slate-900">
-              <div
-                className={
-                  stabilityPct > 50
-                    ? 'h-2 bg-emerald-500'
-                    : stabilityPct > 25
-                      ? 'h-2 bg-amber-500'
-                      : 'h-2 bg-red-500'
-                }
-                style={{ width: `${Math.max(0, stabilityPct)}%` }}
-              />
-            </div>
-            {stabilityPct <= 25 && (
-              <p className="mt-2 text-xs text-red-300">The Union is fraying badly.</p>
-            )}
-          </section>
-
           {state.president && (
             <section className="rounded-lg border border-slate-700 bg-slate-800 p-4">
               <h2 className="mb-1 text-xs uppercase tracking-widest text-slate-400">
@@ -248,13 +238,9 @@ export default function GameShell({ seat, onLeave }) {
               <div className="text-slate-100">{state.president.name}</div>
               <div className="text-xs text-slate-500">
                 elected {state.president.year}
-                {state.president.controller_seat !== null
-                  ? ` · ${
-                      state.players.find(
-                        (p) => p.seat === state.president.controller_seat
-                      )?.player_name || 'a rival'
-                    } owns the administration`
-                  : ' · no paper owns him'}
+                {state.president.patron_seat !== null
+                  ? ` · ${seatName(state.president.patron_seat)} is Patron (+${state.rules.patron_bonus} per cash)`
+                  : ' · no Patron'}
               </div>
             </section>
           )}
@@ -282,10 +268,8 @@ export default function GameShell({ seat, onLeave }) {
                     <span className="font-mono text-sm text-emerald-400">{p.money}</span>
                   </div>
                   <div className="text-xs text-slate-500">
-                    {p.controls_president && (
-                      <span className="text-amber-400">holds the administration · </span>
-                    )}
-                    {p.hand_count} cards · {p.presidencies} won
+                    {p.is_patron && <span className="text-amber-400">Patron · </span>}
+                    {p.hand_count} cards · Patron {p.patronages}×
                     {p.conceded && <span className="text-slate-600"> · left</span>}
                   </div>
                 </li>
@@ -293,6 +277,7 @@ export default function GameShell({ seat, onLeave }) {
             </ul>
           </section>
 
+          <Rules rules={state.rules} />
           <EventLog events={events} />
         </aside>
       </div>

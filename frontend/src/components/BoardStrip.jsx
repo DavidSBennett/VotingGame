@@ -30,13 +30,23 @@ export default function BoardStrip({ space, totalSpaces, history }) {
           else cls += ' border-slate-700 bg-slate-800';
 
           return (
-            <li key={n} className={cls} title={h ? h.winner_name : undefined}>
+            <li
+              key={n}
+              className={cls}
+              title={h ? `${h.winner_name} beat ${h.loser_name}${h.patron_name ? `; Patron: ${h.patron_name}` : ''}` : undefined}
+            >
               <span className="font-mono text-xs text-slate-500">
                 {h ? h.year : n}
               </span>
               {h ? (
                 <>
-                  <span className="max-w-[4.5rem] truncate text-xs text-slate-200">
+                  <span
+                    className={
+                      h.winner_side === 'nation'
+                        ? 'max-w-[4.5rem] truncate text-xs text-sky-300'
+                        : 'max-w-[4.5rem] truncate text-xs text-rose-300'
+                    }
+                  >
                     {h.winner_name.split(' ').slice(-1)[0]}
                   </span>
                   {h.matched_history ? (

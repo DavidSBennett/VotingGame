@@ -3,7 +3,9 @@
  * exportGame.php — GET. One playthrough as verbatim JSON: summary, every
  * seat, the final board, and the COMPLETE event log with detail.
  *
- * ?player_token=…      any seated player, at any point
+ * ?player_token=…      any seated player, at any point. While the game is
+ *                      running, other seats' hands and the draw order are
+ *                      withheld; once it has ended, everything is included.
  * ?game_id=…&admin_token=…   operator access to any game
  *
  * The results screen and the lobby both offer this as "Download
@@ -14,9 +16,11 @@ require_once __DIR__ . '/engine.php';
 
 require_method('GET');
 
+$viewerSeat = null;
 if (isset($_GET['player_token'])) {
   $me = authenticate($mysqli);
   $gameId = (int) $me['game_id'];
+  $viewerSeat = (int) $me['seat'];
 } else {
   require_admin();
   $gameId = isset($_GET['game_id']) ? (int) $_GET['game_id'] : 0;
@@ -27,7 +31,7 @@ $game = load_game($mysqli, $gameId);
 if (!$game) error('Game not found', 404);
 $players = load_players($mysqli, $gameId);
 
-$export = engine_build_export($mysqli, $game, $players);
+$export = engine_build_export($mysqli, $game, $players, $viewerSeat);
 
 // Served as a download when asked, so the browser writes a named file
 // straight into the playtest folder instead of rendering JSON in a tab.

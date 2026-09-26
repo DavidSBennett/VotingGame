@@ -69,59 +69,51 @@ class Checks:
         return ok
 
     def state(self, st, prev_money):
-        cfg = st["config"]
-        self.check(st["space"] >= 1 and st["space"] <= cfg["total_spaces"] + 1,
+        tr = st["track"]
+        self.check(1 <= st["space"] <= st["total_spaces"] + 1,
                    "space in range", "got %s" % st["space"])
-        self.check(0 <= st["stability"] <= st["stability_max"],
-                   "stability in range", "%s/%s" % (st["stability"], st["stability_max"]))
-        self.check(len(st["tracks"]) == 3, "three tracks", "got %d" % len(st["tracks"]))
-        for t in st["tracks"]:
-            self.check(cfg["track_min"] <= t["value"] <= cfg["track_max"],
-                       "track %s in range" % t["axis"], "got %s" % t["value"])
+        self.check(tr["min"] <= tr["value"] <= tr["max"],
+                   "track in range", "got %s" % tr["value"])
         for p in st["players"]:
             self.check(p["money"] >= 0, "seat %d money non-negative" % p["seat"],
                        "got %s" % p["money"])
-        # Exactly one seat may hold the presidency.
-        holders = [p for p in st["players"] if p["controls_president"]]
-        self.check(len(holders) <= 1, "at most one controller",
-                   "got %d" % len(holders))
-        # Our own hand must never leak another seat's cards.
+        patrons = [p for p in st["players"] if p["is_patron"]]
+        self.check(len(patrons) <= 1, "at most one Patron", "got %d" % len(patrons))
+        self.check(st["patron_seat"] == (patrons[0]["seat"] if patrons else None),
+                   "patron_seat matches the seat flagged Patron")
+        race = st.get("race")
+        if race:
+            for side in ("nation", "states"):
+                total = sum(x["amount"] for x in race[side]["stakes"])
+                self.check(total == race[side]["total"], "%s stake total adds up" % side)
+            self.check(race["turns_taken"] < race["turns_needed"],
+                       "election resolves on time",
+                       "%s of %s" % (race["turns_taken"], race["turns_needed"]))
         if st.get("you"):
-            self.check(len(st["you"]["hand"]) <= cfg["hand_size"],
+            self.check(len(st["you"]["hand"]) <= 5,
                        "hand within limit", "got %d" % len(st["you"]["hand"]))
         for p in st["players"]:
-            self.check("private" not in p and "hand" not in p,
+            self.check("private_state" not in p and "hand" not in p,
                        "seat %d exposes no private state" % p["seat"])
         return st
 
 
 def choose(st):
-    """Pick a legal action from what the server says is legal.
+    """Pick a move from what the server reports, never from a re-derived rule.
 
-    Deliberately uses ONLY the server advisory flags (can_sway,
-    can_transition) rather than reimplementing any rule, so that a
-    disagreement between the flags and the engine shows up as a rejected
-    action instead of being silently papered over.
+    Prints the most valuable card that leaves a side ahead, staking on the
+    side the server says would then lead; otherwise cashes the best card.
+    Printing most turns exercises the stake, payout and Patron paths.
     """
     hand = st["you"]["hand"]
     if not hand:
         return None, None
-
-    for c in hand:
-        if c.get("can_transition"):
-            return ("transition", {"card": c["key"]})
-
-    race = st.get("race")
-    if race:
-        swayable = [c for c in hand if c.get("can_sway")]
-        if swayable:
-            cheapest = min(swayable, key=lambda c: c["sway_cost"])
-            # Back whoever the issues currently favour.
-            best = max(race["candidates"], key=lambda c: c["alignment"])
-            return ("sway", {"card": cheapest["key"], "candidate": best["key"]})
-
-    richest = max(hand, key=lambda c: c["finance"])
-    return ("finance", {"card": richest["key"]})
+    printable = [c for c in hand if c["track_after"] != 0]
+    if printable and st.get("race"):
+        c = max(printable, key=lambda c: c["value"])
+        return ("print", {"card": c["key"], "side": c["leads_after"]})
+    c = max(hand, key=lambda c: c["cash_value"])
+    return ("cash", {"card": c["key"]})
 
 
 def main():
@@ -165,10 +157,10 @@ def main():
             last_space = st["space"]
             race = st.get("race")
             if race:
-                say("  %2d. %s  %s vs %s   stability %d/%d"
+                say("  %2d. %s  %s (Nation) vs %s (States)%s"
                     % (race["space"], race["year"],
-                       race["candidates"][0]["name"], race["candidates"][1]["name"],
-                       st["stability"], st["stability_max"]))
+                       race["nation"]["name"], race["states"]["name"],
+                       "   [crisis]" if st["crisis"] else ""))
 
         if st["current_seat"] != st["you"]["seat"]:
             raise ApiError("stuck: current_seat=%s but we are seat %s and no bot ran"
@@ -192,15 +184,18 @@ def main():
     print()
     print("finished after %d of my turns" % turns)
     print("  status        %s (%s)" % (final["status"], final["ended_reason"]))
-    print("  elections     %d of %d" % (elections_seen, final["config"]["total_spaces"]))
-    print("  stability     %d/%d" % (final["stability"], final["stability_max"]))
-    print("  transitions   %d of 3"
-          % sum(1 for t in final["tracks"] if t["transitioned"]))
+    print("  elections     %d of %d" % (elections_seen, final["total_spaces"]))
+    checks.check(elections_seen == final["total_spaces"], "every election was held",
+                 "%d of %d" % (elections_seen, final["total_spaces"]))
+    checks.check(final["ended_reason"] == "board_completed", "game ran to 1860",
+                 str(final["ended_reason"]))
+    sides = [h["winner_side"] for h in final.get("history", [])]
+    print("  winners       %d Nation, %d States" % (sides.count("nation"), sides.count("states")))
     for p in final["players"]:
-        print("  seat %d %-28s wealth %4s  presidencies %s"
+        print("  seat %d %-28s money %4s  Patron %s times  printed %s"
               % (p["seat"], p["player_name"],
                  p["final_score"] if p["final_score"] is not None else p["money"],
-                 p["presidencies"]))
+                 p["patronages"], p["prints"]))
 
     matched = sum(1 for h in final.get("history", []) if h.get("matched_history"))
     if elections_seen:

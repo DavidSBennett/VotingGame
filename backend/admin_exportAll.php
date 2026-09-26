@@ -11,8 +11,8 @@
  *   ?since_game_id=12    only games from that id up
  *
  * This is the "give me everything so far" button for between-session
- * analysis. Admin-gated because it contains every seat private state and
- * every player token.
+ * analysis. Admin-gated because it contains every seat private state,
+ * including hands in games still running.
  */
 require_once __DIR__ . '/engine.php';
 

@@ -32,15 +32,16 @@ if ($bots < 0 || $bots > 4) error('bots must be between 0 and 4', 400);
 if ($humanSeats + $bots < 2) error('A game needs at least two seats: add a rival paper', 400);
 if ($humanSeats + $bots > 5) error('At most five seats in total', 400);
 
-$variant = (string) ($body['variant'] ?? 'v1');
+$variant = (string) ($body['variant'] ?? 'v2');
 if (!preg_match('/^[a-z0-9_.-]{1,40}$/i', $variant)) error('Invalid variant', 400);
 
-// Host-chosen knobs merged over the defaults, then frozen at start.
+// Host-chosen knobs merged over the defaults, clamped to their legal
+// ranges, then frozen at start.
 $config = $defaults;
 if (isset($body['config']) && is_array($body['config'])) {
-  foreach (['total_spaces', 'turns_per_space', 'hand_size', 'start_money',
-            'control_bonus', 'stability_start'] as $knob) {
-    if (isset($body['config'][$knob])) $config[$knob] = (int) $body['config'][$knob];
+  foreach (engine_config_knobs() as $knob => $range) {
+    if (!isset($body['config'][$knob])) continue;
+    $config[$knob] = max($range[0], min($range[1], (int) $body['config'][$knob]));
   }
 }
 $config['bots'] = $bots;

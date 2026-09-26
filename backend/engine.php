@@ -16,40 +16,40 @@
  * ---------------------------------------------------------------------
  * THE RULES IN ONE PLACE  (docs/DESIGN.md has the reasoning)
  *
- * You are a media apparatus, 1796 to 1860. Fourteen presidential spaces,
- * two candidates each. Most WEALTH at the end wins — elections are the
- * means, not the end.
+ * You are a newspaper, 1796 to 1860. Fourteen presidential races, each a
+ * Nation candidate against a States candidate. Most MONEY at the end wins.
  *
- * Each turn you play one card, in one of three ways:
+ * One track, Nation (+5) to States (-5), back to 0 at every election.
  *
- *   FINANCE     take the card money. +control_bonus if you control the
- *               sitting president. Always legal.
- *   SWAY        pay the card cost, put control points on ONE of the two
- *               candidates, and move the issue tracks by the card deltas.
- *               The direction is fixed by history, not by you.
- *   TRANSITION  (key cards only) flip one issue to its successor and
- *               shuffle that pack into the deck.
+ * Each turn you play one card, one of two ways, then draw back to five:
  *
- * When every seat has taken turns_per_space turns, the election resolves:
+ *   CASH    take the card value, +patron_bonus if you are the Patron.
+ *   PRINT   move the track by the card push (its direction is fixed by
+ *           history, not by you), and stake the card value on EITHER
+ *           candidate.
  *
- *   1. The ISSUE TRACKS decide WHICH CANDIDATE wins — the dot product of
- *      their stances with where the country currently sits.
- *   2. CONTROL POINTS decide WHICH PLAYER owns them. Most points on the
- *      winner controls the presidency until the next election; a tie means
- *      nobody does. Points on the loser are wasted.
+ * When every seat still playing has had turns_per_space turns:
  *
- * The game ends when the fourteenth election resolves, or when stability
- * reaches zero and the Union breaks. Either way, wealth is counted where
- * it stands.
+ *   1. The side the track leans toward wins. At 0, the bigger total stake
+ *      wins; failing that, whoever won in history.
+ *   2. Stakes on the winner pay back payout_num/payout_den times. Stakes on
+ *      the loser are gone.
+ *   3. The single largest stake on the winner makes that seat the Patron
+ *      until the next election. A tie leaves nobody Patron.
+ *
+ * In 1848 the crisis cards join the deck. After 1860 the richest wins.
  * ---------------------------------------------------------------------
  */
 
 require_once __DIR__ . '/lib.php';
-require_once __DIR__ . '/history_data.php';
-require_once __DIR__ . '/cards_data.php';
+require_once __DIR__ . '/game_data.php';
 
-/** Bump when the state JSON shape changes incompatibly. */
-define('ENGINE_STATE_VERSION', 2);
+/**
+ * Bump when the state JSON shape changes incompatibly. A game whose state
+ * carries another version cannot be played by this engine; it is shown as
+ * ended instead (see engine_is_current).
+ */
+define('ENGINE_STATE_VERSION', 3);
 
 // ---------------------------------------------------------------------
 // Configuration
@@ -59,37 +59,50 @@ define('ENGINE_STATE_VERSION', 2);
  * Frozen into vg_games.config at start, so a mid-series rules change never
  * rewrites a game already in progress.
  *
- * EVERY NUMBER HERE WAS SET BY SIMULATION, not by feel. tools/simulate.py
- * plays the game a few thousand times per setting; docs/DESIGN.md section 8
- * records what each run found. The three that matter most:
- *
- *   turns_per_space   The payback window. At 2 a sway costs a finance turn
- *                     plus its price and leaves one turn to earn it back,
- *                     so NO control_bonus makes investing pay. At 3 it does.
- *   control_bonus     4 puts investing ahead of hoarding without letting
- *                     the first presidency run away with the game; at 6 the
- *                     investor won 95% and wealth-as-score was a formality.
- *   losing_cp_payout  Support for the LOSING candidate still pays. Without
- *                     it a failed bid burns, contesting is negative-sum, and
- *                     the opener of a campaign took control in 14 of 14.
+ * EVERY NUMBER HERE WAS CHECKED BY SIMULATION. tools/simulate.py plays the
+ * game a few thousand times per setting; docs/DESIGN.md records what each
+ * run found. Change a number here and in the simulator's DEFAULTS together.
  */
 function engine_default_config() {
   return [
     'engine_version'  => ENGINE_STATE_VERSION,
     'total_spaces'    => 14,
-    'turns_per_space' => 3,
+    'turns_per_space' => 2,
     'hand_size'       => 5,
     'start_money'     => 12,
-    'control_bonus'   => 4,
-    'stability_start' => 28,
-    'stability_recovery' => 3,
-    'losing_cp_payout' => 1,
+    'patron_bonus'    => 2,
+    // Winning stakes pay stake * payout_num / payout_den, rounded down per
+    // seat. A fraction rather than 1.5 so the money stays integer.
+    'payout_num'      => 3,
+    'payout_den'      => 2,
     'track_min'       => -5,
     'track_max'       => 5,
+    'crisis_space'    => 11,     // 1848
     'min_players'     => 1,
     'max_players'     => 5,
     'bots'            => 1,
   ];
+}
+
+/**
+ * Host-adjustable knobs and their legal ranges. createGame.php accepts only
+ * these, clamped, so a request cannot set turns_per_space to 0 and resolve
+ * every election after a single card.
+ */
+function engine_config_knobs() {
+  return [
+    'total_spaces'    => [1, 14],
+    'turns_per_space' => [1, 4],
+    'hand_size'       => [2, 8],
+    'start_money'     => [0, 50],
+    'patron_bonus'    => [0, 6],
+  ];
+}
+
+/** Can this engine play the stored game? */
+function engine_is_current($game) {
+  return is_array($game['state'] ?? null)
+    && (int) ($game['state']['engine_version'] ?? 0) === ENGINE_STATE_VERSION;
 }
 
 // ---------------------------------------------------------------------
@@ -101,58 +114,51 @@ function engine_default_config() {
  * with the final seat list. Mutates $game and $players in place.
  */
 function engine_setup(&$game, &$players, $mysqli = null) {
-  $config = array_merge(engine_default_config(), is_array($game['config']) ? $game['config'] : []);
+  $stored = is_array($game['config']) ? $game['config'] : [];
+  // A table opened under an older engine carries that engine's knobs, which
+  // mean something else here. Keep only the seat count it was opened with.
+  if ((int) ($stored['engine_version'] ?? 0) !== ENGINE_STATE_VERSION) {
+    $stored = isset($stored['bots']) ? ['bots' => (int) $stored['bots']] : [];
+  }
+  $config = array_merge(engine_default_config(), $stored);
+  $config['engine_version'] = ENGINE_STATE_VERSION;
   $game['config'] = $config;
 
   $game['status']       = 'active';
   $game['phase']        = 'campaign';
   $game['round_number'] = 1;
-  $game['current_seat'] = 0;
   $game['winner_seat']  = null;
   $game['ended_reason'] = null;
 
-  // The three issue tracks, as slots. A slot keeps its position on the
-  // board when its axis is superseded; the VALUE resets, because the
-  // country has not yet staked out ground on the new question.
-  $slots = [
-    ['axis' => 'market',  'value' => 0, 'transitioned' => false],
-    ['axis' => 'tariff',  'value' => 0, 'transitioned' => false],
-    ['axis' => 'federal', 'value' => 0, 'transitioned' => false],
-  ];
+  $deck = vg_cards_in_era('early');
+  shuffle($deck);
 
-  $deck = engine_build_deck();
-
-  // Both the stability pool and its recovery are expressed PER TWO SEATS
-  // and scaled to the table here. Drain is per card played, so it scales
-  // with the number of seats; a fixed pool made three- and four-player
-  // games collapse before the board was two thirds played.
-  $seatCount = max(1, count($players));
-  $stabilityPool = intdiv((int) $config['stability_start'] * $seatCount, 2);
-  $config['stability_max'] = $stabilityPool;
-  $game['config'] = $config;
+  $first = engine_first_seat($players);
+  $game['current_seat'] = $first;
 
   $game['state'] = [
     'engine_version'         => ENGINE_STATE_VERSION,
     'space'                  => 1,
-    'slots'                  => $slots,
-    'stability'              => $stabilityPool,
+    'track'                  => 0,
+    'stakes'                 => ['nation' => [], 'states' => []],
+    'patron_seat'            => null,
+    'crisis'                 => false,
     'deck'                   => $deck,
     'discard'                => [],
-    'removed'                => [],
-    'control'                => [],     // candidate_key => [seat => points]
-    'president'              => null,   // set after the first election
     'turns_taken_this_space' => 0,
-    'start_seat'             => 0,
+    'start_seat'             => $first,
+    'president'              => null,
     'history'                => [],
   ];
 
   foreach ($players as $seat => $p) {
     $players[$seat]['public_state'] = [
-      'money'              => (int) $config['start_money'],
-      'controls_president' => false,
-      'presidencies'       => 0,
-      'cards_played'       => 0,
-      'hand_count'         => 0,
+      'money'        => (int) $config['start_money'],
+      'is_patron'    => false,
+      'patronages'   => 0,
+      'cards_played' => 0,
+      'prints'       => 0,
+      'hand_count'   => 0,
     ];
     $players[$seat]['private_state'] = ['hand' => []];
     $players[$seat]['score'] = (int) $config['start_money'];
@@ -160,43 +166,12 @@ function engine_setup(&$game, &$players, $mysqli = null) {
 
   // Deal after every seat exists, so the deck depletes in seat order.
   foreach ($players as $seat => $p) {
-    engine_draw_up($game, $players[$seat], $config['hand_size']);
+    engine_draw_up($game, $players[$seat], (int) $config['hand_size']);
   }
 
   if ($mysqli) {
-    $e = vg_election_at(1);
-    engine_log($mysqli, $game, null, 'campaign_begins',
-      'The campaign of ' . $e['year'] . ' opens: ' .
-      $e['candidates'][0]['name'] . ' against ' . $e['candidates'][1]['name'] . '.',
-      ['space' => 1, 'year' => $e['year']]);
+    engine_log_campaign($mysqli, $game);
   }
-}
-
-/**
- * The starting deck: the base pack, shuffled, with the three key cards
- * seeded at spread depths so the transitions cannot all arrive at once
- * and cannot all fail to arrive.
- */
-function engine_build_deck() {
-  $base = vg_cards_in_pack('base');
-  $keys = vg_key_cards();
-  $base = array_values(array_diff($base, $keys));
-  shuffle($base);
-
-  // Seed each key card into a different third of the deck.
-  shuffle($keys);
-  $count = count($base);
-  $third = max(1, (int) floor($count / 3));
-  $positions = [
-    random_int((int) ($third * 0.5), $third),
-    random_int($third + 1, $third * 2),
-    random_int($third * 2 + 1, max($third * 2 + 2, $count)),
-  ];
-  foreach ($keys as $i => $keyCard) {
-    $at = min(count($base), $positions[$i]);
-    array_splice($base, $at, 0, [$keyCard]);
-  }
-  return $base;
 }
 
 // ---------------------------------------------------------------------
@@ -227,42 +202,113 @@ function engine_draw_up(&$game, &$player, $handSize) {
 }
 
 // ---------------------------------------------------------------------
-// Track helpers
+// Track and race helpers
 // ---------------------------------------------------------------------
 
-/** Slot index for an axis key, or null when that axis is not live. */
-function engine_slot_for_axis($game, $axis) {
-  foreach ($game['state']['slots'] as $i => $slot) {
-    if ($slot['axis'] === $axis) return $i;
+/** Where the track would sit after printing this card. */
+function engine_track_after($game, $cardKey) {
+  $card = vg_card($cardKey);
+  $push = $card ? (int) $card['push'] : 0;
+  return max((int) $game['config']['track_min'],
+             min((int) $game['config']['track_max'], (int) $game['state']['track'] + $push));
+}
+
+/** Total stake on one side. */
+function engine_stake_total($game, $side) {
+  $total = 0;
+  foreach (($game['state']['stakes'][$side] ?? []) as $amount) $total += (int) $amount;
+  return $total;
+}
+
+/**
+ * Which side would win if the election were held now, and why.
+ *
+ * @return array [side, decided_by]
+ */
+function engine_leading_side($game, $track = null) {
+  $t = ($track === null) ? (int) $game['state']['track'] : (int) $track;
+  if ($t > 0) return ['nation', 'track'];
+  if ($t < 0) return ['states', 'track'];
+  $n = engine_stake_total($game, 'nation');
+  $s = engine_stake_total($game, 'states');
+  if ($n !== $s) return [($n > $s) ? 'nation' : 'states', 'stakes'];
+  $e = vg_election_at((int) $game['state']['space']);
+  return [$e ? $e['historical_winner'] : 'nation', 'history'];
+}
+
+function engine_other_side($side) {
+  return $side === 'nation' ? 'states' : 'nation';
+}
+
+// ---------------------------------------------------------------------
+// Seats and turn order
+// ---------------------------------------------------------------------
+
+/**
+ * Seat numbers need not be contiguous: bots take the last seats when a
+ * table is opened, and the host may start before every human seat fills.
+ * Turn order therefore walks the seats that EXIST, in order, never
+ * `(seat + 1) % count` — which silently skipped the bot in seat 3 of a
+ * table seated 0, 1, 3.
+ */
+function engine_seat_list($players) {
+  $seats = array_map('intval', array_keys($players));
+  sort($seats);
+  return $seats;
+}
+
+/** The seat after $seat in table order, optionally skipping conceded seats. */
+function engine_seat_after($players, $seat, $skipConceded = true) {
+  $seats = engine_seat_list($players);
+  $n = count($seats);
+  if ($n === 0) return null;
+  $at = array_search((int) $seat, $seats, true);
+  if ($at === false) $at = -1;
+  for ($step = 1; $step <= $n; $step++) {
+    $next = $seats[($at + $step) % $n];
+    if (!$skipConceded || empty($players[$next]['conceded'])) return $next;
   }
   return null;
 }
 
-/** Can this card be played for SWAY right now? */
-function engine_card_swayable($game, $cardKey) {
-  $card = vg_card($cardKey);
-  if (!$card) return false;
-  if (!empty($card['key'])) return false;          // key cards transition instead
-  foreach (array_keys($card['deltas']) as $axis) {
-    if (engine_slot_for_axis($game, $axis) === null) return false;
+/** The lowest seat still playing. */
+function engine_first_seat($players) {
+  foreach (engine_seat_list($players) as $s) {
+    if (empty($players[$s]['conceded'])) return $s;
   }
-  return true;
+  return null;
 }
 
-/** Apply a card deltas to the live tracks, clamped. Returns what moved. */
-function engine_apply_deltas(&$game, $deltas) {
-  $min = (int) $game['config']['track_min'];
-  $max = (int) $game['config']['track_max'];
-  $moved = [];
-  foreach ($deltas as $axis => $delta) {
-    $i = engine_slot_for_axis($game, $axis);
-    if ($i === null) continue;
-    $before = (int) $game['state']['slots'][$i]['value'];
-    $after = max($min, min($max, $before + (int) $delta));
-    $game['state']['slots'][$i]['value'] = $after;
-    if ($after !== $before) $moved[$axis] = ['from' => $before, 'to' => $after];
+/** Seats still playing, bots included. */
+function engine_active_seats($players) {
+  $n = 0;
+  foreach ($players as $p) if (empty($p['conceded'])) $n++;
+  return $n;
+}
+
+/**
+ * Seats still playing that are actually people. A game whose only human
+ * has conceded is over, however many rival papers would print on.
+ */
+function engine_human_seats($players) {
+  $n = 0;
+  foreach ($players as $p) {
+    if (empty($p['conceded']) && empty($p['is_bot'])) $n++;
   }
-  return $moved;
+  return $n;
+}
+
+/** Turns this election needs before it resolves. */
+function engine_turns_needed($game, $players) {
+  return engine_active_seats($players) * (int) $game['config']['turns_per_space'];
+}
+
+/** Reject an out-of-turn action. */
+function engine_require_turn($game, $seat) {
+  if ($game['current_seat'] === null) return;
+  if ((int) $game['current_seat'] !== (int) $seat) {
+    throw new Exception('It is not your turn.');
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -278,28 +324,51 @@ function engine_apply_deltas(&$game, $deltas) {
  */
 function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli) {
   if ($game['status'] !== 'active') throw new Exception('This game is not in progress.');
+  if (!engine_is_current($game)) {
+    throw new Exception('This game was started under the old rules and can no longer be played. Open a new table from the lobby.');
+  }
   if (!isset($players[$seat]))      throw new Exception('You are not seated in this game.');
   if (!empty($players[$seat]['conceded'])) throw new Exception('You have already left this game.');
 
   if ($action === 'concede') {
-    $players[$seat]['conceded'] = 1;
-    $msg = $players[$seat]['player_name'] . ' shut down the presses.';
-    engine_log($mysqli, $game, $seat, 'concede', $msg, null, $players[$seat]['player_name']);
-    // engine_end_turn ends the game outright if that was the last human.
-    engine_end_turn($game, $players, $mysqli);
-    return $msg;
+    return engine_concede($game, $players, $seat, $mysqli);
   }
 
   engine_require_turn($game, $seat);
-
   $msg = engine_play_card($game, $players, $seat, $action, $params, $mysqli);
   engine_end_turn($game, $players, $mysqli);
   return $msg;
 }
 
 /**
- * Play one card in one of the three ways. Shared by human turns and the
- * bot, so a bot can never do something a player could not.
+ * Leave the table. Conceding on your own turn passes it on; conceding on
+ * someone else's turn leaves that turn alone. (The first engine ended the
+ * current turn either way, so a player leaving could cost a rival a move.)
+ */
+function engine_concede(&$game, &$players, $seat, $mysqli) {
+  $wasOnTurn = ($game['current_seat'] !== null && (int) $game['current_seat'] === (int) $seat);
+  $players[$seat]['conceded'] = 1;
+  $msg = $players[$seat]['player_name'] . ' shut down the presses.';
+  engine_log($mysqli, $game, $seat, 'concede', $msg, null, $players[$seat]['player_name']);
+
+  if (engine_human_seats($players) < 1) {
+    engine_end_game($game, $players, 'all_humans_left', $mysqli);
+    return $msg;
+  }
+  if ($wasOnTurn) {
+    engine_end_turn($game, $players, $mysqli);
+    return $msg;
+  }
+  // One seat fewer means fewer turns this election; it may already be due.
+  if ((int) $game['state']['turns_taken_this_space'] >= engine_turns_needed($game, $players)) {
+    engine_resolve_election($game, $players, $mysqli);
+  }
+  return $msg;
+}
+
+/**
+ * Play one card, CASH or PRINT. Shared by human turns and the bot, so a bot
+ * can never do something a player could not.
  */
 function engine_play_card(&$game, &$players, $seat, $action, $params, $mysqli) {
   $player = &$players[$seat];
@@ -314,118 +383,45 @@ function engine_play_card(&$game, &$players, $seat, $action, $params, $mysqli) {
   if (!$card) throw new Exception('Unknown card.');
 
   $name = $player['player_name'];
-  $space = (int) $game['state']['space'];
-  $election = vg_election_at($space);
+  $election = vg_election_at((int) $game['state']['space']);
+  $value = (int) $card['value'];
 
   switch ($action) {
 
-    case 'finance': {
-      $gain = (int) $card['finance'];
-      $bonus = !empty($player['public_state']['controls_president']) ? (int) $config['control_bonus'] : 0;
-      $player['public_state']['money'] = (int) $player['public_state']['money'] + $gain + $bonus;
-
-      // The country is inflamed by the story being printed at all, not by
-      // the motive for printing it. Charging stability on Finance as well as
-      // Sway is what stops a player who never sways from free-riding on the
-      // stability everybody else spends.
-      engine_adjust_stability($game, (int) $card['stability'], $mysqli);
-
-      $msg = $name . ' ran ' . $card['name'] . ' for ' . ($gain + $bonus) . ' wealth'
-           . ($bonus ? ' (including ' . $bonus . ' from the administration).' : '.');
-      engine_log($mysqli, $game, $seat, 'finance', $msg,
-        ['card' => $cardKey, 'gain' => $gain, 'control_bonus' => $bonus,
-         'stability_delta' => (int) $card['stability'],
-         'stability' => $game['state']['stability'],
+    case 'cash': {
+      $bonus = (!empty($player['public_state']['is_patron'])) ? (int) $config['patron_bonus'] : 0;
+      $player['public_state']['money'] = (int) $player['public_state']['money'] + $value + $bonus;
+      $msg = $name . ' ran ' . $card['name'] . ' for ' . ($value + $bonus) . ' money'
+           . ($bonus ? ' (including ' . $bonus . ' as Patron).' : '.');
+      engine_log($mysqli, $game, $seat, 'cash', $msg,
+        ['card' => $cardKey, 'value' => $value, 'patron_bonus' => $bonus,
          'money' => $player['public_state']['money']], $name);
       break;
     }
 
-    case 'sway': {
-      if (!engine_card_swayable($game, $cardKey)) {
-        throw new Exception($card['name'] . ' is no longer what the country argues about. You can still run it for money.');
+    case 'print': {
+      $side = isset($params['side']) ? (string) $params['side'] : '';
+      if ($side !== 'nation' && $side !== 'states') {
+        throw new Exception('Choose which candidate to back.');
       }
-      $cost = (int) $card['sway_cost'];
-      if ((int) $player['public_state']['money'] < $cost) {
-        throw new Exception('You cannot afford that: it costs ' . $cost . ' and you hold ' . $player['public_state']['money'] . '.');
+      $candidate = $election[$side];
+
+      $before = (int) $game['state']['track'];
+      $game['state']['track'] = engine_track_after($game, $cardKey);
+
+      if (!isset($game['state']['stakes'][$side]) || !is_array($game['state']['stakes'][$side])) {
+        $game['state']['stakes'][$side] = [];
       }
+      $current = (int) ($game['state']['stakes'][$side][$seat] ?? 0);
+      $game['state']['stakes'][$side][$seat] = $current + $value;
+      $player['public_state']['prints'] = 1 + (int) ($player['public_state']['prints'] ?? 0);
 
-      $candidateKey = isset($params['candidate']) ? (string) $params['candidate'] : '';
-      $valid = false;
-      foreach ($election['candidates'] as $c) {
-        if ($c['key'] === $candidateKey) { $valid = true; $candidate = $c; break; }
-      }
-      if (!$valid) throw new Exception('That candidate is not standing in this election.');
-
-      $player['public_state']['money'] -= $cost;
-
-      $cp = (int) $card['sway_cp'];
-      if (!isset($game['state']['control'][$candidateKey])) {
-        $game['state']['control'][$candidateKey] = [];
-      }
-      $current = isset($game['state']['control'][$candidateKey][$seat])
-        ? (int) $game['state']['control'][$candidateKey][$seat] : 0;
-      $game['state']['control'][$candidateKey][$seat] = $current + $cp;
-
-      $moved = engine_apply_deltas($game, $card['deltas']);
-      $stabilityDelta = (int) $card['stability'];
-
-      // Pushing a track that is already at an extreme inflames the country
-      // further than the card alone would.
-      foreach ($moved as $axis => $m) {
-        if (abs($m['to']) >= 4) $stabilityDelta -= 1;
-      }
-      engine_adjust_stability($game, $stabilityDelta, $mysqli);
-
-      $msg = $name . ' ran ' . $card['name'] . ' for ' . $candidate['name']
-           . ' (+' . $cp . ' control, -' . $cost . ' wealth).';
-      engine_log($mysqli, $game, $seat, 'sway', $msg,
-        ['card' => $cardKey, 'candidate' => $candidateKey, 'cost' => $cost,
-         'control_points' => $cp, 'tracks_moved' => $moved,
-         'stability_delta' => $stabilityDelta,
-         'stability' => $game['state']['stability']], $name);
-      break;
-    }
-
-    case 'transition': {
-      if (empty($card['key'])) throw new Exception('That is not a key card.');
-      $earliest = (int) ($card['earliest_space'] ?? 1);
-      if ($space < $earliest) {
-        $gate = vg_election_at($earliest);
-        throw new Exception('The country is not arguing about that yet. '
-          . $card['name'] . ' cannot be played before ' . $gate['year'] . '.');
-      }
-      $axis = $card['transitions'];
-      $i = engine_slot_for_axis($game, $axis);
-      if ($i === null) throw new Exception('That question has already been superseded.');
-
-      $tracks = vg_issue_tracks();
-      $oldName = $tracks['early'][$axis]['name'];
-      $newAxis = $card['unlocks'];
-      $newName = $tracks['late'][$newAxis]['name'];
-
-      $game['state']['slots'][$i] = [
-        'axis' => $newAxis, 'value' => 0, 'transitioned' => true,
-      ];
-
-      // The pack this card unlocks joins the deck. Playing Manifest
-      // Destiny is literally what brings Texas into the conversation.
-      $pack = vg_cards_in_pack($newAxis);
-      foreach ($pack as $newCard) $game['state']['deck'][] = $newCard;
-      shuffle($game['state']['deck']);
-
-      engine_adjust_stability($game, (int) $card['stability'], $mysqli);
-
-      // Naming the new national question is itself the story you sell.
-      // Without this the card is strictly worse than playing it for money,
-      // and in 300 simulated games not one transition was ever fired.
-      $gain = (int) $card['finance'];
-      $player['public_state']['money'] = (int) $player['public_state']['money'] + $gain;
-
-      $msg = $name . ' played ' . $card['name'] . '. The country stops arguing about '
-           . $oldName . ' and starts arguing about ' . $newName . '.';
-      engine_log($mysqli, $game, $seat, 'transition', $msg,
-        ['card' => $cardKey, 'from' => $axis, 'to' => $newAxis,
-         'gain' => $gain, 'cards_added' => count($pack)], $name);
+      $msg = $name . ' printed ' . $card['name'] . ' and staked ' . $value . ' on '
+           . $candidate['name'] . '.';
+      engine_log($mysqli, $game, $seat, 'print', $msg,
+        ['card' => $cardKey, 'side' => $side, 'candidate' => $candidate['key'],
+         'stake' => $value, 'push' => (int) $card['push'],
+         'track_from' => $before, 'track_to' => (int) $game['state']['track']], $name);
       break;
     }
 
@@ -433,74 +429,14 @@ function engine_play_card(&$game, &$players, $seat, $action, $params, $mysqli) {
       throw new Exception('Unknown action: ' . $action);
   }
 
-  // The card leaves the hand. Key cards leave the game entirely.
   array_splice($hand, $at, 1);
   $player['private_state']['hand'] = $hand;
   $player['public_state']['cards_played'] = 1 + (int) $player['public_state']['cards_played'];
-
-  if ($action === 'transition') {
-    $game['state']['removed'][] = $cardKey;
-  } else {
-    $game['state']['discard'][] = $cardKey;
-  }
+  $game['state']['discard'][] = $cardKey;
 
   engine_draw_up($game, $player, (int) $config['hand_size']);
   $player['score'] = (int) $player['public_state']['money'];
-
   return $msg;
-}
-
-/** Reject an out-of-turn action. */
-function engine_require_turn($game, $seat) {
-  if ($game['current_seat'] === null) return;
-  if ((int) $game['current_seat'] !== (int) $seat) {
-    throw new Exception('It is not your turn.');
-  }
-}
-
-/** Seats still playing, bots included. */
-function engine_active_seats($players) {
-  $n = 0;
-  foreach ($players as $p) if (empty($p['conceded'])) $n++;
-  return $n;
-}
-
-/**
- * Seats still playing that are actually people.
- *
- * The distinction matters: a game whose only human has conceded is over,
- * however many rival papers are still willing to print. Counting bots as
- * active let the first live game run thirteen elections after its only
- * player left.
- */
-function engine_human_seats($players) {
-  $n = 0;
-  foreach ($players as $p) {
-    if (empty($p['conceded']) && empty($p['is_bot'])) $n++;
-  }
-  return $n;
-}
-
-// ---------------------------------------------------------------------
-// Stability
-// ---------------------------------------------------------------------
-
-/**
- * Move the stability track. At zero the Union breaks and the game ends
- * where it stands — there is no bonus for causing it and no penalty for
- * it happening. You simply might not have banked your winnings yet.
- */
-function engine_adjust_stability(&$game, $delta, $mysqli) {
-  if ($delta === 0) return;
-  $before = (int) $game['state']['stability'];
-  $ceiling = (int) ($game['config']['stability_max'] ?? $game['config']['stability_start']);
-  $after = max(0, min($ceiling, $before + $delta));
-  $game['state']['stability'] = $after;
-
-  if ($after < $before && $after <= 3 && $before > 3) {
-    engine_log($mysqli, $game, null, 'stability_warning',
-      'The Union is fraying badly.', ['stability' => $after]);
-  }
 }
 
 // ---------------------------------------------------------------------
@@ -509,209 +445,109 @@ function engine_adjust_stability(&$game, $delta, $mysqli) {
 
 /**
  * End the current turn: either pass to the next seat, or — when every
- * seat has had its turns for this space — resolve the election.
+ * seat has had its turns for this election — resolve it.
  */
 function engine_end_turn(&$game, &$players, $mysqli) {
   if ($game['status'] !== 'active') return;
 
-  // No people left at the table: the game is over regardless of how many
-  // bots would still happily play on. Checked here rather than in the
-  // concede branch so it covers every path that can empty the table.
   if (engine_human_seats($players) < 1) {
     engine_end_game($game, $players, 'all_humans_left', $mysqli);
     return;
   }
 
-  // Stability collapse is checked here rather than inside the card play,
-  // so the acting player always completes the action that caused it.
-  if ((int) $game['state']['stability'] <= 0) {
-    engine_end_game($game, $players, 'the_union_breaks', $mysqli);
-    return;
-  }
-
   $game['state']['turns_taken_this_space'] = 1 + (int) $game['state']['turns_taken_this_space'];
-
-  $active = engine_active_seats($players);
-  $needed = $active * (int) $game['config']['turns_per_space'];
-
-  if ($game['state']['turns_taken_this_space'] >= $needed) {
+  if ($game['state']['turns_taken_this_space'] >= engine_turns_needed($game, $players)) {
     engine_resolve_election($game, $players, $mysqli);
     return;
   }
-  engine_next_seat($game, $players);
-}
-
-/** Pass to the next non-conceded seat. */
-function engine_next_seat(&$game, &$players) {
-  $seatCount = count($players);
-  if ($seatCount === 0) return;
-  $from = (int) $game['current_seat'];
-  for ($step = 1; $step <= $seatCount; $step++) {
-    $next = ($from + $step) % $seatCount;
-    if (isset($players[$next]) && empty($players[$next]['conceded'])) {
-      $game['current_seat'] = $next;
-      return;
-    }
-  }
+  $game['current_seat'] = engine_seat_after($players, $game['current_seat']);
 }
 
 /**
- * How well a candidate matches where the country currently sits: the dot
- * product of their stances with the three track positions.
- *
- * A track at zero contributes nothing — the country has not decided, so
- * that question does not help anybody. A candidate strongly for something
- * the country is strongly against scores strongly negative.
- */
-function engine_candidate_alignment($game, $candidate) {
-  $total = 0;
-  $detail = [];
-  foreach ($game['state']['slots'] as $slot) {
-    $axis = $slot['axis'];
-    $value = (int) $slot['value'];
-    $stance = $slot['transitioned']
-      ? (int) ($candidate['stance_late'][$axis] ?? 0)
-      : (int) ($candidate['stance_early'][$axis] ?? 0);
-    $contribution = $stance * $value;
-    $total += $contribution;
-    $detail[$axis] = ['stance' => $stance, 'track' => $value, 'points' => $contribution];
-  }
-  return ['total' => $total, 'detail' => $detail];
-}
-
-/** Total control points on a candidate, by seat. */
-function engine_control_on($game, $candidateKey) {
-  return isset($game['state']['control'][$candidateKey])
-    ? $game['state']['control'][$candidateKey] : [];
-}
-
-/**
- * Resolve the election on the current space, award the presidency, and
- * advance the board.
+ * Resolve the election on the current space, pay the stakes, name the
+ * Patron, and advance the board.
  */
 function engine_resolve_election(&$game, &$players, $mysqli) {
   $space = (int) $game['state']['space'];
   $election = vg_election_at($space);
   if (!$election) {
-    engine_end_game($game, $players, 'board_exhausted', $mysqli);
+    engine_end_game($game, $players, 'board_completed', $mysqli);
     return;
   }
 
-  $a = $election['candidates'][0];
-  $b = $election['candidates'][1];
-  $alignA = engine_candidate_alignment($game, $a);
-  $alignB = engine_candidate_alignment($game, $b);
+  list($side, $decidedBy) = engine_leading_side($game);
+  $winner = $election[$side];
+  $loser = $election[engine_other_side($side)];
+  $track = (int) $game['state']['track'];
+  $stakes = $game['state']['stakes'];
+  $num = max(1, (int) $game['config']['payout_num']);
+  $den = max(1, (int) $game['config']['payout_den']);
 
-  $cpA = array_sum(engine_control_on($game, $a['key']));
-  $cpB = array_sum(engine_control_on($game, $b['key']));
-
-  // Issues decide the candidate. Control breaks a dead heat — when the
-  // country is genuinely undecided, the loudest press wins. History
-  // breaks a tie in that too.
-  if ($alignA['total'] !== $alignB['total']) {
-    $winner = ($alignA['total'] > $alignB['total']) ? $a : $b;
-    $reason = 'issues';
-  } elseif ($cpA !== $cpB) {
-    $winner = ($cpA > $cpB) ? $a : $b;
-    $reason = 'control';
-  } else {
-    $winner = ($election['historical_winner'] === $a['key']) ? $a : $b;
-    $reason = 'history';
+  // Winning stakes pay back. Losing stakes are simply gone.
+  $payouts = [];
+  foreach (($stakes[$side] ?? []) as $s => $stake) {
+    if (!isset($players[$s])) continue;
+    $paid = intdiv((int) $stake * $num, $den);
+    if ($paid <= 0) continue;
+    $players[$s]['public_state']['money'] = (int) $players[$s]['public_state']['money'] + $paid;
+    $players[$s]['score'] = (int) $players[$s]['public_state']['money'];
+    $payouts[(int) $s] = $paid;
   }
 
-  // Which player owns the winner. A tie means nobody does.
-  $control = engine_control_on($game, $winner['key']);
-  $controllerSeat = null;
+  // The Patron: the single largest stake on the winner.
+  $patron = null;
   $best = 0;
   $tied = false;
-  foreach ($control as $seat => $points) {
-    $points = (int) $points;
-    if ($points > $best) { $best = $points; $controllerSeat = (int) $seat; $tied = false; }
-    elseif ($points === $best && $points > 0) { $tied = true; }
+  foreach (($stakes[$side] ?? []) as $s => $stake) {
+    $stake = (int) $stake;
+    if ($stake > $best) { $best = $stake; $patron = (int) $s; $tied = false; }
+    elseif ($stake === $best && $stake > 0) { $tied = true; }
   }
-  if ($tied || $best <= 0) $controllerSeat = null;
+  if ($tied || $best <= 0) $patron = null;
 
-  foreach ($players as $seat => $p) {
-    $has = ($controllerSeat !== null && (int) $seat === $controllerSeat);
-    $players[$seat]['public_state']['controls_president'] = $has;
-    if ($has) {
-      $players[$seat]['public_state']['presidencies'] =
-        1 + (int) $players[$seat]['public_state']['presidencies'];
+  foreach ($players as $s => $p) {
+    $is = ($patron !== null && (int) $s === $patron);
+    $players[$s]['public_state']['is_patron'] = $is;
+    if ($is) {
+      $players[$s]['public_state']['patronages'] =
+        1 + (int) ($players[$s]['public_state']['patronages'] ?? 0);
     }
   }
+  $game['state']['patron_seat'] = $patron;
+  $patronName = ($patron !== null && isset($players[$patron])) ? $players[$patron]['player_name'] : null;
 
-  $controllerName = ($controllerSeat !== null && isset($players[$controllerSeat]))
-    ? $players[$controllerSeat]['player_name'] : null;
-
-  $msg = $election['year'] . ': ' . $winner['name'] . ' takes the presidency'
-       . ($controllerName ? ', and ' . $controllerName . ' owns the administration.'
-                          : ', with no paper able to claim him.');
+  $msg = $election['year'] . ': ' . $winner['name'] . ' wins'
+       . ($patronName ? ', and ' . $patronName . ' is his Patron.' : ', and no paper can claim him.');
 
   engine_log($mysqli, $game, null, 'election', $msg, [
     'space' => $space, 'year' => $election['year'],
-    'winner' => $winner['key'], 'decided_by' => $reason,
-    'alignment' => [$a['key'] => $alignA['total'], $b['key'] => $alignB['total']],
-    'alignment_detail' => [$a['key'] => $alignA['detail'], $b['key'] => $alignB['detail']],
-    'control' => [$a['key'] => engine_control_on($game, $a['key']),
-                  $b['key'] => engine_control_on($game, $b['key'])],
-    'controller_seat' => $controllerSeat,
+    'winner_side' => $side, 'winner' => $winner['key'], 'decided_by' => $decidedBy,
+    'track' => $track, 'stakes' => $stakes, 'payouts' => $payouts,
+    'patron_seat' => $patron,
     'historical_winner' => $election['historical_winner'],
-    'stability' => (int) $game['state']['stability'],
   ]);
+  foreach ($payouts as $s => $paid) {
+    engine_log($mysqli, $game, $s, 'payout',
+      $players[$s]['player_name'] . ' collected ' . $paid . ' on ' . $winner['name'] . '.',
+      ['paid' => $paid, 'stake' => (int) $stakes[$side][$s]], $players[$s]['player_name']);
+  }
 
   $game['state']['history'][] = [
     'space' => $space, 'year' => $election['year'],
-    'winner' => $winner['key'], 'winner_name' => $winner['name'],
-    'decided_by' => $reason,
-    'controller_seat' => $controllerSeat,
-    'controller_name' => $controllerName,
-    'matched_history' => ($winner['key'] === $election['historical_winner']),
-    'stability' => (int) $game['state']['stability'],
+    'winner_side' => $side, 'winner' => $winner['key'], 'winner_name' => $winner['name'],
+    'loser_name' => $loser['name'],
+    'decided_by' => $decidedBy, 'track' => $track,
+    'patron_seat' => $patron, 'patron_name' => $patronName,
+    'matched_history' => ($side === $election['historical_winner']),
   ];
-
   $game['state']['president'] = [
-    'candidate' => $winner['key'],
-    'name' => $winner['name'],
-    'year' => $election['year'],
-    'controller_seat' => $controllerSeat,
+    'name' => $winner['name'], 'year' => $election['year'], 'side' => $side,
+    'patron_seat' => $patron,
   ];
 
-  // Support for the LOSING candidate is not wasted: you backed the wrong
-  // man, but you sold newspapers doing it. Without this a failed bid burns
-  // outright, contesting is negative-sum, and control silently goes
-  // uncontested to whoever bids first — which is what the simulation found.
-  $loser = ($winner['key'] === $a['key']) ? $b : $a;
-  $rate = (int) ($game['config']['losing_cp_payout'] ?? 0);
-  if ($rate > 0) {
-    foreach (engine_control_on($game, $loser['key']) as $s => $pts) {
-      if (!isset($players[$s])) continue;
-      $paid = (int) $pts * $rate;
-      if ($paid <= 0) continue;
-      $players[$s]['public_state']['money'] =
-        (int) $players[$s]['public_state']['money'] + $paid;
-      $players[$s]['score'] = (int) $players[$s]['public_state']['money'];
-      engine_log($mysqli, $game, (int) $s, 'losing_support',
-        $players[$s]['player_name'] . ' sold papers for ' . $loser['name']
-        . ' and took ' . $paid . ' wealth from a losing campaign.',
-        ['candidate' => $loser['key'], 'points' => (int) $pts, 'paid' => $paid],
-        $players[$s]['player_name']);
-    }
-  }
-
-  // An election settles the country a little: the result is accepted,
-  // and the argument starts over. This is the stability track income,
-  // and it is what lets the early republic absorb quarrels the 1850s
-  // cannot.
-  // Proportional to the table: four seats play twice as many cards per
-  // era as two, so a flat recovery made the game unplayable above two
-  // players — it collapsed after 2.8 of 14 spaces. The rate is expressed
-  // per two seats, which preserves the heads-up value it was tuned at.
-  $recovery = intdiv((int) ($game['config']['stability_recovery'] ?? 0)
-                     * max(1, count($players)), 2);
-  engine_adjust_stability($game, $recovery, $mysqli);
-
-  // Clear the slate for the next campaign.
-  $game['state']['control'] = [];
+  // Clear the slate. The country starts every campaign undecided.
+  $game['state']['stakes'] = ['nation' => [], 'states' => []];
+  $game['state']['track'] = 0;
   $game['state']['turns_taken_this_space'] = 0;
   $game['state']['space'] = $space + 1;
   $game['round_number'] = $space + 1;
@@ -721,21 +557,31 @@ function engine_resolve_election(&$game, &$players, $mysqli) {
     return;
   }
 
-  $next = vg_election_at($game['state']['space']);
-  engine_log($mysqli, $game, null, 'campaign_begins',
-    'The campaign of ' . $next['year'] . ' opens: ' .
-    $next['candidates'][0]['name'] . ' against ' . $next['candidates'][1]['name'] . '.',
-    ['space' => $game['state']['space'], 'year' => $next['year']]);
-
-  // Rotate who OPENS the campaign. Without this the same paper opened
-  // every era, bought control first and cheapest, and no rival could ever
-  // profitably contest it.
-  $seatCount = max(1, count($players));
-  $game['state']['start_seat'] = ((int) ($game['state']['start_seat'] ?? 0) + 1) % $seatCount;
-  $game['current_seat'] = (int) $game['state']['start_seat'];
-  if (!empty($players[$game['current_seat']]['conceded'])) {
-    engine_next_seat($game, $players);
+  if ($game['state']['space'] === (int) $game['config']['crisis_space']) {
+    foreach (vg_cards_in_era('crisis') as $k) $game['state']['deck'][] = $k;
+    shuffle($game['state']['deck']);
+    $game['state']['crisis'] = true;
+    engine_log($mysqli, $game, null, 'crisis',
+      'The sectional crisis: Texas, Kansas and the Fugitive Slave Act join the argument.',
+      ['space' => $game['state']['space']]);
   }
+
+  engine_log_campaign($mysqli, $game);
+
+  // Rotate who opens the campaign, walking the seats that exist.
+  $start = engine_seat_after($players, (int) ($game['state']['start_seat'] ?? 0), false);
+  $game['state']['start_seat'] = $start;
+  $game['current_seat'] = empty($players[$start]['conceded'])
+    ? $start : engine_seat_after($players, $start);
+}
+
+function engine_log_campaign($mysqli, $game) {
+  $e = vg_election_at((int) $game['state']['space']);
+  if (!$e || !$mysqli) return;
+  engine_log($mysqli, $game, null, 'campaign_begins',
+    'The campaign of ' . $e['year'] . ' opens: ' .
+    $e['nation']['name'] . ' against ' . $e['states']['name'] . '.',
+    ['space' => (int) $game['state']['space'], 'year' => $e['year']]);
 }
 
 // ---------------------------------------------------------------------
@@ -746,35 +592,29 @@ function engine_resolve_election(&$game, &$players, $mysqli) {
  * Run every consecutive bot seat until a human is on turn or the game
  * ends. Called after each human action, inside the same transaction, so
  * a solo player sees the whole round resolve in one response.
- *
- * The bot plays through engine_play_card like anybody else, so it can
- * never do something a player could not.
  */
 function engine_run_bots(&$game, &$players, $mysqli, $limit = null) {
-  // One full round of the current space, plus a small margin for the
-  // rollover into the next one. This is a bound on NORMAL play, not just
-  // an anti-infinite-loop backstop: the previous limit of 40 let a single
-  // request play thirteen elections once every seat was a bot.
+  // One full election plus a margin: a bound on NORMAL play, so a table
+  // of bots can never play the whole board inside one request.
   if ($limit === null) {
     $limit = count($players) * (int) $game['config']['turns_per_space'] + 4;
   }
   $steps = 0;
   while ($game['status'] === 'active' && $steps < $limit) {
-    // Never play on behalf of a table nobody is sitting at.
     if (engine_human_seats($players) < 1) break;
     $seat = $game['current_seat'];
     if ($seat === null || !isset($players[$seat])) break;
     if (empty($players[$seat]['is_bot']) || !empty($players[$seat]['conceded'])) break;
 
+    $hand = $players[$seat]['private_state']['hand'] ?? [];
+    if (empty($hand)) { $players[$seat]['conceded'] = 1; engine_end_turn($game, $players, $mysqli); $steps++; continue; }
+
     list($action, $params) = engine_bot_choice($game, $players, $seat);
     try {
       engine_play_card($game, $players, $seat, $action, $params, $mysqli);
     } catch (Exception $e) {
-      // A bot must never wedge the game. Fall back to the always-legal
-      // move, and if even that fails, drop the card.
-      $hand = $players[$seat]['private_state']['hand'];
-      if (empty($hand)) { $players[$seat]['conceded'] = 1; break; }
-      engine_play_card($game, $players, $seat, 'finance', ['card' => $hand[0]], $mysqli);
+      // A bot must never wedge the game: fall back to the always-legal move.
+      engine_play_card($game, $players, $seat, 'cash', ['card' => $hand[0]], $mysqli);
     }
     engine_end_turn($game, $players, $mysqli);
     $steps++;
@@ -782,118 +622,40 @@ function engine_run_bots(&$game, &$players, $mysqli, $limit = null) {
 }
 
 /**
- * The bot decision — the 'tycoon' heuristic, which is the strategy the
- * balance tuning was actually validated against (tools/simulate.py). If
- * this and strat_tycoon there drift apart, the tuning stops meaning
- * anything, so change them together.
+ * The bot decision. Kept in step with strat_bot in tools/simulate.py — the
+ * tuning was validated against it, so change them together.
  *
- * Deliberately a readable heuristic rather than a search: it should play
- * like a plausible rival press, not like a solver, and it has to be
- * explainable when a playtest says it did something odd.
- *
- *   1. Holding the presidency? Bank — the income is the whole point.
- *   2. Already leading the candidate the issues favour? Bank; do not bid
- *      against yourself.
- *   3. Otherwise take the lead with the CHEAPEST sway that does it.
- *   4. Nothing worth buying? Bank, preferring a key card, since a
- *      transition pays the same money and moves the board too.
+ *   1. Patron? Cash the best card; the bonus is the point of the office.
+ *   2. Otherwise print the most valuable card that leaves the track off
+ *      zero, staking it on whichever side then leads.
+ *   3. No such card? Cash the best card.
  */
 function engine_bot_choice($game, $players, $seat) {
   $player = $players[$seat];
-  $hand = isset($player['private_state']['hand']) ? $player['private_state']['hand'] : [];
-  if (empty($hand)) return ['finance', []];
+  $hand = $player['private_state']['hand'] ?? [];
 
-  $money = (int) $player['public_state']['money'];
-  $space = (int) $game['state']['space'];
-  $election = vg_election_at($space);
-  if (!$election) return engine_bot_bank($game, $players, $seat);
-
-  if (!empty($player['public_state']['controls_president'])) {
-    return engine_bot_bank($game, $players, $seat);
-  }
-
-  $a = $election['candidates'][0];
-  $b = $election['candidates'][1];
-  $favoured = (engine_candidate_alignment($game, $a)['total']
-            >= engine_candidate_alignment($game, $b)['total']) ? $a : $b;
-
-  $control = engine_control_on($game, $favoured['key']);
-  $mine = isset($control[$seat]) ? (int) $control[$seat] : 0;
-  $rival = 0;
-  foreach ($control as $s => $pts) {
-    if ((int) $s !== (int) $seat) $rival = max($rival, (int) $pts);
-  }
-  if ($mine > $rival) return engine_bot_bank($game, $players, $seat);
-
-  $seats = max(1, count($players));
-  $turnsLeft = intdiv($seats * (int) $game['config']['turns_per_space']
-                    - (int) $game['state']['turns_taken_this_space'], $seats);
-  if ($turnsLeft < 1) return engine_bot_bank($game, $players, $seat);
-
-  // Cheapest card that actually takes the lead. Once losing support pays
-  // out, a bid that fails refunds rather than burns, so a late bid is
-  // worth making — guarding against it was what handed every presidency
-  // to whoever opened the campaign.
-  $bestCard = null;
-  $bestCost = PHP_INT_MAX;
+  $bestCash = $hand[0];
   foreach ($hand as $key) {
-    $c = vg_card($key);
-    if (!$c || !engine_card_swayable($game, $key)) continue;
-    if ((int) $c['sway_cost'] > $money) continue;
-    if ($mine + (int) $c['sway_cp'] <= $rival) continue;
-    if ((int) $c['sway_cost'] < $bestCost) {
-      $bestCost = (int) $c['sway_cost'];
-      $bestCard = $key;
+    if ((int) vg_card($key)['value'] > (int) vg_card($bestCash)['value']) $bestCash = $key;
+  }
+  if (!empty($player['public_state']['is_patron'])) {
+    return ['cash', ['card' => $bestCash]];
+  }
+
+  $bestPrint = null;
+  $bestSide = null;
+  foreach ($hand as $key) {
+    $track = engine_track_after($game, $key);
+    if ($track === 0) continue;
+    if ($bestPrint === null || (int) vg_card($key)['value'] > (int) vg_card($bestPrint)['value']) {
+      $bestPrint = $key;
+      $bestSide = ($track > 0) ? 'nation' : 'states';
     }
   }
-  if ($bestCard !== null) {
-    return ['sway', ['card' => $bestCard, 'candidate' => $favoured['key']]];
+  if ($bestPrint !== null) {
+    return ['print', ['card' => $bestPrint, 'side' => $bestSide]];
   }
-  return engine_bot_bank($game, $players, $seat);
-}
-
-/**
- * Bank a card — preferring a key card, because a transition pays the same
- * money AND moves the board. Held back only while the track it would reset
- * is one this bot is currently winning on: resetting that track would
- * throw away the position it just paid for.
- */
-function engine_bot_bank($game, $players, $seat) {
-  $player = $players[$seat];
-  $hand = isset($player['private_state']['hand']) ? $player['private_state']['hand'] : [];
-  if (empty($hand)) return ['finance', []];
-
-  $space = (int) $game['state']['space'];
-  $election = vg_election_at($space);
-
-  foreach ($hand as $key) {
-    $c = vg_card($key);
-    if (!$c || empty($c['key'])) continue;
-    if ($space < (int) ($c['earliest_space'] ?? 1)) continue;
-    $i = engine_slot_for_axis($game, $c['transitions']);
-    if ($i === null) continue;
-
-    $helpingMe = false;
-    if ($election) {
-      $a = $election['candidates'][0];
-      $b = $election['candidates'][1];
-      $favoured = (engine_candidate_alignment($game, $a)['total']
-                >= engine_candidate_alignment($game, $b)['total']) ? $a : $b;
-      $slot = $game['state']['slots'][$i];
-      $stance = (int) ($favoured['stance_early'][$slot['axis']] ?? 0);
-      $control = engine_control_on($game, $favoured['key']);
-      $helpingMe = ($stance * (int) $slot['value']) > 2
-        && isset($control[$seat]) && (int) $control[$seat] > 0;
-    }
-    if (!$helpingMe) return ['transition', ['card' => $key]];
-  }
-
-  $best = $hand[0];
-  foreach ($hand as $key) {
-    $c = vg_card($key);
-    if ($c && (int) $c['finance'] > (int) vg_card($best)['finance']) $best = $key;
-  }
-  return ['finance', ['card' => $best]];
+  return ['cash', ['card' => $bestCash]];
 }
 
 // ---------------------------------------------------------------------
@@ -909,13 +671,13 @@ function engine_end_game(&$game, &$players, $reason, $mysqli) {
   $game['current_seat'] = null;
   $game['ended_reason'] = $reason;
 
-  $best = null;
   foreach ($players as $seat => $p) {
-    $result = engine_score_player($game, $players, $seat);
+    $result = engine_score_player($players, $seat);
     $players[$seat]['final_score']     = (int) $result['total'];
     $players[$seat]['score']           = (int) $result['total'];
     $players[$seat]['score_breakdown'] = $result['breakdown'];
   }
+  $best = null;
   foreach ($players as $seat => $p) {
     if (!empty($p['conceded'])) continue;
     if ($best === null || (int) $players[$seat]['final_score'] > (int) $players[$best]['final_score']) {
@@ -924,36 +686,35 @@ function engine_end_game(&$game, &$players, $reason, $mysqli) {
   }
   $game['winner_seat'] = $best;
 
-  $reasonText = [
-    'board_completed'   => 'The board is played out. It is 1860.',
-    'the_union_breaks'  => 'The Union breaks. The presses stop where they stand.',
-    'board_exhausted'   => 'The board ran out.',
-    'all_conceded'      => 'Every paper has shut down.',
-    'all_humans_left'   => 'The last editor walked away.',
-    'no_active_players' => 'Nobody is left to print.',
-  ];
-
   engine_log($mysqli, $game, null, 'game_ended',
-    ($reasonText[$reason] ?? 'The game ended.') .
+    engine_ended_text($reason) .
     ($best !== null ? ' ' . $players[$best]['player_name'] . ' ends richest.' : ''),
     ['reason' => $reason, 'winner_seat' => $best,
-     'stability' => (int) $game['state']['stability'],
-     'spaces_played' => count($game['state']['history'])]);
+     'spaces_played' => count($game['state']['history'] ?? [])]);
+}
+
+function engine_ended_text($reason) {
+  $text = [
+    'board_completed' => 'The board is played out. It is 1860.',
+    'all_humans_left' => 'The last editor walked away.',
+    'rules_changed'   => 'This game was started under the old rules.',
+  ];
+  return $text[$reason] ?? 'The game ended.';
 }
 
 /**
- * Final score. Wealth IS the score — the brief is explicit that the
- * richest player wins, and nothing else is added on top. Presidencies
- * are reported because they explain the wealth, not because they score.
+ * Final score. Money IS the score; nothing else is added. Patronages are
+ * reported because they explain the money, not because they score.
  */
-function engine_score_player($game, $players, $seat) {
+function engine_score_player($players, $seat) {
   $p = $players[$seat];
   $money = (int) ($p['public_state']['money'] ?? 0);
   return [
     'total' => $money,
     'breakdown' => [
-      'wealth'       => $money,
-      'presidencies' => (int) ($p['public_state']['presidencies'] ?? 0),
+      'money'        => $money,
+      'patronages'   => (int) ($p['public_state']['patronages'] ?? 0),
+      'prints'       => (int) ($p['public_state']['prints'] ?? 0),
       'cards_played' => (int) ($p['public_state']['cards_played'] ?? 0),
     ],
   ];
@@ -963,6 +724,15 @@ function engine_score_player($game, $players, $seat) {
 // Public projection — the ONLY thing getState.php serialises
 // ---------------------------------------------------------------------
 
+/** A side's stakes as a list, so JSON never has to guess list-or-object. */
+function engine_stake_list($game, $side) {
+  $out = [];
+  foreach (($game['state']['stakes'][$side] ?? []) as $s => $amount) {
+    $out[] = ['seat' => (int) $s, 'amount' => (int) $amount];
+  }
+  return $out;
+}
+
 /**
  * Build the state blob the client polls. Every seat sees the same public
  * payload; exactly one private block is included, for the asking seat.
@@ -971,7 +741,18 @@ function engine_score_player($game, $players, $seat) {
  * other seats get a COUNT, never the contents.
  */
 function engine_public_state($game, $players, $viewerSeat = null) {
-  $tracks = vg_issue_tracks();
+  $current = engine_is_current($game);
+  $status = $game['status'];
+  $endedReason = $game['ended_reason'];
+  // An active game from an older engine cannot be played: show it as over
+  // rather than feed its state to a UI that expects this shape.
+  if ($status === 'active' && !$current) {
+    $status = 'ended';
+    $endedReason = 'rules_changed';
+  }
+
+  $state = $current ? $game['state'] : [];
+  $config = $game['config'];
 
   $seats = [];
   foreach ($players as $seat => $p) {
@@ -981,105 +762,98 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'is_bot'          => (bool) $p['is_bot'],
       'conceded'        => (bool) $p['conceded'],
       'money'           => (int) ($p['public_state']['money'] ?? 0),
-      'controls_president' => (bool) ($p['public_state']['controls_president'] ?? false),
-      'presidencies'    => (int) ($p['public_state']['presidencies'] ?? 0),
+      'is_patron'       => (bool) ($p['public_state']['is_patron'] ?? false),
+      'patronages'      => (int) ($p['public_state']['patronages'] ?? 0),
+      'prints'          => (int) ($p['public_state']['prints'] ?? 0),
       'hand_count'      => (int) ($p['public_state']['hand_count'] ?? 0),
       'score'           => (int) $p['score'],
       'final_score'     => $p['final_score'],
-      'score_breakdown' => ($game['status'] === 'ended') ? $p['score_breakdown'] : null,
-      'last_seen_at'    => $p['last_seen_at'],
+      'score_breakdown' => ($status === 'ended') ? $p['score_breakdown'] : null,
       'is_you'          => ($viewerSeat !== null && (int) $seat === (int) $viewerSeat),
     ];
   }
 
-  $state = $game['state'];
   $space = (int) ($state['space'] ?? 1);
-  $election = vg_election_at($space);
+  $election = $current ? vg_election_at($space) : null;
+  $track = (int) ($state['track'] ?? 0);
 
-  // The live tracks, with the names the country currently uses for them.
-  $liveTracks = [];
-  foreach (($state['slots'] ?? []) as $slot) {
-    $axis = $slot['axis'];
-    $def = $slot['transitioned'] ? $tracks['late'][$axis] : $tracks['early'][$axis];
-    $liveTracks[] = [
-      'axis' => $axis, 'name' => $def['name'],
-      'low' => $def['low'], 'high' => $def['high'],
-      'value' => (int) $slot['value'],
-      'transitioned' => (bool) $slot['transitioned'],
-    ];
-  }
-
-  // The current race, with each candidate current standing. Alignment is
-  // public: a newspaper can read the country as well as anyone.
   $race = null;
-  if ($election && $game['status'] === 'active') {
+  if ($election && $status === 'active') {
+    list($leading, $decidedBy) = engine_leading_side($game);
     $cands = [];
-    foreach ($election['candidates'] as $c) {
-      $align = engine_candidate_alignment($game, $c);
-      $cands[] = [
+    foreach (['nation', 'states'] as $side) {
+      $c = $election[$side];
+      $cands[$side] = [
         'key' => $c['key'], 'name' => $c['name'], 'party' => $c['party'],
-        'note' => $c['note'],
-        'stance' => $align['detail'],
-        'alignment' => $align['total'],
-        'control' => engine_control_on($game, $c['key']),
+        'note' => $c['note'], 'side' => $side,
+        'stakes' => engine_stake_list($game, $side),
+        'total' => engine_stake_total($game, $side),
       ];
     }
     $race = [
-      'space' => $space, 'year' => $election['year'],
-      'note' => $election['note'],
-      'candidates' => $cands,
+      'space' => $space, 'year' => $election['year'], 'note' => $election['note'],
+      'nation' => $cands['nation'], 'states' => $cands['states'],
+      'leading' => $leading, 'decided_by' => $decidedBy,
+      'historical_winner' => $election['historical_winner'],
       'turns_taken' => (int) ($state['turns_taken_this_space'] ?? 0),
-      'turns_needed' => engine_active_seats($players) * (int) $game['config']['turns_per_space'],
+      'turns_needed' => engine_turns_needed($game, $players),
     ];
   }
 
-  // The viewer hand, with per-card legality worked out server-side so the
-  // UI never has to reimplement a rule to grey out a button.
+  // The viewer hand, with what each card would do worked out server-side
+  // so the UI never reimplements a rule.
   $you = null;
   if ($viewerSeat !== null && isset($players[$viewerSeat])) {
     $me = $players[$viewerSeat];
-    $money = (int) ($me['public_state']['money'] ?? 0);
+    $bonus = !empty($me['public_state']['is_patron']) ? (int) ($config['patron_bonus'] ?? 0) : 0;
     $hand = [];
-    foreach (($me['private_state']['hand'] ?? []) as $key) {
+    foreach (($current ? ($me['private_state']['hand'] ?? []) : []) as $key) {
       $c = vg_card($key);
       if (!$c) continue;
+      $after = engine_track_after($game, $key);
       $hand[] = [
         'key' => $key, 'name' => $c['name'], 'year' => $c['year'],
-        'flavor' => $c['flavor'],
-        'finance' => (int) $c['finance'],
-        'sway_cost' => (int) $c['sway_cost'],
-        'sway_cp' => (int) $c['sway_cp'],
-        'deltas' => $c['deltas'],
-        'stability' => (int) $c['stability'],
-        'is_key' => !empty($c['key']),
-        'can_sway' => engine_card_swayable($game, $key) && $money >= (int) $c['sway_cost'],
-        'can_transition' => !empty($c['key'])
-          && engine_slot_for_axis($game, $c['transitions']) !== null
-          && $space >= (int) ($c['earliest_space'] ?? 1),
-        'earliest_space' => isset($c['earliest_space']) ? (int) $c['earliest_space'] : null,
+        'flavor' => $c['flavor'], 'era' => $c['era'],
+        'value' => (int) $c['value'],
+        'cash_value' => (int) $c['value'] + $bonus,
+        'push' => (int) $c['push'],
+        'track_after' => $after,
+        'leads_after' => engine_leading_side($game, $after)[0],
       ];
     }
     $you = ['seat' => (int) $viewerSeat, 'hand' => $hand];
   }
 
+  $num = max(1, (int) ($config['payout_num'] ?? 3));
+  $den = max(1, (int) ($config['payout_den'] ?? 2));
+
   return [
     'game_id'       => (int) $game['game_id'],
     'join_code'     => $game['join_code'],
-    'status'        => $game['status'],
+    'status'        => $status,
     'variant'       => $game['variant'],
     'phase'         => $game['phase'],
     'space'         => $space,
-    'total_spaces'  => (int) ($game['config']['total_spaces'] ?? 14),
-    'current_seat'  => $game['current_seat'],
+    'total_spaces'  => (int) ($config['total_spaces'] ?? 14),
+    'current_seat'  => ($status === 'active') ? $game['current_seat'] : null,
     'max_players'   => (int) $game['max_players'],
     'winner_seat'   => $game['winner_seat'],
-    'ended_reason'  => $game['ended_reason'],
+    'ended_reason'  => $endedReason,
+    'ended_text'    => $endedReason ? engine_ended_text($endedReason) : null,
     'state_version' => (int) $game['state_version'],
-    'config'        => $game['config'],
-    'tracks'        => $liveTracks,
-    'stability'     => (int) ($state['stability'] ?? 0),
-    'stability_max' => (int) ($game['config']['stability_max']
-                        ?? $game['config']['stability_start'] ?? 12),
+    'rules'         => [
+      'turns_per_space' => (int) ($config['turns_per_space'] ?? 2),
+      'patron_bonus'    => (int) ($config['patron_bonus'] ?? 2),
+      'payout'          => $num / $den,
+      'crisis_year'     => ($e = vg_election_at((int) ($config['crisis_space'] ?? 11))) ? $e['year'] : null,
+    ],
+    'track'         => [
+      'value' => $track,
+      'min' => (int) ($config['track_min'] ?? -5),
+      'max' => (int) ($config['track_max'] ?? 5),
+    ],
+    'crisis'        => (bool) ($state['crisis'] ?? false),
+    'patron_seat'   => $state['patron_seat'] ?? null,
     'president'     => $state['president'] ?? null,
     'race'          => $race,
     'history'       => $state['history'] ?? [],
@@ -1096,14 +870,13 @@ function engine_public_state($game, $players, $viewerSeat = null) {
  */
 function engine_available_actions($game, $players, $seat) {
   if ($seat === null || !isset($players[$seat])) return [];
-  if ($game['status'] !== 'active') return [];
+  if ($game['status'] !== 'active' || !engine_is_current($game)) return [];
   if (!empty($players[$seat]['conceded'])) return [];
 
   $actions = ['concede'];
   if ($game['current_seat'] === null || (int) $game['current_seat'] === (int) $seat) {
-    $actions[] = 'finance';
-    $actions[] = 'sway';
-    $actions[] = 'transition';
+    $actions[] = 'cash';
+    $actions[] = 'print';
   }
   return $actions;
 }
@@ -1123,10 +896,16 @@ function engine_log($mysqli, $game, $seat, $type, $message = '', $data = null, $
  * The verbatim playthrough export: summary, every seat, the final board,
  * and the COMPLETE event log with detail. Lossless by policy — add
  * fields, never trim them.
+ *
+ * $viewerSeat: the seated player asking, or null for operator access.
+ * While a game is still running a player gets only their OWN private
+ * state; otherwise a mid-game download would show them every rival hand.
  */
-function engine_build_export($mysqli, $game, $players) {
+function engine_build_export($mysqli, $game, $players, $viewerSeat = null) {
+  $hideOthers = ($viewerSeat !== null && $game['status'] !== 'ended');
   $seats = [];
   foreach ($players as $seat => $p) {
+    $private = ($hideOthers && (int) $seat !== (int) $viewerSeat) ? null : $p['private_state'];
     $seats[] = [
       'seat'            => (int) $seat,
       'player_name'     => $p['player_name'],
@@ -1136,12 +915,18 @@ function engine_build_export($mysqli, $game, $players) {
       'score'           => (int) $p['score'],
       'score_breakdown' => $p['score_breakdown'],
       'public_state'    => $p['public_state'],
-      'private_state'   => $p['private_state'],
+      'private_state'   => $private,
     ];
   }
 
+  $board = $game['state'];
+  if ($hideOthers && is_array($board)) {
+    // The draw order is hidden information too.
+    $board['deck'] = count($board['deck'] ?? []);
+  }
+
   return [
-    'export_version' => 2,
+    'export_version' => 3,
     'exported_at'    => gmdate('c'),
     'summary' => [
       'game_id'       => (int) $game['game_id'],
@@ -1151,7 +936,6 @@ function engine_build_export($mysqli, $game, $players) {
       'phase'         => $game['phase'],
       'spaces_played' => count($game['state']['history'] ?? []),
       'total_spaces'  => (int) ($game['config']['total_spaces'] ?? 14),
-      'stability'     => (int) ($game['state']['stability'] ?? 0),
       'winner_seat'   => $game['winner_seat'],
       'ended_reason'  => $game['ended_reason'],
       'created_at'    => $game['created_at'],
@@ -1159,14 +943,14 @@ function engine_build_export($mysqli, $game, $players) {
       'config'        => $game['config'],
     ],
     'elections'   => $game['state']['history'] ?? [],
-    'final_board' => $game['state'],
+    'final_board' => $board,
     'players'     => $seats,
     'events'      => all_events($mysqli, (int) $game['game_id']),
   ];
 }
 
 /**
- * Write one vg_scores row per seat at game end. Separate table so
+ * Write one vg_scores row per human seat at game end. Separate table so
  * clearing finished games never wipes the board.
  */
 function engine_record_scores($mysqli, $game, $players) {

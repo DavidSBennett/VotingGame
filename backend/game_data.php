@@ -1,34 +1,35 @@
 <?php
 /**
- * v2_data.php — content for the SIMPLIFIED ruleset (v2). Not yet read by
- * the engine: the live game still runs on history_data.php and
- * cards_data.php. tools/simulate_v2.py parses this file, so tuning runs
- * against exactly the content the rewritten engine will read.
+ * game_data.php — the board and the deck. CONTENT, not rules: the engine
+ * reads this and never writes it, and tools/simulate.py parses it, so the
+ * tuning always runs against exactly what the server plays.
  *
  * ONE TRACK, Nation (+) against States (-), from -5 to +5.
  *
- * DERIVED, NOT RE-AUTHORED. Every number here came mechanically from the
- * v1 data, so it is cheap to regenerate and nothing was tuned by feel:
+ * DERIVED FROM THE v1 CONTENT (see git history before the v2 switch-over)
+ * by fixed formulas, then kept here as the source of truth:
  *
  *   side   In each race, the candidate with the higher v1 Federal Power
  *          stance is the Nation candidate.
  *   push   v1 deltas: federal - expansion - slavery - states, halved
  *          (rounding away from zero) and clamped to -2..+2. Market and
- *          tariff are dropped: market had no consistent partisan
+ *          tariff were dropped: market had no consistent partisan
  *          direction, and counting tariff made the early deck lean +20
  *          toward Nation, so Nation won ~90% of early races. Full-size
  *          pushes pinned the track at +-5 in most elections.
  *   value  v1 finance value.
- *   era    base-pack cards are early; the three late packs arrive with
- *          the crisis. The v1 key cards are gone.
+ *   era    early cards start in the deck; crisis cards join it in 1848.
  *
- * Known oddities of the formula, left for a playtest to argue with: the
- * Louisiana Purchase comes out Nation +1, and the Missouri Compromise
- * Nation +1.
+ * Every number is a first draft worth arguing with. Known oddities: the
+ * Louisiana Purchase comes out Nation +1, and so does the Missouri
+ * Compromise. Change a number here, then re-run tools/simulate.py.
+ *
+ * NOTE ON QUOTING: apostrophes inside these single-quoted strings must be
+ * escaped ('). An unescaped one is a parse error that takes the site down.
  */
 
 /** The fourteen races. Each has exactly one nation and one states candidate. */
-function vg2_elections() {
+function vg_elections() {
   return [
     ['space' => 1, 'year' => 1796, 'historical_winner' => 'nation',
      'note' => 'The first contested election. Adams carried New England and the commercial seaboard.',
@@ -132,7 +133,7 @@ function vg2_elections() {
 }
 
 /** The deck. push is + for Nation, - for States. */
-function vg2_cards() {
+function vg_cards() {
   return [
     'jay_treaty' => ['name' => 'The Jay Treaty', 'year' => 1795, 'era' => 'early', 'value' => 4, 'push' => 1,
       'flavor' => 'Peace with Britain, bought with the carrying trade. Burned in effigy from Boston to Charleston.'],
@@ -246,23 +247,23 @@ function vg2_cards() {
 }
 
 /** One race by space (1-based), or null. */
-function vg2_election_at($space) {
-  foreach (vg2_elections() as $e) {
+function vg_election_at($space) {
+  foreach (vg_elections() as $e) {
     if ((int) $e['space'] === (int) $space) return $e;
   }
   return null;
 }
 
 /** One card by key, or null. */
-function vg2_card($key) {
-  $cards = vg2_cards();
+function vg_card($key) {
+  $cards = vg_cards();
   return isset($cards[$key]) ? $cards[$key] : null;
 }
 
 /** Card keys of one era. */
-function vg2_cards_in_era($era) {
+function vg_cards_in_era($era) {
   $out = [];
-  foreach (vg2_cards() as $key => $card) {
+  foreach (vg_cards() as $key => $card) {
     if ($card['era'] === $era) $out[] = $key;
   }
   return $out;

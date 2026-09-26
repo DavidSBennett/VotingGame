@@ -1,19 +1,69 @@
 /**
- * The current election: two candidates, and who the country is carrying.
+ * The current election: the States candidate against the Nation candidate,
+ * and who has money riding on each.
  *
- * Alignment is public on purpose — a newspaper can read the mood of the
- * country as well as anyone. Showing the per-track breakdown is what makes
- * the central decision legible: you can see WHICH issue is carrying a
- * candidate, and therefore which one you would need to move.
+ * Stakes are public — every paper can see who is backing whom, which is
+ * what makes a late counter-stake a decision rather than a guess.
  */
-export default function RacePanel({ race, seats, mySeat }) {
+export default function RacePanel({ race, seats, mySeat, payout }) {
   if (!race) return null;
 
-  const leader = race.candidates.reduce((a, b) => (a.alignment >= b.alignment ? a : b));
-
   const seatName = (n) => {
-    const s = seats.find((p) => p.seat === Number(n));
+    const s = seats.find((p) => p.seat === n);
     return s ? s.player_name : `seat ${n}`;
+  };
+
+  const column = (c) => {
+    const leading = race.leading === c.side;
+    const mine = c.stakes.find((st) => st.seat === mySeat);
+    const top = c.stakes.reduce((m, st) => Math.max(m, st.amount), 0);
+    const topCount = c.stakes.filter((st) => st.amount === top).length;
+    return (
+      <div
+        key={c.side}
+        className={
+          leading
+            ? 'rounded border border-amber-600 bg-slate-900 p-3'
+            : 'rounded border border-slate-700 bg-slate-900 p-3'
+        }
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-medium text-slate-100">{c.name}</span>
+          <span className={c.side === 'nation' ? 'text-xs text-sky-300' : 'text-xs text-rose-300'}>
+            {c.side === 'nation' ? 'Nation' : 'States'}
+          </span>
+        </div>
+        <div className="text-xs text-slate-500">{c.party}</div>
+        {leading && <div className="mt-1 text-xs text-amber-400">leading</div>}
+
+        <div className="mt-2 border-t border-slate-700 pt-2 text-xs">
+          {c.stakes.length === 0 ? (
+            <span className="text-slate-600">no paper has staked on him</span>
+          ) : (
+            <ul className="space-y-0.5">
+              {c.stakes.map((st) => (
+                <li
+                  key={st.seat}
+                  className={st.seat === mySeat ? 'text-amber-300' : 'text-slate-400'}
+                >
+                  {seatName(st.seat)} — {st.amount}
+                  {st.amount === top && topCount === 1 && (
+                    <span className="text-slate-500"> · Patron if he wins</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {mine && (
+            <div className="mt-1 text-slate-500">
+              yours pays {Math.floor(mine.amount * payout)} if he wins
+            </div>
+          )}
+        </div>
+
+        <p className="mt-2 text-xs italic text-slate-500">{c.note}</p>
+      </div>
+    );
   };
 
   return (
@@ -23,88 +73,13 @@ export default function RacePanel({ race, seats, mySeat }) {
           The election of {race.year}
         </h2>
         <span className="text-xs text-slate-500">
-          turn {race.turns_taken + 1} of {race.turns_needed}
+          turn {Math.min(race.turns_taken + 1, race.turns_needed)} of {race.turns_needed}
         </span>
       </div>
-
       {race.note && <p className="mb-3 text-xs italic text-slate-500">{race.note}</p>}
-
       <div className="grid gap-3 sm:grid-cols-2">
-        {race.candidates.map((c) => {
-          const winning = c.key === leader.key && c.alignment !== 0;
-          const control = Object.entries(c.control || {});
-          const mine = control.find(([s]) => Number(s) === mySeat);
-          return (
-            <div
-              key={c.key}
-              className={
-                winning
-                  ? 'rounded border border-amber-600 bg-slate-900 p-3'
-                  : 'rounded border border-slate-700 bg-slate-900 p-3'
-              }
-            >
-              <div className="flex items-baseline justify-between">
-                <span className="font-medium text-slate-100">{c.name}</span>
-                <span
-                  className={
-                    c.alignment > 0
-                      ? 'font-mono text-sm text-emerald-400'
-                      : c.alignment < 0
-                        ? 'font-mono text-sm text-red-300'
-                        : 'font-mono text-sm text-slate-500'
-                  }
-                >
-                  {c.alignment > 0 ? `+${c.alignment}` : c.alignment}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500">{c.party}</div>
-              {winning && (
-                <div className="mt-1 text-xs text-amber-400">the country is carrying him</div>
-              )}
-
-              {/* Which issue is doing the work. */}
-              <ul className="mt-2 space-y-0.5 text-xs text-slate-400">
-                {Object.entries(c.stance).map(([axis, s]) => (
-                  <li key={axis} className="flex justify-between gap-2">
-                    <span className="capitalize">{axis}</span>
-                    <span className="font-mono">
-                      {s.stance > 0 ? `+${s.stance}` : s.stance} × {s.track} ={' '}
-                      <span className={s.points > 0 ? 'text-emerald-400' : s.points < 0 ? 'text-red-300' : ''}>
-                        {s.points}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-2 border-t border-slate-700 pt-2 text-xs">
-                {control.length === 0 ? (
-                  <span className="text-slate-600">no support yet</span>
-                ) : (
-                  <ul className="space-y-0.5">
-                    {control.map(([s, pts]) => (
-                      <li
-                        key={s}
-                        className={
-                          Number(s) === mySeat ? 'text-amber-300' : 'text-slate-400'
-                        }
-                      >
-                        {seatName(s)} — {pts} control
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {mine && (
-                  <div className="mt-1 text-slate-500">
-                    yours pays {mine[1]} back if he loses
-                  </div>
-                )}
-              </div>
-
-              <p className="mt-2 text-xs italic text-slate-500">{c.note}</p>
-            </div>
-          );
-        })}
+        {column(race.states)}
+        {column(race.nation)}
       </div>
     </section>
   );

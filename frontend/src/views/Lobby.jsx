@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createGame, joinGame, listOpenGames } from '../api/client.js';
 import HighScores from '../components/HighScores.jsx';
+import Rules from '../components/Rules.jsx';
 
 /**
  * Lobby: name yourself, then open a table or take a seat at one.
@@ -104,8 +105,8 @@ export default function Lobby({ onSeated }) {
           The Fourth Estate
         </h1>
         <p className="mt-1 text-sm text-slate-400">
-          You are a partisan press, 1796 to 1860. Back the candidates who make you rich.
-          Fourteen elections; the richest paper wins.
+          You are a partisan press, 1796 to 1860. Print the stories, back the candidates,
+          and collect when they win. Fourteen elections; the richest paper wins.
         </p>
       </header>
 
@@ -182,6 +183,10 @@ export default function Lobby({ onSeated }) {
           </button>
         </div>
       </section>
+
+      <div className="mb-8">
+        <Rules open />
+      </div>
 
       <section className="mb-8">
         <h2 className="mb-3 text-lg font-semibold text-slate-100">Tables</h2>

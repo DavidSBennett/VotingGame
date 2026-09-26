@@ -26,3 +26,6 @@ backend/uploads/
 .DS_Store
 *.log
 .env
+
+# Python
+__pycache__/

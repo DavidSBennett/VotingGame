@@ -4,9 +4,8 @@
  * a player makes arrives here and is dispatched by the engine.
  *
  * Body: { player_token, action, params: { … } }
- *   finance     params { card }
- *   sway        params { card, candidate }
- *   transition  params { card }            (key cards only)
+ *   cash        params { card }
+ *   print       params { card, side: 'nation' | 'states' }
  *   concede     params {}
  *
  * Response: { ok, message, state_version }
