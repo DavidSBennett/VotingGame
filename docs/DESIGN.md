@@ -337,3 +337,8 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-08-24 | Losing support pays out | Opener took control in 14 of 14 campaigns |
 | 2026-08-24 | turns_per_space 3, control_bonus 4 | Payback-window sweep |
 | 2026-08-24 | Stability pool and recovery scale per two seats | 4-player games died at space 2.8 |
+| 2026-09-26 | v2 simplification begun: one Nation/States track, cards reduced to value + push, cash or print, 2 turns per seat, winning stakes pay 1.5x, a Patron bonus replaces the presidency bonus. Content in `backend/v2_data.php`, rules in `tools/simulate_v2.py`; the live engine is still v1 | Rules reduced to two ways to play a card and one track |
+| 2026-09-26 | v2: the track resets to 0 every election | Carried over, 67% of races were decided at +-5 |
+| 2026-09-26 | v2: pushes halved to +-1..2, tariff dropped from the push formula | Early deck leaned +20 to Nation, which won ~90% of early races; now ~60%, pinned races ~12% |
+| 2026-09-26 | v2: the crisis only adds its cards in 1848, and pushes are not doubled | Doubling changed no win rate, only re-pinned the track (4% -> 14%) |
+| 2026-09-26 | v2: the bot prints its best card that leaves a side ahead | The first bot lost to the EV player 91% heads-up; now 61% |
