@@ -14,6 +14,9 @@ dbConfig.php
 backend/dbConfig.php
 config.secret.php
 backend/config.secret.php
+# Written by the deploy from the OPCACHE_TOKEN secret; server-only.
+_opcache_token.php
+backend/_opcache_token.php
 
 # Server-only data folders
 uploads/

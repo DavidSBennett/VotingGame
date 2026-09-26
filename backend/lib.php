@@ -101,8 +101,7 @@ require_once __DIR__ . '/dbConfig.php';
  * The engine speaks mysqli throughout (FOR UPDATE row locks, transactional
  * single-writer turns), so we build a mysqli rather than borrow the PDO.
  *
- * $VG_DB_SOURCE records which step won, so _diag.php can report how this
- * install is actually connecting instead of leaving it to folklore.
+ * $VG_DB_SOURCE records which step won, for debugging.
  */
 
 $VG_DB_SOURCE = null;
@@ -193,7 +192,7 @@ if ($VG_DB_SOURCE === null) {
              . '$mysqli, defined no DB_* or SECRET_DB_* constants, and no usable '
              . 'MyDatabase wrapper was found'
              . (isset($VG_DB_CONNECT_ERROR) ? ' (' . $VG_DB_CONNECT_ERROR . ')' : '')
-             . '. See _diag.php for what this install actually declares.',
+             . '. Check the shape of dbConfig.php on the server.',
   ]);
   exit;
 }

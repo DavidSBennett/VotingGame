@@ -14,7 +14,8 @@ env:
   # The subdomain this install serves. Used for the rsync target path and
   # the post-deploy OPcache flush. Change in ONE place.
   SUBDOMAIN: voting.thehistorians.org
-  OPCACHE_TOKEN: 7c4f1a9e2b6d43f0a8e5c1d7b93042fe
+  # The OPcache flush token is the OPCACHE_TOKEN Actions secret. Never put
+  # it here: this repository is public.
 
 jobs:
   build-and-deploy:
@@ -53,7 +54,15 @@ jobs:
           cp backend/*.php publish/
           # dbConfig.php and uploads/ are intentionally absent — they live
           # only on the server and are excluded from the rsync below too.
+
+          # The OPcache token exists only in the published docroot, written
+          # here from the secret. Fail loudly rather than deploy a flush
+          # endpoint that silently refuses every request.
+          test -n "$OPCACHE_TOKEN" || { echo "OPCACHE_TOKEN secret is not set"; exit 1; }
+          printf "<?php return '%s';\n" "$OPCACHE_TOKEN" > publish/_opcache_token.php
           ls -la publish/
+        env:
+          OPCACHE_TOKEN: ${{ secrets.OPCACHE_TOKEN }}
 
       - name: Deploy via SSH (rsync)
         uses: easingthemes/ssh-deploy@v5.1.0
@@ -69,8 +78,11 @@ jobs:
           EXCLUDE: "dbConfig.php, uploads/"
           # LiteSpeed serves new static assets immediately but can keep
           # running stale compiled PHP. Flush it or the deploy is a lie.
+          # _diag.php was removed from the repo because the token guarding
+          # it was published; rsync never deletes, so remove it here too.
           SCRIPT_AFTER: |
-            curl -s "https://${{ env.SUBDOMAIN }}/_opcache_reset.php?token=${{ env.OPCACHE_TOKEN }}" >/dev/null 2>&1 || true
+            rm -f "$HOME/public_html/${{ env.SUBDOMAIN }}/_diag.php"
+            curl -s "https://${{ env.SUBDOMAIN }}/_opcache_reset.php?token=${{ secrets.OPCACHE_TOKEN }}" >/dev/null 2>&1 || true
 
       - name: Smoke check the live install
         run: |

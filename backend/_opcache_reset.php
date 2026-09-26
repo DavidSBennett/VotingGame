@@ -13,12 +13,19 @@
  * The JSON response says whether OPcache was even available and enabled,
  * which is how you tell "the deploy did not take" apart from "OPcache was
  * never the problem".
+ *
+ * THE TOKEN IS NOT IN THIS REPOSITORY, which is public. The deploy writes
+ * _opcache_token.php from the OPCACHE_TOKEN Actions secret; that file only
+ * ever exists in the published docroot. Without it this endpoint stays
+ * closed rather than open. (The token that used to be hard-coded here is
+ * in git history and must never be reused.)
  */
 
-$EXPECTED_TOKEN = '7c4f1a9e2b6d43f0a8e5c1d7b93042fe';
+$tokenFile = __DIR__ . '/_opcache_token.php';
+$EXPECTED_TOKEN = is_file($tokenFile) ? (string) (include $tokenFile) : '';
 
 $token = isset($_GET['token']) ? (string) $_GET['token'] : '';
-if (!hash_equals($EXPECTED_TOKEN, $token)) {
+if ($EXPECTED_TOKEN === '' || !hash_equals($EXPECTED_TOKEN, $token)) {
   http_response_code(403);
   header('Content-Type: application/json');
   echo json_encode(['ok' => false, 'error' => 'forbidden']);
