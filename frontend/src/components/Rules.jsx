@@ -7,7 +7,6 @@ export default function Rules({ rules, open = false }) {
   const payout = rules ? rules.payout : 1.5;
   const bonus = rules ? rules.patron_bonus : 2;
   const turns = rules ? rules.turns_per_space : 2;
-  const crisis = rules && rules.crisis_year ? rules.crisis_year : 1848;
 
   return (
     <details open={open} className="rounded-lg border border-slate-700 bg-slate-800 p-4">
@@ -42,7 +41,11 @@ export default function Rules({ rules, open = false }) {
             The biggest stake on the winner makes you <span className="text-amber-300">Patron</span>:
             +{bonus} every time you cash, until the next election.
           </li>
-          <li>In {crisis} the sectional crisis begins, and its cards join the deck.</li>
+          <li>
+            Cards are dated. The deck opens on the Revolution, and each campaign adds the events
+            of the years since the last one. <span className="text-emerald-400">Profit</span> cards
+            are the business of the press: worth a lot, but they push nobody.
+          </li>
         </ul>
       </div>
     </details>

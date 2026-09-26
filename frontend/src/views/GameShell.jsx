@@ -5,6 +5,7 @@ import EventLog from '../components/EventLog.jsx';
 import PlaytestReportModal from '../components/PlaytestReportModal.jsx';
 import Track from '../components/Track.jsx';
 import Rules from '../components/Rules.jsx';
+import News from '../components/News.jsx';
 import RacePanel from '../components/RacePanel.jsx';
 import Hand from '../components/Hand.jsx';
 import BoardStrip from '../components/BoardStrip.jsx';
@@ -107,7 +108,7 @@ export default function GameShell({ seat, onLeave }) {
           <p className="text-sm text-slate-400">
             {state.status === 'lobby' && 'Waiting for the other papers'}
             {state.status === 'active' &&
-              `Election ${state.space} of ${state.total_spaces}${state.crisis ? ' · the sectional crisis' : ''}`}
+              `Election ${state.space} of ${state.total_spaces}`}
             {ended && (state.ended_text || 'The game is over.')}
             {' · '}
             <span className="font-mono text-xs text-slate-600" title="State updates received">
@@ -192,6 +193,7 @@ export default function GameShell({ seat, onLeave }) {
                   Waiting for {onTurn.player_name}…
                 </div>
               )}
+              <News news={state.news} space={state.space} />
               <Track track={state.track} race={state.race} preview={preview} />
               <RacePanel
                 race={state.race}

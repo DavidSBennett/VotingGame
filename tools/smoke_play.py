@@ -92,6 +92,13 @@ class Checks:
         if st.get("you"):
             self.check(len(st["you"]["hand"]) <= 5,
                        "hand within limit", "got %d" % len(st["you"]["hand"]))
+            year = race["year"] if race else None
+            for c in st["you"]["hand"]:
+                if year is not None:
+                    self.check(c["year"] <= year, "hand holds no card from the future",
+                               "%s (%s) in %s" % (c["name"], c["year"], year))
+                if c["kind"] == "profit":
+                    self.check(c["push"] == 0, "profit card %s does not push" % c["key"])
         for p in st["players"]:
             self.check("private_state" not in p and "hand" not in p,
                        "seat %d exposes no private state" % p["seat"])
@@ -157,10 +164,13 @@ def main():
             last_space = st["space"]
             race = st.get("race")
             if race:
-                say("  %2d. %s  %s (Nation) vs %s (States)%s"
+                say("  %2d. %s  %s (Nation) vs %s (States)   +%d cards"
                     % (race["space"], race["year"],
                        race["nation"]["name"], race["states"]["name"],
-                       "   [crisis]" if st["crisis"] else ""))
+                       len(st["news"])))
+                # Dated release: nothing in the new batch may postdate the race.
+                late = [n["name"] for n in st["news"] if n["year"] > race["year"]]
+                checks.check(not late, "no card released before its year", str(late))
 
         if st["current_seat"] != st["you"]["seat"]:
             raise ApiError("stuck: current_seat=%s but we are seat %s and no bot ran"

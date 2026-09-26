@@ -8,8 +8,9 @@ its push, and stake its value on either candidate). After every seat has
 had turns_per_space turns the election resolves: the side the track leans
 wins; winning stakes pay payout_num/payout_den times back; the largest
 stake on the winner makes that seat the Patron for the next era; the track
-returns to 0. At crisis_space (1848) the crisis cards join the deck. After
-the fourteenth election the richest paper wins.
+returns to 0. Cards are dated: each campaign shuffles in the cards from the
+years since the last one, so the deck opens on the Revolution and reaches
+Kansas in the 1850s. After the fourteenth election the richest paper wins.
 
 Three rules here overturned the first draft of the simplified game, each on a run of this file:
   - The track RESETS every election. Carried over, it drifted to an end and
@@ -17,8 +18,9 @@ Three rules here overturned the first draft of the simplified game, each on a ru
   - Pushes are halved to +-1..2 (see backend/game_data.php). With the reset
     alone, 43% of races still ended pinned; with both, ~12%.
   - The crisis does NOT double pushes. Doubling changed no win rate at all,
-    only re-pinned the track (4% -> 14%). The States-leaning crisis cards
-    arriving are what make the late era different on their own.
+    only re-pinned the track (4% -> 14%). The States-leaning late cards
+    arriving are what make the late era different on their own. (Dated
+    release has since replaced the crisis rule outright.)
 
     py -X utf8 tools/simulate.py                 # the standard report
     py -X utf8 tools/simulate.py --games 4000
@@ -137,7 +139,8 @@ def check_parity():
         assert e["historical_winner"] in ("nation", "states"), e["year"]
         assert e["nation"]["key"] != e["states"]["key"], e["year"]
     for key, c in CARDS.items():
-        assert c["era"] in ("early", "crisis"), key
+        assert c["kind"] in ("event", "profit"), key
+        assert c["kind"] != "profit" or c["push"] == 0, "%s: profit cards do not push" % key
         assert -3 <= c["push"] <= 3, key
         assert c["value"] > 0, key
     assert len(CARDS) >= 40, "deck looks too small: %d" % len(CARDS)
@@ -145,8 +148,18 @@ def check_parity():
 
 check_parity()
 
-EARLY = [k for k, c in CARDS.items() if c["era"] == "early"]
-CRISIS = [k for k, c in CARDS.items() if c["era"] == "crisis"]
+YEARS = [e["year"] for e in ELECTIONS]
+
+
+def released(after_year, through_year):
+    """Cards a campaign releases -- mirror of vg_cards_released()."""
+    return [k for k, c in CARDS.items()
+            if (after_year is None or c["year"] > after_year) and c["year"] <= through_year]
+
+
+OPENING = released(None, YEARS[0])
+assert len(OPENING) >= 26, "opening deck of %d cannot deal five hands" % len(OPENING)
+LATE_SPACE = 11      # 1848: only a reporting boundary now, not a rule
 SIDES = ("nation", "states")
 
 
@@ -166,7 +179,6 @@ DEFAULTS = dict(
     payout_den=2,
     track_min=-5,
     track_max=5,
-    crisis_space=11,          # 1848
 )
 
 
@@ -202,7 +214,7 @@ class Game:
         self.ended = None
         self.history = []
 
-        self.deck = list(EARLY)
+        self.deck = list(OPENING)
         self.rng.shuffle(self.deck)
         self.discard = []
 
@@ -331,8 +343,9 @@ class Game:
         if self.space > self.cfg["total_spaces"]:
             self.ended = "board_completed"
             return
-        if self.space == self.cfg["crisis_space"]:
-            self.deck.extend(CRISIS)
+        fresh = released(YEARS[self.space - 2], YEARS[self.space - 1])
+        if fresh:
+            self.deck.extend(fresh)
             self.rng.shuffle(self.deck)
         self.start_seat = (self.start_seat + 1) % len(self.players)
         self.current = self.start_seat
@@ -493,8 +506,8 @@ def report_matchup(r):
 
 def report_elections(history):
     n = len(history)
-    early = [h for h in history if h["space"] < DEFAULTS["crisis_space"]]
-    late = [h for h in history if h["space"] >= DEFAULTS["crisis_space"]]
+    early = [h for h in history if h["space"] < LATE_SPACE]
+    late = [h for h in history if h["space"] >= LATE_SPACE]
 
     def share(rows, f):
         return pct(sum(1 for h in rows if f(h)) / max(1, len(rows)))
@@ -504,10 +517,10 @@ def report_elections(history):
              share(history, lambda h: h["decided_by"] == "stakes"),
              share(history, lambda h: h["decided_by"] == "history")))
     print("    matched history                        %s" % share(history, lambda h: h["matched"]))
-    print("    nation won          early %s   crisis %s"
+    print("    nation won     before 1848 %s   after %s"
           % (share(early, lambda h: h["winner"] == "nation"),
              share(late, lambda h: h["winner"] == "nation")))
-    print("    track at +-5        early %s   crisis %s"
+    print("    track at +-5   before 1848 %s   after %s"
           % (share(early, lambda h: abs(h["track"]) >= 5),
              share(late, lambda h: abs(h["track"]) >= 5)))
     print("    nobody backed anyone                   %s" % share(history, lambda h: not h["anyone_backed"]))
@@ -577,8 +590,9 @@ def main():
     args = ap.parse_args()
 
     print()
-    print("Parsed %d cards (%d early, %d crisis) and %d races from backend/game_data.php"
-          % (len(CARDS), len(EARLY), len(CRISIS), len(ELECTIONS)))
+    print("Parsed %d cards (%d in the opening deck, %d profit) and %d races from backend/game_data.php"
+          % (len(CARDS), len(OPENING), sum(1 for c in CARDS.values() if c["kind"] == "profit"),
+             len(ELECTIONS)))
     print()
     if args.sweep:
         sweep(args.games, args.seed)

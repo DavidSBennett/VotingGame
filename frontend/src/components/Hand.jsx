@@ -61,6 +61,11 @@ export default function Hand({ hand, race, yourTurn, busy, onPlay, onPreview }) 
               <span className="text-sm font-medium text-slate-100">{c.name}</span>
               <span className="font-mono text-xs text-slate-500">{c.year}</span>
             </div>
+            {c.kind === 'profit' && (
+              <div className="mt-1 inline-block rounded bg-emerald-950 px-1.5 py-0.5 text-xs text-emerald-300">
+                profit
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap gap-x-3 font-mono text-xs">
               <span className="text-emerald-400">value {c.value}</span>
               <span

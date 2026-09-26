@@ -61,12 +61,29 @@ and returns to 0 after every election: each race is argued fresh.
 
 ## 4. Cards
 
-54 historical events, each with two numbers: a **value** (3–8) and a
-**push** (States 2 … Nation 2, fixed by history). 30 early cards start in
-the deck; 24 crisis cards (Texas, Kansas, Dred Scott…) join it in **1848**.
+94 dated cards, each with two numbers: a **value** (3–8) and a **push**
+(States 2 … Nation 2, fixed by history).
 
-Every number was derived from the v1 content by a fixed formula, recorded
-in the header of `game_data.php`, and is a first draft worth arguing with.
+**Cards are released over time.** A card enters the deck at the first
+campaign held in or after its year, so nothing turns up before it
+happened. The opening deck is the 30 cards up to 1796 — the Stamp Act,
+Common Sense, the Articles, Shays' Rebellion, the Federalist, the Postal
+Act — and each later campaign shuffles in the years since the last: the
+Louisiana Purchase in 1808, the telegraph in 1844, Kansas in 1856. The UI
+announces each batch.
+
+Two kinds:
+
+- **Event** cards argue: they carry a push.
+- **Profit** cards are the business of the press itself — the first daily,
+  the Postal Act of 1792, Niles' Register, the penny press, the telegraph,
+  the Associated Press, the rotary press, cheap postage. High value, **no
+  push**: cash them, or stake them without moving the country.
+
+The 54 cards from 1795 on came from the v1 content by a fixed formula; the
+founding era, the gap years (1809–12, 1837–44) and the profit cards were
+written by hand. All of it is recorded in the header of `game_data.php`,
+and every number is a first draft worth arguing with.
 
 ---
 
@@ -120,6 +137,15 @@ in the crisis; races pinned at ±5 fall to ~2% early, ~14% in the crisis.
 
 **3. Doubling pushes in the crisis did nothing** but re-pin the track
 (4% → 14%); win rates were identical. → The crisis only adds its cards.
+
+**5. Dated release keeps the balance** (1,000 games per matchup): races
+pinned at ±5 stay under 10%, seat bias within ~5 points of fair, rivals
+back opposite candidates in 30% of races. Nation's late win rate rose
+from ~29% to ~42%, because the States-leaning late cards are now diluted
+by everything released before them. That dilution is the open question:
+a third to half of the cards played from 1828 on are over 25 years old
+(the Stamp Act in 1844). Retiring cards after 20 years would cut that to
+~15% and restore the late States lean (~30%); not yet adopted.
 
 **4. The first bot was a pushover.** An expected-value player beat it 91%
 heads-up. → The current bot holds it to ~61%.
@@ -240,3 +266,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-26 | v2: the crisis only adds its cards in 1848, and pushes are not doubled | Doubling changed no win rate, only re-pinned the track (4% -> 14%) |
 | 2026-09-26 | v2: the bot prints its best card that leaves a side ahead | The first bot lost to the EV player 91% heads-up; now 61% |
 | 2026-09-26 | v2 goes live: engine rewritten, v1 data and simulator deleted, games from v1 shown as ended | — |
+| 2026-09-26 | Cards released by date; 40 new cards (the founding, the gap years, profit cards); the crisis rule removed | Opening deck of 30 deals five hands; pinned races stay under 10% |

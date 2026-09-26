@@ -37,7 +37,10 @@
  *   3. The single largest stake on the winner makes that seat the Patron
  *      until the next election. A tie leaves nobody Patron.
  *
- * In 1848 the crisis cards join the deck. After 1860 the richest wins.
+ * Cards are dated. Each campaign shuffles in the events of the years since
+ * the last one, so the deck opens on the Revolution and reaches Kansas in
+ * the 1850s; nothing turns up before it happened. After 1860 the richest
+ * paper wins.
  * ---------------------------------------------------------------------
  */
 
@@ -49,7 +52,7 @@ require_once __DIR__ . '/game_data.php';
  * carries another version cannot be played by this engine; it is shown as
  * ended instead (see engine_is_current).
  */
-define('ENGINE_STATE_VERSION', 3);
+define('ENGINE_STATE_VERSION', 4);
 
 // ---------------------------------------------------------------------
 // Configuration
@@ -77,7 +80,6 @@ function engine_default_config() {
     'payout_den'      => 2,
     'track_min'       => -5,
     'track_max'       => 5,
-    'crisis_space'    => 11,     // 1848
     'min_players'     => 1,
     'max_players'     => 5,
     'bots'            => 1,
@@ -130,7 +132,10 @@ function engine_setup(&$game, &$players, $mysqli = null) {
   $game['winner_seat']  = null;
   $game['ended_reason'] = null;
 
-  $deck = vg_cards_in_era('early');
+  // The opening deck: everything that has happened by the first campaign.
+  $firstElection = vg_election_at(1);
+  $opening = vg_cards_released(null, (int) $firstElection['year']);   // date order
+  $deck = $opening;
   shuffle($deck);
 
   $first = engine_first_seat($players);
@@ -142,7 +147,7 @@ function engine_setup(&$game, &$players, $mysqli = null) {
     'track'                  => 0,
     'stakes'                 => ['nation' => [], 'states' => []],
     'patron_seat'            => null,
-    'crisis'                 => false,
+    'last_released'          => $opening,
     'deck'                   => $deck,
     'discard'                => [],
     'turns_taken_this_space' => 0,
@@ -557,22 +562,35 @@ function engine_resolve_election(&$game, &$players, $mysqli) {
     return;
   }
 
-  if ($game['state']['space'] === (int) $game['config']['crisis_space']) {
-    foreach (vg_cards_in_era('crisis') as $k) $game['state']['deck'][] = $k;
-    shuffle($game['state']['deck']);
-    $game['state']['crisis'] = true;
-    engine_log($mysqli, $game, null, 'crisis',
-      'The sectional crisis: Texas, Kansas and the Fugitive Slave Act join the argument.',
-      ['space' => $game['state']['space']]);
-  }
-
   engine_log_campaign($mysqli, $game);
+  engine_release_cards($game, (int) $election['year'], $mysqli);
 
   // Rotate who opens the campaign, walking the seats that exist.
   $start = engine_seat_after($players, (int) ($game['state']['start_seat'] ?? 0), false);
   $game['state']['start_seat'] = $start;
   $game['current_seat'] = empty($players[$start]['conceded'])
     ? $start : engine_seat_after($players, $start);
+}
+
+/**
+ * Shuffle into the deck every card dated after $previousYear and no later
+ * than the campaign now opening. Events enter the game when they happened.
+ */
+function engine_release_cards(&$game, $previousYear, $mysqli) {
+  $e = vg_election_at((int) $game['state']['space']);
+  if (!$e) return;
+  $fresh = vg_cards_released($previousYear, (int) $e['year']);
+  $game['state']['last_released'] = $fresh;
+  if (!$fresh) return;
+  foreach ($fresh as $k) $game['state']['deck'][] = $k;
+  shuffle($game['state']['deck']);
+
+  $names = [];
+  foreach ($fresh as $k) $names[] = vg_card($k)['name'];
+  $msg = 'News reaches the presses: ' . implode(', ', $names) . '.';
+  if (mb_strlen($msg) > 480) $msg = mb_substr($msg, 0, 477) . '...';
+  engine_log($mysqli, $game, null, 'cards_released', $msg,
+    ['space' => (int) $game['state']['space'], 'cards' => $fresh]);
 }
 
 function engine_log_campaign($mysqli, $game) {
@@ -813,7 +831,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       $after = engine_track_after($game, $key);
       $hand[] = [
         'key' => $key, 'name' => $c['name'], 'year' => $c['year'],
-        'flavor' => $c['flavor'], 'era' => $c['era'],
+        'flavor' => $c['flavor'], 'kind' => $c['kind'],
         'value' => (int) $c['value'],
         'cash_value' => (int) $c['value'] + $bonus,
         'push' => (int) $c['push'],
@@ -845,14 +863,18 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'turns_per_space' => (int) ($config['turns_per_space'] ?? 2),
       'patron_bonus'    => (int) ($config['patron_bonus'] ?? 2),
       'payout'          => $num / $den,
-      'crisis_year'     => ($e = vg_election_at((int) ($config['crisis_space'] ?? 11))) ? $e['year'] : null,
     ],
     'track'         => [
       'value' => $track,
       'min' => (int) ($config['track_min'] ?? -5),
       'max' => (int) ($config['track_max'] ?? 5),
     ],
-    'crisis'        => (bool) ($state['crisis'] ?? false),
+    // What this campaign added to the deck, so the UI can announce it.
+    'news'          => array_values(array_filter(array_map(function ($k) {
+                         $c = vg_card($k);
+                         return $c ? ['key' => $k, 'name' => $c['name'], 'year' => (int) $c['year'],
+                                      'kind' => $c['kind']] : null;
+                       }, $state['last_released'] ?? []))),
     'patron_seat'   => $state['patron_seat'] ?? null,
     'president'     => $state['president'] ?? null,
     'race'          => $race,
