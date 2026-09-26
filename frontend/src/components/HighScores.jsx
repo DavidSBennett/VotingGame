@@ -10,7 +10,8 @@ export default function HighScores() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchHighScores({ limit: 15 })
+    // v1 scores came from a different game; they stay in the table but not on the board.
+    fetchHighScores({ limit: 15, variant: 'v2' })
       .then((data) => setScores(data.scores || []))
       .catch((err) => setError(err.message));
   }, []);

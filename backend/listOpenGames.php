@@ -7,7 +7,7 @@
  * ?include_active=1 also lists games already in progress (spectating and
  * "rejoin from another device" both start here).
  */
-require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/engine.php';   // for ENGINE_STATE_VERSION
 
 require_method('GET');
 
@@ -16,7 +16,7 @@ $statusClause = $includeActive ? "g.status IN ('lobby','active')" : "g.status = 
 
 $sql = "
   SELECT g.game_id, g.join_code, g.status, g.variant, g.max_players,
-         g.round_number, g.created_at,
+         g.round_number, g.created_at, g.config,
          COUNT(p.player_id) AS seated,
          GROUP_CONCAT(p.player_name ORDER BY p.seat SEPARATOR ', ') AS names
     FROM vg_games g
@@ -31,6 +31,11 @@ if (!$res) error('Query failed: ' . $mysqli->error, 500);
 
 $games = [];
 while ($r = $res->fetch_assoc()) {
+  // A game running under an older engine can no longer be played, so it
+  // is not "in progress" in any sense a player cares about. Leave it out.
+  $cfg = json_col($r['config']);
+  if ($r['status'] === 'active'
+      && (int) ($cfg['engine_version'] ?? 0) !== ENGINE_STATE_VERSION) continue;
   $games[] = [
     'game_id'     => (int) $r['game_id'],
     'join_code'   => $r['join_code'],

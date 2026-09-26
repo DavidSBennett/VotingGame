@@ -110,7 +110,9 @@ export default function GameShell({ seat, onLeave }) {
               `Election ${state.space} of ${state.total_spaces}${state.crisis ? ' · the sectional crisis' : ''}`}
             {ended && (state.ended_text || 'The game is over.')}
             {' · '}
-            <span className="font-mono text-xs text-slate-600">v{state.state_version}</span>
+            <span className="font-mono text-xs text-slate-600" title="State updates received">
+              #{state.state_version}
+            </span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
