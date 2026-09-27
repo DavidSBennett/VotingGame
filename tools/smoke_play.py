@@ -264,14 +264,14 @@ def main():
     if len(negs) >= 2:
         refused("a second negative card is refused",
                 {"plays": [{"card": c["key"], "action": "negative", "side": "nation"} for c in negs[:2]]},
-                "negative coverage")
+                "negative stor")
     refused("reserving a profit card is refused",
             {"plays": [{"card": hand[0]["key"], "action": "profit"}], "reserve": hand[0]["key"]},
-            "coverage can be reserved")
+            "can be reserved")
     zero = [c for c in hand if c["positive"] == 0]
     if zero:
         refused("coverage a card does not have is refused",
-                {"plays": [{"card": zero[0]["key"], "action": "positive", "side": "nation"}]}, "has no positive")
+                {"plays": [{"card": zero[0]["key"], "action": "positive", "side": "nation"}]}, "cannot be run positive")
 
     turns = 0
     while turns < args.max_turns:
