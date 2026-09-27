@@ -22,40 +22,42 @@ function Body({ rules }) {
         You run a partisan newspaper, 1796 to 1860. Seventeen elections, each a{' '}
         <span className="font-semibold text-federal-700">Nation</span> man (federal power) against a{' '}
         <span className="font-semibold text-oxblood-700">States</span> man (states&rsquo; rights).{' '}
-        <em>The richest paper at the end wins</em> — and money comes only from selling your clippings.
+        <em>The richest paper at the end wins</em> — and money comes only from burying stories.
       </p>
 
       <H>Each round, in secret</H>
-      <p>Put as many clippings on the table as you like, or none and pass. Where you put one decides what it does:</p>
+      <p>Every story in your hand faces one decision. Commit as many as you like, or none and pass:</p>
       <ul className="mt-1 list-none space-y-1 pl-0">
         <li>
-          <span className="font-semibold text-wood-700">Cash in</span> — sell it for its profit.
+          <span className="font-semibold text-ink-950">Run it positive</span> — a favourable story for a candidate: its push
+          goes on the track, and counts as your influence on him.
         </li>
         <li>
-          <span className="font-semibold text-ink-950">On a candidate</span> — run the coverage that helps him: its push
-          goes on the track, and counts as your influence on him. If that coverage is{' '}
-          <span className="font-semibold text-oxblood-700">hostile</span>, it pushes harder than the favourable kind but
-          costs the Union stability — only {maxNeg} such clipping a round.
+          <span className="font-semibold text-oxblood-700">Run it negative</span> — a hostile story against his opponent. It
+          pushes harder than the positive run, but costs the Union stability — only {maxNeg} a round.
+        </li>
+        <li>
+          <span className="font-semibold text-wood-700">Bury it</span> — kill the story and take its profit.
         </li>
       </ul>
-      <p className="mt-1">Star one clipping you ran as coverage to reserve it.</p>
+      <p className="mt-1">Drop a story on a candidate to run it; it runs whichever way helps him. Star one story you ran to reserve it.</p>
 
       <H>The reveal</H>
       <ul className="list-none space-y-1 pl-0">
         <li>Every push is added up. The side the track leans toward wins the election.</li>
         <li>
-          The most influence on the winner makes you <span className="font-semibold">Patron</span>: next round your sales
-          pay {mult}×.
+          The most influence on the winner makes you <span className="font-semibold">Patron</span>: next round every story
+          you bury pays {mult}×.
         </li>
-        <li>Everyone but the new Patron takes their reserved clipping back. Everyone draws {draw}.</li>
+        <li>Everyone but the new Patron takes their reserved story back. Everyone draws {draw}.</li>
       </ul>
 
       <H>The Union</H>
       <ul className="list-none space-y-1 pl-0">
-        <li>Hostile coverage wears it down, and so does any election that goes against history.</li>
+        <li>Negative stories wear it down, and so does any election that goes against history.</li>
         <li>Each election it recovers a little.</li>
         <li>
-          Every hostile clipping adds to your <span className="font-semibold">exposure</span>.{' '}
+          Every negative story adds to your <span className="font-semibold">exposure</span>.{' '}
           <span className="text-oxblood-700">
             If the Union breaks, the game ends at once and the most exposed paper loses {penalty}.
           </span>
@@ -64,8 +66,8 @@ function Body({ rules }) {
 
       <H>The deck</H>
       <p>
-        Clippings are dated. The deck opens on the Revolution, and each campaign brings the news of the years since the
-        last. Some are the business of the press itself — worth money, but they push nobody.
+        Stories are dated. The deck opens on the Revolution, and each campaign brings the news of the years since the
+        last. Some are the business of the press itself — trade stories, worth money but pushing nobody: bury them.
       </p>
     </div>
   );

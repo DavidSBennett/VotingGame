@@ -334,7 +334,7 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
 
   $n = count($commit['plays']);
   $msg = $players[$seat]['player_name'] . ($replacing ? ' changed its commitment.' : ' committed '
-       . $n . ' ' . ($n === 1 ? 'card' : 'cards') . '.');
+       . $n . ' ' . ($n === 1 ? 'story' : 'stories') . '.');
   engine_log($mysqli, $game, $seat, 'commit', $msg, ['cards' => $n, 'replaced' => $replacing],
     $players[$seat]['player_name']);
 
@@ -351,10 +351,10 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
 function engine_validate_commit($game, $player, $params) {
   $hand = $player['private_state']['hand'] ?? [];
   $plays = $params['plays'] ?? null;
-  if (!is_array($plays)) throw new Exception('Choose the cards you are committing.');
+  if (!is_array($plays)) throw new Exception('Choose the stories you are committing.');
 
   $min = min((int) ($game['config']['min_commit'] ?? 0), count($hand));
-  if (count($plays) < $min) throw new Exception('Commit at least ' . $min . ' card' . ($min === 1 ? '' : 's') . '.');
+  if (count($plays) < $min) throw new Exception('Commit at least ' . $min . ' stor' . ($min === 1 ? 'y' : 'ies') . '.');
 
   $out = [];
   $seen = [];
@@ -362,8 +362,8 @@ function engine_validate_commit($game, $player, $params) {
   foreach ($plays as $pl) {
     if (!is_array($pl)) throw new Exception('Malformed commitment.');
     $card = (string) ($pl['card'] ?? '');
-    if (!in_array($card, $hand, true)) throw new Exception('A committed card is not in your hand.');
-    if (isset($seen[$card])) throw new Exception('Each card can be committed once.');
+    if (!in_array($card, $hand, true)) throw new Exception('A committed story is not in your hand.');
+    if (isset($seen[$card])) throw new Exception('Each story can be committed once.');
     $seen[$card] = true;
     $def = vg_card($card);
     $mode = (string) ($pl['action'] ?? '');
@@ -372,28 +372,28 @@ function engine_validate_commit($game, $player, $params) {
       continue;
     }
     if ($mode !== 'positive' && $mode !== 'negative') {
-      throw new Exception('Each committed card is played for profit, positive or negative coverage.');
+      throw new Exception('Each committed story is run positive, run negative, or buried.');
     }
     if ((int) $def[$mode] === 0) {
-      throw new Exception($def['name'] . ' has no ' . $mode . ' coverage.');
+      throw new Exception($def['name'] . ' cannot be run ' . $mode . '.');
     }
     $side = (string) ($pl['side'] ?? '');
     if ($side !== 'nation' && $side !== 'states') {
-      throw new Exception('Name the candidate each coverage card backs.');
+      throw new Exception('Name the candidate each story you run is for.');
     }
     if ($mode === 'negative') $negatives++;
     $out[] = ['card' => $card, 'action' => $mode, 'side' => $side];
   }
   $maxNeg = (int) ($game['config']['max_negative'] ?? 1);
   if ($negatives > $maxNeg) {
-    throw new Exception('You may play only ' . $maxNeg . ' card' . ($maxNeg === 1 ? '' : 's') . ' for negative coverage a round.');
+    throw new Exception('You may run only ' . $maxNeg . ' negative stor' . ($maxNeg === 1 ? 'y' : 'ies') . ' a round.');
   }
 
   $covered = [];
   foreach ($out as $pl) if ($pl['action'] !== 'profit') $covered[] = $pl['card'];
   $reserve = isset($params['reserve']) ? (string) $params['reserve'] : '';
   if ($reserve !== '' && !in_array($reserve, $covered, true)) {
-    throw new Exception('Only a card you played for coverage can be reserved.');
+    throw new Exception('Only a story you ran can be reserved, not one you buried.');
   }
   if ($reserve === '') {
     // Unmarked: keep back the most profitable card played for coverage.
@@ -929,21 +929,18 @@ function engine_seat_amounts($bySide) {
   return $out;
 }
 
-/** "Name played X for profit (+5); covered Y for Jefferson; kept Y." */
+/** "Name buried X for profit (+5); ran Y (positive, for Jefferson). Kept Y." */
 function engine_reveal_text($name, $r, $election) {
   $profit = [];
-  $cover = [];
-  $neg = [];
+  $ran = [];
   foreach ($r['plays'] as $pl) {
     if ($pl['action'] === 'profit') { $profit[] = $pl['name']; continue; }
     $who = $election[$pl['side']]['name'];
-    $txt = $pl['name'] . ' for ' . $who;
-    if ($pl['action'] === 'negative') $neg[] = $txt; else $cover[] = $txt;
+    $ran[] = $pl['name'] . ' (' . $pl['action'] . ', for ' . $who . ')';
   }
   $parts = [];
-  if ($profit) $parts[] = 'played ' . implode(', ', $profit) . ' for profit (+' . $r['earned'] . ')';
-  if ($cover) $parts[] = 'ran favourable coverage of ' . implode(', ', $cover);
-  if ($neg) $parts[] = 'ran hostile coverage of ' . implode(', ', $neg);
+  if ($profit) $parts[] = 'buried ' . implode(', ', $profit) . ' for profit (+' . $r['earned'] . ')';
+  if ($ran) $parts[] = 'ran ' . implode(', ', $ran);
   $msg = $name . ' ' . implode('; ', $parts) . '.';
   if ($r['kept']) $msg .= ' Kept ' . $r['kept'] . '.';
   if (mb_strlen($msg) > 480) $msg = mb_substr($msg, 0, 477) . '...';

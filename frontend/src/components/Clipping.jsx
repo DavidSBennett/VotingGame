@@ -1,5 +1,5 @@
 /**
- * A card, drawn as a newspaper clipping: dateline, headline, a line of
+ * A story card, drawn as a newspaper clipping: dateline, headline, a line of
  * flavour, and its three stats along the foot.
  *
  * `effect` (optional) replaces the stat line with what the card will
@@ -23,7 +23,7 @@ function PushCell({ sign, push, cost }) {
           ? 'flex flex-1 items-center justify-center gap-0.5 py-1 text-federal-700'
           : 'flex flex-1 items-center justify-center gap-0.5 py-1 text-oxblood-700'
       }
-      title={`${sign === '+' ? 'Positive' : 'Negative'} coverage: ${push > 0 ? 'Nation' : 'States'} +${Math.abs(push)}${cost ? `, costs the Union ${cost}` : ''}`}
+      title={`Run ${sign === '+' ? 'positive' : 'negative'}: ${push > 0 ? 'Nation' : 'States'} +${Math.abs(push)}${cost ? `, costs the Union ${cost}` : ''}`}
     >
       <span className="text-ink-950/50">{sign}</span>
       {pushShort(push)}
@@ -61,7 +61,7 @@ export default function Clipping({ card, effect = null, size = 'md', lifted = fa
     >
       <div className="flex items-baseline justify-between border-b border-ink-950/20 px-2 pb-0.5 pt-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-ink-950/60">
         <span>{card.year}</span>
-        <span>{card.kind === 'profit' ? 'The press' : 'Event'}</span>
+        <span>{card.kind === 'profit' ? 'Trade' : 'News'}</span>
       </div>
 
       <div className={md ? 'min-h-0 flex-1 overflow-hidden px-2 pt-1' : 'px-2 pb-1 pt-1'}>
@@ -94,16 +94,16 @@ export default function Clipping({ card, effect = null, size = 'md', lifted = fa
           }
         >
           {effect.mode === 'profit'
-            ? `Sold · $${effect.money}`
-            : `${effect.mode === 'negative' ? 'Hostile' : 'Favourable'} · ${effect.push > 0 ? 'Nation' : 'States'} +${Math.abs(effect.push)}${effect.mode === 'negative' ? ` · Union −${effect.stability}` : ''}`}
+            ? `Buried · $${effect.money}`
+            : `${effect.mode === 'negative' ? 'Negative' : 'Positive'} · ${effect.push > 0 ? 'Nation' : 'States'} +${Math.abs(effect.push)}${effect.mode === 'negative' ? ` · Union −${effect.stability}` : ''}`}
         </div>
       ) : (
         // The foot is laid out like the table it is played on: what the card
-        // does for the States man on the left, its profit in the middle (the
-        // counting house), what it does for the Nation man on the right.
+        // does for the States man on the left, its profit in the middle (Bury
+        // it), what it does for the Nation man on the right.
         <div className="flex items-stretch divide-x divide-ink-950/15 border-t border-ink-950/20 font-mono text-[11px] font-medium">
           {sideCell(card, 'states')}
-          <span className="flex-1 py-1 text-center text-wood-700" title="Profit">
+          <span className="flex-1 py-1 text-center text-wood-700" title="Bury it for this profit">
             ${card.profit}
             {card.profit_value !== undefined && card.profit_value !== card.profit && (
               <span className="text-gold-500">→{card.profit_value}</span>

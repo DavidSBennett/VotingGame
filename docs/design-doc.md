@@ -142,7 +142,7 @@ The screen is a newspaper office on one desktop page, in the visual language of 
 
 | Element | What the player sees |
 | --- | --- |
-| The table | Three drop zones: the States candidate (oxblood), the counting house where stories are buried (labelled "Cash in" on screen today), the Nation candidate (federal blue); drag a story, or tap it then tap a zone |
+| The table | Three drop zones: the States candidate (oxblood), "Bury it", where stories are killed for their profit, the Nation candidate (federal blue); drag a story, or tap it then tap a zone |
 | The desk | Your hand of stories, laid out on parchment across a wooden desk: dateline, headline, flavour, and a foot of three numbers in table order |
 | The temper of the nation | A tug-of-war gauge: where each past election landed, the last one in gold, and a dashed marker for where your own commitment would push |
 | The returns | After each election, a parchment broadsheet: "The returns of 1800", the track, the Patron, what the Union lost, every paper's stories |
@@ -157,7 +157,6 @@ The screen is a newspaper office on one desktop page, in the visual language of 
 
 The biggest open question is whether the Patronage should be fought over more; everything else is refinement.
 
-- [ ] **Story language on screen.** Carry run positive / run negative / bury into the game itself, which still says "clippings" and "Cash in".
 - [ ] **Incumbent Patron.** Keep the Patronage until someone beats the influence it was won with, turning the ping-pong seen in playtests into a bidding war. Needs a simulation before any change.
 - [ ] **Heads-up ties.** Nearly half of two-player races end level with equal influence and go to the historical winner; consider a different tie-break.
 - [ ] **Old news.** Stories never leave the deck, so founding-era stories are still drawn in the 1850s; retiring stories 20 years after their date cut that share to ~15% in simulation.

@@ -25,8 +25,8 @@ function PlayLine({ pl }) {
       <span className="font-display text-[15px] font-semibold leading-tight text-ink-950">{pl.name}</span>
       <span className={`whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.12em] ${tone}`}>
         {pl.action === 'profit'
-          ? `sold $${pl.money}`
-          : `${pl.action === 'negative' ? 'hostile' : 'favourable'} ${pl.push > 0 ? 'N' : 'S'}+${Math.abs(pl.push)} for ${pl.side === 'nation' ? 'Nation' : 'States'}${pl.stability ? ` · union −${pl.stability}` : ''}`}
+          ? `buried $${pl.money}`
+          : `${pl.action === 'negative' ? 'negative' : 'positive'} ${pl.push > 0 ? 'N' : 'S'}+${Math.abs(pl.push)} for ${pl.side === 'nation' ? 'Nation' : 'States'}${pl.stability ? ` · union −${pl.stability}` : ''}`}
       </span>
     </li>
   );
@@ -65,7 +65,7 @@ export default function Reveal({ reveal, seats, track, onClose }) {
             {reveal.broke
               ? reveal.broke_by === 'history'
                 ? `${reveal.winner_name || 'An unlooked-for victor'} was never meant to win, and the country could not bear it.`
-                : `Hostile coverage cost the Union ${reveal.stability_spent}; it had ${reveal.stability_before} left.`
+                : `Negative stories cost the Union ${reveal.stability_spent}; it had ${reveal.stability_before} left.`
               : `${reveal.winner_name} defeats ${reveal.loser_name}. ${decidedText[reveal.decided_by] || ''}`}
             {blamed.length > 0 &&
               ` ${blamed.join(' and ')} ${blamed.length === 1 ? 'was' : 'were'} the most exposed, and paid ${reveal.penalty}.`}
@@ -81,7 +81,7 @@ export default function Reveal({ reveal, seats, track, onClose }) {
             Patron · <span className="text-ink-950">{reveal.patron_seat !== null && reveal.patron_seat !== undefined ? name(reveal.patron_seat) : 'none'}</span>
           </div>
           <div className="border border-ink-950/20 px-2 py-1.5 text-center">
-            Hostile coverage · <span className="text-oxblood-700">−{reveal.stability_spent || 0}</span>
+            Negative stories · <span className="text-oxblood-700">−{reveal.stability_spent || 0}</span>
           </div>
           <div className="border border-ink-950/20 px-2 py-1.5 text-center">
             History changed ·{' '}

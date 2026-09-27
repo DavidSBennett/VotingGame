@@ -4,13 +4,13 @@ import NationGauge from './NationGauge.jsx';
 import Collapsible from './Collapsible.jsx';
 
 /**
- * The table: three drop zones -- the States candidate, Cash in, the Nation
- * candidate -- above your desk of clippings.
+ * The table: three drop zones -- the States candidate, Bury it, the Nation
+ * candidate -- above your desk of stories.
  *
- * Drag a clipping (or tap it, then tap a zone) to commit it:
+ * Drag a story (or tap it, then tap a zone) to commit it:
  *
- *   Cash in       played for PROFIT (doubled if you are the Patron)
- *   a candidate   played for the coverage stat that pushes toward that
+ *   Bury it       buried for PROFIT (doubled if you are the Patron)
+ *   a candidate   run positive or negative, whichever pushes toward that
  *                 candidate's side, as influence on him. A card's positive
  *                 and negative push opposite ways, so at most one fits
  *                 each candidate; a card with nothing for him is refused.
@@ -73,16 +73,16 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
   const refusal = (card, zone) => {
     if (zone === 'cash' || zone === 'hand') return null;
     const mode = modeFor(card, zone);
-    if (!mode) return `${card.name} has no coverage that helps ${race ? race[zone].name : zone}.`;
+    if (!mode) return `${card.name} cannot be run for ${race ? race[zone].name : zone}.`;
     if (mode === 'negative' && negativesPlaced(card.key) >= rules.max_negative) {
-      return `Only ${rules.max_negative} card a round can run hostile coverage.`;
+      return `Only ${rules.max_negative} negative ${rules.max_negative === 1 ? 'story' : 'stories'} a round.`;
     }
     return null;
   };
 
   const drop = (key, zone) => {
     if (locked || !byKey[key]) return;
-    // The dropped clipping is remounted in its new zone, so its dragend
+    // The dropped story is remounted in its new zone, so its dragend
     // never fires: always clear the drag state here.
     setDragging(null);
     setOver(null);
@@ -222,11 +222,11 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
     if (!holding || !byKey[holding] || locked) return null;
     const c = byKey[holding];
     if (refusal(c, zone)) return <span className="text-cream-200/40">won&rsquo;t fit</span>;
-    if (zone === 'cash') return <span className="text-gold-300">sell for ${c.profit_value}</span>;
+    if (zone === 'cash') return <span className="text-gold-300">bury for ${c.profit_value}</span>;
     const mode = modeFor(c, zone);
     return (
       <span className={mode === 'negative' ? 'text-oxblood-300' : 'text-cream-50'}>
-        {mode === 'negative' ? 'hostile' : 'favourable'} {pushText(c[mode])}
+        {mode === 'negative' ? 'run negative' : 'run positive'} {pushText(c[mode])}
         {mode === 'negative' && ` · union −${c.stability}`}
       </span>
     );
@@ -272,13 +272,13 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
         <div className="divider" />
         <div className="mb-2 flex items-baseline justify-between font-mono text-[10px] uppercase tracking-[0.15em]">
           <span className="text-cream-200/60">
-            {summary.influence[side] > 0 ? `your influence ${summary.influence[side]}` : 'coverage'}
+            {summary.influence[side] > 0 ? `your influence ${summary.influence[side]}` : 'run a story'}
           </span>
           <span>{preview(side)}</span>
         </div>
         {placed.length === 0 ? (
           <div className="flex flex-1 items-center justify-center border border-dashed border-cream-200/15 font-serif text-sm italic text-cream-200/35">
-            {locked ? '—' : 'Drop coverage here'}
+            {locked ? '—' : 'Run stories here'}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
@@ -321,10 +321,10 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
 
         <div {...zoneHandlers('cash')} className={zoneShell('cash')}>
           <div className="text-center">
-            <div className="label">The counting house</div>
-            <div className="font-display text-xl font-semibold leading-tight text-cream-50">Cash in</div>
+            <div className="label">Kill the story, keep the money</div>
+            <div className="font-display text-xl font-semibold leading-tight text-cream-50">Bury it</div>
             <div className="font-serif text-xs italic text-cream-200/70">
-              {me && me.is_patron ? 'You are Patron — profit pays double' : 'Money is the only score'}
+              {me && me.is_patron ? 'You are Patron — buried stories pay double' : 'Money is the only score'}
             </div>
           </div>
           <div className="divider" />
@@ -334,7 +334,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
           </div>
           {inZone('cash').length === 0 ? (
             <div className="flex flex-1 items-center justify-center border border-dashed border-cream-200/15 font-serif text-sm italic text-cream-200/35">
-              {locked ? '—' : 'Sell clippings here'}
+              {locked ? '—' : 'Bury stories here'}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
@@ -366,7 +366,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
           <p className="text-center font-serif text-sm italic text-cream-200/50">Your desk is empty.</p>
         ) : loose.length === 0 ? (
           <p className="text-center font-serif text-sm italic text-cream-200/50">
-            Every clipping is on the table. Drag one back here to keep it.
+            Every story is on the table. Drag one back here to hold it.
           </p>
         ) : (
           <div className="flex gap-2 overflow-x-auto pb-1.5 pt-1">
@@ -384,7 +384,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
         )}
         {!locked && cards.length > 0 && (
           <p className="text-center font-mono text-[9px] uppercase tracking-[0.2em] text-cream-200/40 [@media(max-height:820px)]:hidden">
-            Drag a clipping to a candidate or the counting house — or tap it, then tap where it goes
+            Drag a story to a candidate to run it, or to Bury it — or tap it, then tap where it goes
           </p>
         )}
       </div>
@@ -429,7 +429,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
               )}
               <button type="button" disabled={busy} onClick={submit} className="btn-solid">
                 {committed.length > 0
-                  ? `Commit ${committed.length} ${committed.length === 1 ? 'clipping' : 'clippings'}`
+                  ? `Commit ${committed.length} ${committed.length === 1 ? 'story' : 'stories'}`
                   : 'Pass this round'}
               </button>
             </>
@@ -450,7 +450,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
               </p>
             )}
             {covered.length > 0 && !effectiveReserve && !locked && (
-              <p className="text-cream-200/50">No reserve starred: your most profitable coverage will be kept.</p>
+              <p className="text-cream-200/50">No reserve starred: the most profitable story you ran will be kept.</p>
             )}
             {committed.length === 0 && !locked && (
               <p className="text-cream-200/50">

@@ -342,11 +342,11 @@ export default function GameShell({ seat, onLeave }) {
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-3 font-mono text-[9px] uppercase tracking-[0.15em] text-cream-200/60">
                       {p.is_patron && <span className="text-gold-300">★ Patron</span>}
-                      <span>{p.hand_count} clippings</span>
+                      <span>{p.hand_count} {p.hand_count === 1 ? 'story' : 'stories'}</span>
                       <span>Patron {p.patronages}×</span>
                       <span
                         className={p.exposure > 0 && p.exposure_rank === 1 ? 'text-oxblood-300' : ''}
-                        title="Exposure: clippings run as hostile coverage. If the Union breaks, the most exposed paper pays."
+                        title="Exposure: negative stories run. If the Union breaks, the most exposed paper pays."
                       >
                         exposure {p.exposure}
                         {p.exposure > 0 && p.exposure_rank === 1 ? ' · most' : ''}

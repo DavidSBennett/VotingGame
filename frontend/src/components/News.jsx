@@ -9,7 +9,7 @@ export default function News({ news, space, compact = false }) {
   if (space === 1) {
     return (
       <p className={compact ? 'shrink-0 truncate font-serif text-xs italic text-cream-200/60' : 'text-center font-serif text-sm italic text-cream-200/70'}>
-        The deck opens on the Revolution and the founding — {news.length} clippings, {news[0].year} to{' '}
+        The deck opens on the Revolution and the founding — {news.length} stories, {news[0].year} to{' '}
         {news[news.length - 1].year}. Later news arrives as it happens.
       </p>
     );
