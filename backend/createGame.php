@@ -45,6 +45,9 @@ if (isset($body['config']) && is_array($body['config'])) {
   }
 }
 $config['bots'] = $bots;
+$level = (string) ($body['bot_level'] ?? 'easy');
+if (!in_array($level, ['easy', 'hard'], true)) error('bot_level must be easy or hard', 400);
+$config['bot_level'] = $level;
 $configJson = json_encode($config, JSON_UNESCAPED_UNICODE);
 
 /** Rival papers, for bot seats. Real mastheads of the period. */

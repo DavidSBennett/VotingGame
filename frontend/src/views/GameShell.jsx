@@ -351,7 +351,9 @@ export default function GameShell({ seat, onLeave }) {
                         exposure {p.exposure}
                         {p.exposure > 0 && p.exposure_rank === 1 ? ' · most' : ''}
                       </span>
-                      {p.is_bot && <span className="text-cream-200/30">rival</span>}
+                      {p.is_bot && (
+                        <span className="text-cream-200/30">rival · {state.rules.bot_level === 'hard' ? 'hard' : 'easy'}</span>
+                      )}
                       {p.conceded && <span className="text-cream-200/30">left</span>}
                     </div>
                   </li>

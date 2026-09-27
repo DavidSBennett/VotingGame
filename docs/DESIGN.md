@@ -126,10 +126,19 @@ After 1860 the richest paper wins; conceded seats cannot. If the Union
 breaks, the game ends early, the most exposed paper pays 25, and the
 richest paper after that wins.
 
-**The bot**: keep four cards, commit the rest. Patron? Profit them all.
+**Two bots, chosen in the lobby.** *Easy* is the original: keep four
+cards, commit the rest. Patron? Profit them all.
 Otherwise pick the side the hand can push hardest and, cheapest first,
 cover a card for it when its push is at least its profit — negatively only
 once, and only if stability stays above 4. Profit the rest.
+
+*Hard* is distilled from the playtests the easy bot lost (games 24, 29,
+31: 162–150, 170–159, 224–152). As Patron it sells its hand at double,
+keeping one cheap-to-cover card back; otherwise it wins the Patronage as
+cheaply as the table allows (influence 1 if every rival is the selling
+Patron, else 3), at most one hostile card while stability allows, and keeps
+the rest for its next Patron round. Simulated: beats Easy 99% heads-up and
+the human line from those games 66%.
 
 ---
 
@@ -375,3 +384,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-27 | Exposure rank; a broken Union costs the most exposed paper 25 instead of everyone losing | Smallest penalty with the full deterrent effect; careful play never breaks the Union |
 | 2026-09-27 | A paper may pass a round (commit no cards) | No passing line beat a fair share: pass-to-6 won 19% heads-up, pass-to-full-then-dump 0% |
 | 2026-09-27 | Changing history costs the Union 2 per two seats; ceiling lowered from 14 to 10 | Careful play now breaks the Union in 0/16/9/25% of games at 2-5 seats; backing the unhistorical man on purpose loses |
+| 2026-09-27 | Bot difficulty: Easy (the original bot) and Hard (distilled from playtests 24, 29, 31) | Hard beats Easy 99% and the human line 66%; the human beat Easy 224-152 in game 31 |

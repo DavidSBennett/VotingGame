@@ -121,6 +121,8 @@ function engine_default_config() {
     'min_players'        => 1,
     'max_players'        => 5,
     'bots'               => 1,
+    // 'easy' or 'hard': which rival papers the table plays against.
+    'bot_level'          => 'easy',
   ];
 }
 
@@ -442,7 +444,7 @@ function engine_run_bots(&$game, &$players, $mysqli) {
       $players[$seat]['conceded'] = 1;       // nothing left to print
       continue;
     }
-    $game['state']['commits'][$seat] = engine_bot_commit($game, $players[$seat]);
+    $game['state']['commits'][$seat] = engine_bot_commit(engine_bot_view($game, $players, $seat), $players[$seat]);
     $players[$seat]['public_state']['committed'] = true;
   }
 
@@ -453,11 +455,29 @@ function engine_run_bots(&$game, &$players, $mysqli) {
       foreach (engine_seat_list($players) as $seat) {
         $p = $players[$seat];
         if (empty($p['is_bot']) || !empty($p['conceded']) || empty($p['private_state']['hand'])) continue;
-        $game['state']['commits'][$seat] = engine_bot_commit($game, $players[$seat]);
+        $game['state']['commits'][$seat] = engine_bot_commit(engine_bot_view($game, $players, $seat), $players[$seat]);
         $players[$seat]['public_state']['committed'] = true;
       }
     }
   }
+}
+
+/**
+ * The game as a bot may see it: public facts only, plus whether every
+ * rival still playing is the sitting Patron (public: the Patron is shown
+ * to everyone). Never any commitment on file.
+ */
+function engine_bot_view($game, $players, $seat) {
+  $all = true;
+  $any = false;
+  foreach ($players as $s => $p) {
+    if ((int) $s === (int) $seat || !empty($p['conceded'])) continue;
+    $any = true;
+    if (empty($p['public_state']['is_patron'])) $all = false;
+  }
+  $game['rivals_all_patron'] = $any && $all;
+  unset($game['state']['commits']);
+  return $game;
 }
 
 /**
@@ -475,6 +495,9 @@ function engine_run_bots(&$game, &$players, $mysqli) {
  *   5. Reserve the most profitable card it covered.
  */
 function engine_bot_commit($game, $player) {
+  if (($game['config']['bot_level'] ?? 'easy') === 'hard') {
+    return engine_bot_commit_hard($game, $player);
+  }
   $hand = $player['private_state']['hand'] ?? [];
   $n = max(1, count($hand) - 4 + (int) ($game['config']['draw_per_round'] ?? 2));
   $byProfit = $hand;
@@ -534,6 +557,121 @@ function engine_bot_commit($game, $player) {
     if (count($plays) >= $n) break;
     if (isset($used[$k])) continue;
     $plays[] = ['card' => $k, 'action' => 'profit', 'side' => null];
+  }
+
+  $reserve = null;
+  foreach ($plays as $pl) {
+    if ($pl['action'] === 'profit') continue;
+    if ($reserve === null || (int) vg_card($pl['card'])['profit'] > (int) vg_card($reserve)['profit']) $reserve = $pl['card'];
+  }
+  return ['plays' => $plays, 'reserve' => $reserve];
+}
+
+/**
+ * The HARD bot, distilled from the playtests the easy bot kept losing
+ * (games 24, 29 and 31: 162-150, 170-159, 224-152). Kept in step with
+ * make_hard in tools/simulate.py (keep 1, cushion 2).
+ *
+ *   1. Patron? Sell the hand at double, keeping back the one card that is
+ *      cheapest to cover with, for the next bid.
+ *   2. Otherwise win the Patronage as cheaply as the table allows: on the
+ *      side the hand pushes hardest, add the lowest-profit coverage until
+ *      influence reaches the target -- 1 if every rival is the sitting
+ *      Patron (who will be selling), else 3. At most one hostile card, and
+ *      only while stability stays above 3 after it.
+ *   3. Keep everything else for the next Patron round, selling only the
+ *      cheapest cards the draw would otherwise waste at the hand limit.
+ *
+ * Simulated: beats the easy bot 99% heads-up and the human line from those
+ * games 66%; two easy bots and one hard, the hard bot wins 84%.
+ */
+function engine_bot_commit_hard($game, $player) {
+  $hand = $player['private_state']['hand'] ?? [];
+  $maxPush = function ($c) { return max(abs((int) $c['positive']), abs((int) $c['negative'])); };
+
+  if (!empty($player['public_state']['is_patron'])) {
+    $keep = null;
+    foreach ($hand as $k) {
+      $c = vg_card($k);
+      if ($keep === null) { $keep = $k; continue; }
+      $kc = vg_card($keep);
+      if ((int) $c['profit'] < (int) $kc['profit']
+          || ((int) $c['profit'] === (int) $kc['profit'] && $maxPush($c) > $maxPush($kc))) {
+        $keep = $k;
+      }
+    }
+    $plays = [];
+    foreach ($hand as $k) {
+      if ($k === $keep) continue;
+      $plays[] = ['card' => $k, 'action' => 'profit', 'side' => null];
+    }
+    return ['plays' => $plays, 'reserve' => null];
+  }
+
+  // The side this hand can push hardest (history breaks a tie).
+  $reach = ['nation' => 0, 'states' => 0];
+  foreach ($hand as $k) {
+    $c = vg_card($k);
+    foreach (['nation' => 1, 'states' => -1] as $side => $want) {
+      $best = 0;
+      if ((int) $c['positive'] * $want > 0) $best = max($best, abs((int) $c['positive']));
+      if ((int) $c['negative'] * $want > 0) $best = max($best, abs((int) $c['negative']));
+      $reach[$side] += $best;
+    }
+  }
+  if ($reach['nation'] !== $reach['states']) {
+    $side = ($reach['nation'] > $reach['states']) ? 'nation' : 'states';
+  } else {
+    $e = vg_election_at((int) $game['state']['space']);
+    $side = $e ? $e['historical_winner'] : 'nation';
+  }
+  $want = ($side === 'nation') ? 1 : -1;
+
+  // Every rival the sitting Patron? They will be selling: one card will do.
+  $stability = (int) ($game['state']['stability'] ?? 0);
+  $target = !empty($game['rivals_all_patron']) ? 1 : 3;
+
+  $options = [];
+  foreach ($hand as $k) {
+    $c = vg_card($k);
+    $profit = (int) $c['profit'];
+    if ((int) $c['positive'] * $want > 0) {
+      $push = abs((int) $c['positive']);
+      $options[] = ['score' => $profit / $push, 'profit' => $profit, 'card' => $k, 'mode' => 'positive', 'push' => $push];
+    }
+    if ((int) $c['negative'] * $want > 0 && $stability - (int) $c['stability'] > 3) {
+      $push = abs((int) $c['negative']);
+      $options[] = ['score' => $profit / $push + 0.5, 'profit' => $profit, 'card' => $k, 'mode' => 'negative', 'push' => $push];
+    }
+  }
+  usort($options, function ($a, $b) {
+    if ($a['score'] != $b['score']) return ($a['score'] < $b['score']) ? -1 : 1;
+    return $a['profit'] - $b['profit'];
+  });
+
+  $plays = [];
+  $used = [];
+  $influence = 0;
+  $negs = 0;
+  $maxNeg = (int) ($game['config']['max_negative'] ?? 1);
+  foreach ($options as $o) {
+    if ($influence >= $target) break;
+    if (isset($used[$o['card']])) continue;
+    if ($o['mode'] === 'negative' && $negs >= $maxNeg) continue;
+    $plays[] = ['card' => $o['card'], 'action' => $o['mode'], 'side' => $side];
+    $used[$o['card']] = true;
+    $influence += $o['push'];
+    if ($o['mode'] === 'negative') $negs++;
+  }
+
+  // Sell only what the draw would waste at the hand limit, cheapest first.
+  $spare = count($hand) - count($used) + (int) ($game['config']['draw_per_round'] ?? 2)
+         - (int) ($game['config']['hand_limit'] ?? 10);
+  if ($spare > 0) {
+    $rest = [];
+    foreach ($hand as $k) if (!isset($used[$k])) $rest[] = $k;
+    usort($rest, function ($a, $b) { return (int) vg_card($a)['profit'] - (int) vg_card($b)['profit']; });
+    foreach (array_slice($rest, 0, $spare) as $k) $plays[] = ['card' => $k, 'action' => 'profit', 'side' => null];
   }
 
   $reserve = null;
@@ -1041,6 +1179,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'hand_limit'        => (int) ($config['hand_limit'] ?? 10),
       'stability_recovery'=> intdiv((int) ($config['stability_recovery'] ?? 2) * max(1, count($players)), 2),
       'exposure_penalty'  => (int) ($config['exposure_penalty'] ?? 25),
+      'bot_level'         => (string) ($config['bot_level'] ?? 'easy'),
       'history_shock'     => intdiv((int) ($config['history_shock'] ?? 0) * max(1, count($players)), 2),
     ],
     'track'         => ['min' => (int) ($config['track_min'] ?? -5), 'max' => (int) ($config['track_max'] ?? 5)],

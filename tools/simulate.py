@@ -549,10 +549,86 @@ def strat_breaker(game, p):
     return plays, None
 
 
+def make_hard(keep_on_dump=0, cushion=2, neg_margin=3):
+    """Distilled from the playtests the bots kept losing (games 24, 29, 31).
+
+      1. Patron? Sell the hand at double, keeping `keep_on_dump` cards
+         (the cheapest-to-cover ones) for the next Patronage bid.
+      2. Otherwise win the Patronage as cheaply as possible: on the side
+         the hand pushes hardest, add the lowest-profit coverage cards until
+         influence reaches a target -- 1 if every rival is the sitting Patron
+         (who will be selling), else `cushion` + 1. One hostile card at most,
+         only while stability stays above `neg_margin` after it.
+      3. Keep everything else, except sell the cheapest cards the draw
+         would otherwise waste at the hand limit.
+    """
+    def strat(game, p):
+        hand = list(p.hand)
+        if p.patron:
+            keep = sorted(hand, key=lambda k: (CARDS[k]["profit"], -max(abs(CARDS[k]["positive"]), abs(CARDS[k]["negative"]))))[:keep_on_dump]
+            return [(k, "profit", None) for k in hand if k not in keep], None
+
+        side = lean(game, hand, allow_negative=True)
+        want = 1 if side == "nation" else -1
+        rivals = [q for q in game.players if q is not p]
+        target = 1 if all(q.patron for q in rivals) else cushion + 1
+
+        options = []
+        for k in hand:
+            c = CARDS[k]
+            if c["positive"] * want > 0:
+                options.append((c["profit"] / abs(c["positive"]), c["profit"], k, "positive", abs(c["positive"])))
+            if c["negative"] * want > 0 and game.stability - c["stability"] > neg_margin:
+                options.append((c["profit"] / abs(c["negative"]) + 0.5, c["profit"], k, "negative", abs(c["negative"])))
+        options.sort()
+        plays, used, inf, negs = [], set(), 0, 0
+        for _, _, k, mode, push in options:
+            if inf >= target:
+                break
+            if k in used or (mode == "negative" and negs >= game.cfg["max_negative"]):
+                continue
+            plays.append((k, mode, side))
+            used.add(k)
+            inf += push
+            negs += mode == "negative"
+
+        # Don't let the draw overflow the hand limit: sell the cheapest extras.
+        spare = len(hand) - len(used) + game.cfg["draw_per_round"] - game.cfg["hand_limit"]
+        if spare > 0:
+            rest = sorted([k for k in hand if k not in used], key=lambda k: CARDS[k]["profit"])
+            plays += [(k, "profit", None) for k in rest[:spare]]
+        if not plays and hand:
+            plays = []   # a pass is fine: nothing worth bidding
+        covered = [k for k, m, _ in plays if m != "profit"]
+        return plays, (max(covered, key=lambda k: CARDS[k]["profit"]) if covered else None)
+    return strat
+
+
+def sniper(game, p):
+    """The human line, as played in games 29 and 31 (the benchmark)."""
+    if p.patron:
+        return [(k, "profit", None) for k in p.hand], None
+    side = lean(game, p.hand, True)
+    want = 1 if side == "nation" else -1
+    opts = []
+    for k in p.hand:
+        c = CARDS[k]
+        for mode in ("positive", "negative"):
+            if c[mode] * want > 0 and (mode == "positive" or game.stability - c["stability"] > 3):
+                opts.append((c["profit"], abs(c[mode]), k, mode))
+    opts.sort()
+    if not opts:
+        return [], None
+    _, _, k, mode = opts[0]
+    return [(k, mode, side)], None
+
+
 STRATEGIES = {
     "hoarder": strat_hoarder,
     "casher": strat_casher,
-    "bot": make_bot(),
+    "bot": make_bot(),                    # the server's EASY bot
+    "hard": make_hard(keep_on_dump=1, cushion=2),   # the server's HARD bot
+    "sniper": sniper,                     # the human line from games 29 and 31
     "positive": strat_positive_only,
     "all_cover": strat_all_cover,
     "spoiler": strat_spoiler,

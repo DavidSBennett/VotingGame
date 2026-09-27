@@ -21,6 +21,21 @@ export default function Lobby({ onSeated }) {
   });
   const [joinCode, setJoinCode] = useState('');
   const [rivals, setRivals] = useState(1);
+  const [level, setLevel] = useState(() => {
+    try {
+      return localStorage.getItem('votinggame.level') || 'easy';
+    } catch {
+      return 'easy';
+    }
+  });
+  const chooseLevel = (l) => {
+    setLevel(l);
+    try {
+      localStorage.setItem('votinggame.level', l);
+    } catch {
+      /* private browsing */
+    }
+  };
   const [games, setGames] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -72,7 +87,7 @@ export default function Lobby({ onSeated }) {
     setBusy(true);
     setError(null);
     try {
-      seated(await createGame({ player_name: playerName.trim(), max_players: 1, bots: rivals }));
+      seated(await createGame({ player_name: playerName.trim(), max_players: 1, bots: rivals, bot_level: level }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -157,6 +172,34 @@ export default function Lobby({ onSeated }) {
             </div>
             <p className="mt-2 font-serif text-sm italic text-cream-200/50">
               {rivals === 1 ? 'Head to head — the balanced setting.' : `A crowded field of ${rivals + 1} papers.`}
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <span className="label text-cream-200/60">The rival editors</span>
+            <div className="mt-2 inline-flex border border-gold-500/50">
+              {[
+                ['easy', 'Easy'],
+                ['hard', 'Hard'],
+              ].map(([key, text]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => chooseLevel(key)}
+                  className={
+                    key === level
+                      ? 'h-9 px-5 bg-cream-100 font-display text-lg font-semibold text-ink-950'
+                      : 'h-9 px-5 font-display text-lg text-cream-200/70 transition hover:text-gold-300'
+                  }
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 font-serif text-sm italic text-cream-200/50">
+              {level === 'easy'
+                ? 'Steady papers that cover what is cheap and sell the rest.'
+                : 'Papers that play the way the winning playtests did: bid for the Patronage as cheaply as they can, and sell their hoard when they hold it.'}
             </p>
           </div>
 
