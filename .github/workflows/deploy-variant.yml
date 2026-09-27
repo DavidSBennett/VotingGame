@@ -12,7 +12,7 @@ on:
 env:
   # The subdomain this install serves. Used for the rsync target path and
   # the post-deploy OPcache flush. Change in ONE place.
-  SUBDOMAIN: variant.thehistorians.org
+  SUBDOMAIN: fourthestate.thehistorians.org
   # The OPcache flush token is the OPCACHE_TOKEN Actions secret. Never put
   # it here: this repository is public.
 

@@ -9,7 +9,7 @@ tested and what has been tried so far, and keep it up to date.
 - Work on the `variant` branch only. Never commit to, merge into, or push
   `main`. Never run `deploy.yml` (it publishes the real game and refuses any
   ref but main anyway).
-- The variant is live at https://variant.thehistorians.org, with its own
+- The variant is live at https://fourthestate.thehistorians.org, with its own
   database. Pushing `variant` deploys it (`deploy-variant.yml`); to deploy
   by hand: `gh workflow run deploy-variant.yml --ref variant`, then
   `gh run watch`.

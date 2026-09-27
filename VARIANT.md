@@ -5,7 +5,7 @@ seventeen elections, stories run positive / run negative / buried,
 negative stories always the stronger push, Patron x2, Union ceiling 10 per
 two seats.
 
-Live at https://variant.thehistorians.org (its own database).
+Live at https://fourthestate.thehistorians.org, with its own database (thehist2_fourthestate).
 
 ## The theory being tested
 
