@@ -8,7 +8,7 @@ each one. Everything it touches is a normal game that the admin
 clear-finished endpoint will tidy away.
 
     py -X utf8 tools/smoke_play.py
-    py -X utf8 tools/smoke_play.py --base https://voting.thehistorians.org
+    py -X utf8 tools/smoke_play.py --base https://variant.thehistorians.org
     py -X utf8 tools/smoke_play.py --quiet
 
 Exit code is 0 only if a game reached a terminal state with no failed
@@ -21,7 +21,7 @@ import sys
 import urllib.error
 import urllib.request
 
-BASE = "https://voting.thehistorians.org"
+BASE = "https://variant.thehistorians.org"   # VARIANT BRANCH
 
 
 class ApiError(Exception):

@@ -11,7 +11,7 @@ export default function HighScores() {
 
   useEffect(() => {
     // v1 scores came from a different game; they stay in the table but not on the board.
-    fetchHighScores({ limit: 15, variant: 'v2' })
+    fetchHighScores({ limit: 15, variant: 'variant' })
       .then((data) => setScores(data.scores || []))
       .catch((err) => setError(err.message));
   }, []);

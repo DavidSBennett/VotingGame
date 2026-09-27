@@ -32,7 +32,7 @@ if ($bots < 0 || $bots > 4) error('bots must be between 0 and 4', 400);
 if ($humanSeats + $bots < 2) error('A game needs at least two seats: add a rival paper', 400);
 if ($humanSeats + $bots > 5) error('At most five seats in total', 400);
 
-$variant = (string) ($body['variant'] ?? 'v2');
+$variant = (string) ($body['variant'] ?? 'variant');   // VARIANT BRANCH
 if (!preg_match('/^[a-z0-9_.-]{1,40}$/i', $variant)) error('Invalid variant', 400);
 
 // Host-chosen knobs merged over the defaults, clamped to their legal
