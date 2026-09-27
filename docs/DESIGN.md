@@ -77,21 +77,22 @@ that wins.
 
 ## 4. Cards
 
-94 dated cards. Each has up to three stats:
+97 dated cards. Each has up to three stats:
 
 - **Profit** — money when played for profit. The only way to score.
 - **Positive coverage** — a signed push (−3 … +3).
-- **Negative coverage** — a signed push, usually weaker and always the
-  other way, plus the **stability** it costs. Each card touches stability
-  once at most, and only when played negatively.
+- **Negative coverage** — a signed push, always the other way and always
+  **stronger** than the card's positive coverage, plus the **stability** it
+  costs. Hostile coverage is the powerful move; its price is disunion. Each
+  card touches stability once at most, and only when played negatively.
 
-Example: *The Bill of Rights* — profit 1; positive States +3; negative
-Nation +1 at a cost of 2 stability.
+Example: *The Bill of Rights* — profit 1; positive States +1; negative
+Nation +3 at a cost of 2 stability.
 
 **Balance rule:** within every one of the 17 release batches, the Nation
 push on offer equals the States push on offer, counting both coverage
 options of every card. `tools/simulate.py` refuses to run if a batch
-drifts. Negative coverage is where most of the balancing was done.
+drifts, or if any card's hostile push is not the larger of the two.
 
 8 cards are profit-only (the business of the press: the Postal Act, the
 telegraph, the rotary press…). Cards enter the deck at the first campaign
@@ -135,16 +136,18 @@ richest paper after that wins.
 cards, commit the rest. Patron? Profit them all.
 Otherwise pick the side the hand can push hardest and, cheapest first,
 cover a card for it when its push is at least its profit — negatively only
-once, and only if stability stays above 4. Profit the rest.
+once, and only if stability stays above 4 per two seats (every rival may be
+spending it the same round). Profit the rest.
 
 *Hard* is distilled from the playtests the easy bot lost (games 24, 29,
 31: 162–150, 170–159, 224–152). As Patron it sells its hand at double,
 keeping one cheap-to-cover card back; otherwise it wins the Patronage as
 cheaply as the table allows (influence 1 if every rival is the selling
-Patron, else 2), at most one hostile card while stability allows, and keeps
+Patron, else 2), at most one hostile card while stability stays above 5
+per two seats, and keeps
 the rest for its next Patron round. In the final election, with nothing to
 carry forward, it sells its whole hand. Simulated over seventeen elections:
-beats Easy 100% heads-up and the human line from those games 57–60%.
+beats Easy 100% heads-up and the human line from those games 62%.
 
 ---
 
@@ -154,6 +157,23 @@ beats Easy 100% heads-up and the human line from those games 57–60%.
 times per setting. It parses the content **out of the PHP**, so the data
 cannot drift; the rules are a hand-port of `engine.php`, kept in step by
 hand. Every number in `engine_default_config()` came from a run.
+
+### Hostile coverage made the stronger push (2026-09-27)
+
+Every card's hostile push is now larger than its favourable one (unequal
+pairs swapped; equal pairs m/m became m/m+1, 3/3 became 2/3), and each batch
+re-balanced with the fewest one-point moves. Three batches (1808, 1824,
+1848) held only cards leaning one way and could not balance, so each gained
+a card pointing the other: the Burr Conspiracy (1807), the Crawford Radicals
+(1823), the Free Soil Party (1848). 97 cards.
+
+With the bots' old fixed caution (stay above 4) the Union broke in 1% / 53%
+/ 98% / 100% of bot games at 2 / 3 / 4 / 5 seats: every bot judged the
+Union safe for its own hostile card in the same sealed round. Scaling the
+caution per two seats (4 for Easy, 5 for Hard) brought it to 1% / 11% / 20%
+/ 25%, near the old figures, with no change heads-up. Playing only
+favourable coverage now loses to the bot 97% heads-up (it was even):
+hostile coverage matters. Hard: 100% vs Easy, 62% vs the human line.
 
 ### History shock and a lower ceiling (2026-09-27)
 
@@ -392,3 +412,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-27 | Changing history costs the Union 2 per two seats; ceiling lowered from 14 to 10 | Careful play now breaks the Union in 0/16/9/25% of games at 2-5 seats; backing the unhistorical man on purpose loses |
 | 2026-09-27 | Bot difficulty: Easy (the original bot) and Hard (distilled from playtests 24, 29, 31) | Hard beats Easy 99% and the human line 66%; the human beat Easy 224-152 in game 31 |
 | 2026-09-27 | 1804, 1816 and 1820 restored: seventeen elections. Batches re-balanced by one point on Marbury, the Embargo, the Tariff of 1816, the Panic of 1819, the Missouri Compromise and the Monroe Doctrine | Union breaks among bots rose (3 seats 17% -> 27%, 5 seats 20% -> 30%); Hard fell to 27% against the human line until it learned to sell out in the final election and bid to 2, now 57-60% |
+| 2026-09-27 | Hostile coverage is always the stronger push on a card; three new cards (Burr Conspiracy, Crawford Radicals, Free Soil Party) balance the batches that could not; bot caution scales with table size | Hostile coverage should be the powerful move, paid for in disunion. Union breaks among bots 1/11/20/25% at 2-5 seats (fixed caution gave 1/53/98/100%) |

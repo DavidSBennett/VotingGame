@@ -34,8 +34,8 @@ function Body({ rules }) {
         <li>
           <span className="font-semibold text-ink-950">On a candidate</span> — run the coverage that helps him: its push
           goes on the track, and counts as your influence on him. If that coverage is{' '}
-          <span className="font-semibold text-oxblood-700">hostile</span>, it costs the Union stability — only {maxNeg}{' '}
-          such clipping a round.
+          <span className="font-semibold text-oxblood-700">hostile</span>, it pushes harder than the favourable kind but
+          costs the Union stability — only {maxNeg} such clipping a round.
         </li>
       </ul>
       <p className="mt-1">Star one clipping you ran as coverage to reserve it.</p>

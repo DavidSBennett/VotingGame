@@ -140,6 +140,7 @@ def check_parity():
             assert pos == 0 and neg == 0 and stab == 0, "%s: profit cards only profit" % key
         if pos and neg:
             assert (pos > 0) != (neg > 0), "%s: positive and negative push the same way" % key
+            assert abs(neg) > abs(pos), "%s: hostile coverage must push harder than favourable" % key
         assert (neg != 0) == (stab > 0), "%s: stability is paid by, and only by, negative coverage" % key
     assert len(CARDS) >= 40, "deck looks too small: %d" % len(CARDS)
 
@@ -461,7 +462,8 @@ def make_bot(weight=1, margin=4):
          for that side when its push, times `weight`, is worth at least
          its profit -- positively if that pushes the right way; negatively
          (one card at most) only if it does and stability stays above
-         `margin` after the cost. Name that side's candidate.
+         `margin` per two seats after the cost (every rival may be spending
+         it the same round). Name that side's candidate.
       4. Play the rest of the commitment for profit, best first.
       5. Reserve the most profitable card it covered.
     """
@@ -477,7 +479,8 @@ def make_bot(weight=1, margin=4):
             if len(plays) >= n:
                 break
             c = CARDS[k]
-            ok_neg = negs < game.cfg["max_negative"] and budget - c["stability"] > margin
+            ok_neg = (negs < game.cfg["max_negative"]
+                      and budget - c["stability"] > margin * len(game.players) // 2)
             mode = best_push(game, k, want, allow_negative=ok_neg)
             if mode and abs(push_of(k, mode)) * weight >= c["profit"]:
                 plays.append((k, mode, side))
@@ -558,7 +561,7 @@ def make_hard(keep_on_dump=0, cushion=2, neg_margin=3):
          the hand pushes hardest, add the lowest-profit coverage cards until
          influence reaches a target -- 1 if every rival is the sitting Patron
          (who will be selling), else `cushion` + 1. One hostile card at most,
-         only while stability stays above `neg_margin` after it.
+         only while stability stays above `neg_margin` per two seats.
       3. Keep everything else, except sell the cheapest cards the draw
          would otherwise waste at the hand limit.
       4. The final election carries nothing forward: sell the whole hand.
@@ -581,7 +584,7 @@ def make_hard(keep_on_dump=0, cushion=2, neg_margin=3):
             c = CARDS[k]
             if c["positive"] * want > 0:
                 options.append((c["profit"] / abs(c["positive"]), c["profit"], k, "positive", abs(c["positive"])))
-            if c["negative"] * want > 0 and game.stability - c["stability"] > neg_margin:
+            if c["negative"] * want > 0 and game.stability - c["stability"] > neg_margin * len(game.players) // 2:
                 options.append((c["profit"] / abs(c["negative"]) + 0.5, c["profit"], k, "negative", abs(c["negative"])))
         options.sort()
         plays, used, inf, negs = [], set(), 0, 0
@@ -630,7 +633,7 @@ STRATEGIES = {
     "hoarder": strat_hoarder,
     "casher": strat_casher,
     "bot": make_bot(),                    # the server's EASY bot
-    "hard": make_hard(keep_on_dump=1, cushion=1),   # the server's HARD bot
+    "hard": make_hard(keep_on_dump=1, cushion=1, neg_margin=5),   # the server's HARD bot
     "sniper": sniper,                     # the human line from games 29 and 31
     "positive": strat_positive_only,
     "all_cover": strat_all_cover,

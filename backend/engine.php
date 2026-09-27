@@ -476,20 +476,23 @@ function engine_bot_view($game, $players, $seat) {
     if (empty($p['public_state']['is_patron'])) $all = false;
   }
   $game['rivals_all_patron'] = $any && $all;
+  $game['seat_count'] = count($players);
   unset($game['state']['commits']);
   return $game;
 }
 
 /**
  * The bot. Kept in step with make_bot in tools/simulate.py (weight 1,
- * margin 4) -- the tuning was validated against it, so change them together.
+ * margin 4 per two seats) -- the tuning was validated against it, so change
+ * them together.
  *
  *   1. Keep four cards in hand; commit the rest (at least one).
  *   2. Patron? Play them all for profit: each pays double.
  *   3. Otherwise pick the side the hand can push hardest. Cheapest card
  *      first, cover a card for that side when its push is at least its
  *      profit: positively if that pushes the right way; negatively (one card
- *      at most) only if it does and stability stays above 4 after the cost.
+ *      at most) only if it does and stability stays above 4 per two seats
+ *      after the cost: every rival may be spending it the same round.
  *      Name that side's candidate.
  *   4. Play the rest of the commitment for profit, best first.
  *   5. Reserve the most profitable card it covered.
@@ -510,7 +513,7 @@ function engine_bot_commit($game, $player) {
   }
 
   $stability = (int) ($game['state']['stability'] ?? 0);
-  $margin = 4;
+  $margin = intdiv(4 * (int) ($game['seat_count'] ?? 2), 2);
   $maxNeg = (int) ($game['config']['max_negative'] ?? 1);
 
   // The side this hand can push hardest (negative options included).
@@ -570,7 +573,7 @@ function engine_bot_commit($game, $player) {
 /**
  * The HARD bot, distilled from the playtests the easy bot kept losing
  * (games 24, 29 and 31: 162-150, 170-159, 224-152). Kept in step with
- * make_hard in tools/simulate.py (keep 1, cushion 1).
+ * make_hard in tools/simulate.py (keep 1, cushion 1, neg margin 5).
  *
  *   1. Patron? Sell the hand at double, keeping back the one card that is
  *      cheapest to cover with, for the next bid.
@@ -578,14 +581,14 @@ function engine_bot_commit($game, $player) {
  *      side the hand pushes hardest, add the lowest-profit coverage until
  *      influence reaches the target -- 1 if every rival is the sitting
  *      Patron (who will be selling), else 2. At most one hostile card, and
- *      only while stability stays above 3 after it.
+ *      only while stability stays above 5 per two seats after it.
  *   3. Keep everything else for the next Patron round, selling only the
  *      cheapest cards the draw would otherwise waste at the hand limit.
  *   4. The final election carries nothing forward: sell the whole hand.
  *
  * Simulated over seventeen elections: beats the easy bot 100% heads-up and
- * the human line from those games 60%; two easy bots and one hard, the
- * hard bot wins 90%.
+ * the human line from those games 62%; two easy bots and one hard, the
+ * hard bot wins 95%.
  */
 function engine_bot_commit_hard($game, $player) {
   $hand = $player['private_state']['hand'] ?? [];
@@ -646,7 +649,8 @@ function engine_bot_commit_hard($game, $player) {
       $push = abs((int) $c['positive']);
       $options[] = ['score' => $profit / $push, 'profit' => $profit, 'card' => $k, 'mode' => 'positive', 'push' => $push];
     }
-    if ((int) $c['negative'] * $want > 0 && $stability - (int) $c['stability'] > 3) {
+    if ((int) $c['negative'] * $want > 0
+        && $stability - (int) $c['stability'] > intdiv(5 * (int) ($game['seat_count'] ?? 2), 2)) {
       $push = abs((int) $c['negative']);
       $options[] = ['score' => $profit / $push + 0.5, 'profit' => $profit, 'card' => $k, 'mode' => 'negative', 'push' => $push];
     }
