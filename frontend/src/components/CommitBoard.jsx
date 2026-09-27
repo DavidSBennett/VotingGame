@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Clipping from './Clipping.jsx';
 import NationGauge from './NationGauge.jsx';
 import Collapsible from './Collapsible.jsx';
+import Exchange from './Exchange.jsx';
 
 /**
  * The table: three drop zones -- the States candidate, Bury it, the Nation
@@ -14,6 +15,9 @@ import Collapsible from './Collapsible.jsx';
  *                 candidate's side, as influence on him. A card's positive
  *                 and negative push opposite ways, so at most one fits
  *                 each candidate; a card with nothing for him is refused.
+ *
+ * VARIANT -- the newsroom: above the desk, the exchange. Tap a story there
+ * to buy it with this commitment (see Exchange).
  *
  * Nothing is sent until you press Commit (or Pass), and nobody sees it
  * until every paper has committed. The server re-checks every rule; this
@@ -36,7 +40,7 @@ function effectOf(card, zone) {
   return { mode, push: card[mode], stability: card.stability };
 }
 
-export default function CommitBoard({ hand, race, commit, busy, onCommit, rules, stability, seats = [], history = [], track = { min: -5, max: 5 } }) {
+export default function CommitBoard({ hand, race, commit, busy, onCommit, rules, stability, seats = [], history = [], track = { min: -5, max: 5 }, exchange = [], you = null }) {
   const [place, setPlace] = useState({});       // card key -> 'cash' | 'states' | 'nation'
   const [reserve, setReserve] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -44,6 +48,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
   const [over, setOver] = useState(null);
   const [selected, setSelected] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [buys, setBuys] = useState([]);
 
   const cards = hand || [];
   const byKey = useMemo(() => Object.fromEntries(cards.map((c) => [c.key, c])), [cards]);
@@ -59,6 +64,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
     }
     setPlace(next);
     setReserve(commit ? commit.reserve : null);
+    setBuys(commit && commit.buys ? commit.buys.filter((k) => exchange.some((c) => c.key === k)) : []);
     setEditing(false);
     setSelected(null);
     setNotice(null);
@@ -162,13 +168,17 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
   const wouldLead = negatives > 0 && myExposure >= rivalTop;
   const danger = summary.cost > 0 && stability - summary.cost <= 3;
   const holding = dragging || selected;
+  const cash = (me ? me.money : 0) + summary.money;
+  const buying = exchange.filter((c) => buys.includes(c.key));
+  const buyCost = buying.reduce((n, c) => n + c.price, 0);
+  const cantAfford = buying.length > 0 && buying[0].price > cash;
 
   const submit = () => {
     const plays = committed.map((c) => {
       const z = place[c.key];
       return z === 'cash' ? { card: c.key, action: 'profit' } : { card: c.key, action: modeFor(c, z), side: z };
     });
-    onCommit({ plays, reserve: effectiveReserve || undefined });
+    onCommit({ plays, reserve: effectiveReserve || undefined, buys: rules.deckbuild ? buys : undefined });
   };
 
   // ---- pieces (render functions, not components: see Clipping) ----------
@@ -352,6 +362,18 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
         </p>
       )}
 
+      {rules.deckbuild && (
+        <Exchange
+          exchange={exchange}
+          buys={buys}
+          setBuys={setBuys}
+          maxBuys={rules.max_buys}
+          cash={cash}
+          locked={locked}
+          you={you}
+        />
+      )}
+
       {/* The desk */}
       <div
         {...zoneHandlers('hand')}
@@ -363,7 +385,9 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
       >
         <div className="section-title mb-1">Your desk · {loose.length}</div>
         {cards.length === 0 ? (
-          <p className="text-center font-serif text-sm italic text-cream-200/50">Your desk is empty.</p>
+          <p className="text-center font-serif text-sm italic text-cream-200/50">
+            Your desk is empty.{rules.deckbuild ? ' Buy a story off the exchange, or pass: you draw from your own deck.' : ''}
+          </p>
         ) : loose.length === 0 ? (
           <p className="text-center font-serif text-sm italic text-cream-200/50">
             Every story is on the table. Drag one back here to hold it.
@@ -400,13 +424,20 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
           <span className="text-cream-200/70">push {pushText(summary.push)}</span>
           {summary.cost > 0 && <span className={danger ? 'text-oxblood-300' : 'text-gold-400'}>union −{summary.cost}</span>}
           {negatives > 0 && <span className={wouldLead ? 'text-oxblood-300' : 'text-cream-200/70'}>exposure → {myExposure}</span>}
+          {buying.length > 0 && (
+            <span className={cantAfford ? 'text-oxblood-300' : 'text-gold-300'}>
+              buying {buying.map((c) => c.name).join(', ')} −${buyCost}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
           {locked ? (
             <>
               <span className="font-serif text-sm italic text-cream-200/70">
-                {commit.plays.length === 0 ? 'You passed. Waiting for the others…' : 'Sealed. Waiting for the others…'}
+                {commit.plays.length === 0
+                  ? `You passed${commit.buys && commit.buys.length ? ' and placed an order' : ''}. Waiting for the others…`
+                  : 'Sealed. Waiting for the others…'}
               </span>
               <button type="button" onClick={() => setEditing(true)} className="btn">
                 Change
@@ -427,7 +458,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
                   Clear
                 </button>
               )}
-              <button type="button" disabled={busy} onClick={submit} className="btn-solid">
+              <button type="button" disabled={busy || cantAfford} onClick={submit} className="btn-solid">
                 {committed.length > 0
                   ? `Commit ${committed.length} ${committed.length === 1 ? 'story' : 'stories'}`
                   : 'Pass this round'}
@@ -436,12 +467,17 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
           )}
         </div>
 
-        {(wouldLead || danger || (covered.length > 0 && !effectiveReserve && !locked) || (committed.length === 0 && !locked)) && (
+        {(wouldLead || danger || cantAfford || (covered.length > 0 && !effectiveReserve && !locked) || (committed.length === 0 && !locked)) && (
           <div className="w-full space-y-0.5 font-serif text-xs italic">
             {wouldLead && (
               <p className="text-oxblood-300">
                 This makes you {myExposure > rivalTop ? 'the most exposed paper' : 'joint most exposed'}. If the Union
                 breaks, you lose {rules.exposure_penalty}.
+              </p>
+            )}
+            {cantAfford && (
+              <p className="text-oxblood-300">
+                {buying[0].name} costs ${buying[0].price}; you have ${cash} with what you are burying.
               </p>
             )}
             {danger && (
@@ -454,7 +490,8 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
             )}
             {committed.length === 0 && !locked && (
               <p className="text-cream-200/50">
-                Nothing on the table: you may pass. You still draw {rules.draw_per_round} at the round&rsquo;s end.
+                Nothing on the table: you may pass{rules.deckbuild ? ' (and still buy)' : ''}. You still draw {rules.draw_per_round}{' '}
+                at the round&rsquo;s end{rules.deckbuild ? ', from your own deck' : ''}.
               </p>
             )}
           </div>

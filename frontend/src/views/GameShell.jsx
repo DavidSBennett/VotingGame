@@ -250,6 +250,8 @@ export default function GameShell({ seat, onLeave }) {
                   seats={state.players}
                   history={state.history}
                   track={state.track}
+                  exchange={state.exchange || []}
+                  you={state.you}
                 />
 
               </>
@@ -343,6 +345,11 @@ export default function GameShell({ seat, onLeave }) {
                     <div className="mt-0.5 flex flex-wrap gap-x-3 font-mono text-[9px] uppercase tracking-[0.15em] text-cream-200/60">
                       {p.is_patron && <span className="text-gold-300">★ Patron</span>}
                       <span>{p.hand_count} {p.hand_count === 1 ? 'story' : 'stories'}</span>
+                      {state.rules.deckbuild && (
+                        <span title="Stories in its own deck and discard pile; stories bought">
+                          deck {p.deck_count + p.discard_count} · bought {p.bought}
+                        </span>
+                      )}
                       <span>Patron {p.patronages}×</span>
                       <span
                         className={p.exposure > 0 && p.exposure_rank === 1 ? 'text-oxblood-300' : ''}

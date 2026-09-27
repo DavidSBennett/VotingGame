@@ -64,11 +64,39 @@ function Body({ rules }) {
         </li>
       </ul>
 
-      <H>The deck</H>
-      <p>
-        Stories are dated. The deck opens on the Revolution, and each campaign brings the news of the years since the
-        last. Some are the business of the press itself — trade stories, worth money but pushing nobody: bury them.
-      </p>
+      {!rules || rules.deckbuild ? (
+        <>
+          <H>Your newsroom</H>
+          <ul className="list-none space-y-1 pl-0">
+            <li>
+              Every paper draws from <span className="font-semibold">its own deck</span>, which starts with five stories
+              of the founding.
+            </li>
+            <li>
+              A story you <span className="font-semibold">run</span> goes to your discard pile and comes back when your
+              deck reshuffles. A story you <span className="font-semibold">bury</span> is sold: it leaves the game.
+            </li>
+            <li>
+              <span className="font-semibold">The exchange</span> offers stories for sale at what they would bury for.
+              With your commitment you may buy {!rules || rules.max_buys === 1 ? 'one' : `up to ${rules.max_buys}`} — after the
+              election, poorest paper first — into your discard pile. Money spent is score spent: invest early, cash in
+              late.
+            </li>
+            <li>
+              Stories are dated. Each campaign&rsquo;s news goes onto the exchange first. Trade stories push nobody but
+              are worth money: buy them to bury as Patron.
+            </li>
+          </ul>
+        </>
+      ) : (
+        <>
+          <H>The deck</H>
+          <p>
+            Stories are dated. The deck opens on the Revolution, and each campaign brings the news of the years since the
+            last. Some are the business of the press itself — trade stories, worth money but pushing nobody: bury them.
+          </p>
+        </>
+      )}
     </div>
   );
 }

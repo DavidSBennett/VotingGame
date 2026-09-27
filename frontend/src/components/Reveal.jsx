@@ -116,6 +116,10 @@ export default function Reveal({ reveal, seats, track, onClose }) {
                 {r.influence.states > 0 && <span className="text-oxblood-700">influence States {r.influence.states}</span>}
                 {r.influence.nation > 0 && <span className="text-federal-700">influence Nation {r.influence.nation}</span>}
                 {r.kept && <span>kept {r.kept}</span>}
+                {(r.bought || []).map((b) => (
+                  <span key={b.card} className="text-wood-700">bought {b.name} −${b.price}</span>
+                ))}
+                {r.missed_buy && <span>order missed</span>}
               </div>
             </section>
           ))}

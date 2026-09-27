@@ -22,8 +22,8 @@ Design chosen by the user (2026-09-27), from three options each:
 
 - **Acquire:** a newsroom market. Each paper starts with its own deck of 5
   opening stories (its opening hand). The rest of the released stories are
-  the supply, and 6 of them lie face up on **the wire**. Fresh news goes on
-  the wire first each election.
+  the supply, and 6 of them lie face up on **the exchange**. Fresh news goes on
+  the exchange first each election.
 - **Currency:** money. A story costs what it would bury for (its profit).
 - **Recycling:** a story you **run** goes to your own discard pile and comes
   back when your deck reshuffles; a story you **bury** is sold and leaves
@@ -37,7 +37,8 @@ Design chosen by the user (2026-09-27), from three options each:
 
 | Date | Change | Simulator result | Playtest notes |
 | --- | --- | --- | --- |
-| 2026-09-27 | Newsroom deck-builder (above): own decks, the wire, buy at bury value, run returns / bury trashes | See "Findings, 2026-09-27" | |
+| 2026-09-27 | Newsroom deck-builder (above): own decks, the exchange, buy at bury value, run returns / bury trashes | See "Findings, 2026-09-27" | |
+| 2026-09-27 | Built into the engine (config `deckbuild`, engine state v8; old games show as ended) and the UI: "The exchange" panel above the desk (tap a story to buy it with your commitment), your own deck and discard listed, purchases in the reveal, deck/bought counts per paper. Bots buy: easy = push per dollar, hard = dearest story that pushes. Named "the exchange" because "the wire" is already the event log. | as above | |
 
 ## Findings
 
@@ -68,7 +69,7 @@ plays the variant by default; `--shared` plays main's shared deck).
   2 × bury value − push. None removed the heads-up edge of dear stories;
   "double for profit-only" overcorrected at 3-4 seats (the dear buyer fell
   to 29% / 16%). Kept the simplest: **price = bury value**. Other knobs
-  (price ±1-2, start deck 7, wire 4 or 8, 2 buys a round) moved little;
+  (price ±1-2, start deck 7, exchange 4 or 8, 2 buys a round) moved little;
   2 buys a round made the greedy buyer lose (31%) and broke the Union more.
 - **Compared with main** (shared deck → newsroom):
   - hard bot vs easy bot heads-up: 99.7% → 98.4%
@@ -77,10 +78,10 @@ plays the variant by default; `--shared` plays main's shared deck).
     line buying the same way as its rival won ~61%. Players will have to
     learn what to buy.
   - winning money is about 40% of main's (254 → 101 heads-up, 166 → 56 at
-    four): buried stories leave the game and the wire is the only new supply.
+    four): buried stories leave the game and the exchange is the only new supply.
   - Union broke with all hard bots: 2 seats 9% → 5%, 3 seats 46% → 47%,
     **4 seats 15% → 33%**, 5 seats 46% → 50%. Run stories come back, so
     hostile stories recur. Watch this in play; stability_start is the knob.
-- The market never ran dry for the hard bots (wire always full; supply 9-26).
+- The market never ran dry for the hard bots (exchange always full; supply 9-26).
   Easy bots at five seats bury their own decks away and hold an empty hand
   19% of rounds: a mistake that punishes itself.

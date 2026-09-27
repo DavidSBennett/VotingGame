@@ -50,6 +50,16 @@
  *      draw_per_round, and the Union recovers stability_recovery.
  *
  * Cards are dated: each round shuffles in the events since the last one.
+ *
+ * VARIANT -- THE NEWSROOM (a deck-builder; config 'deckbuild'). Each paper
+ * draws from its OWN deck, dealt start_deck opening stories. Every other
+ * released story is the supply, and exchange_size of them lie face up on THE
+ * EXCHANGE (fresh news goes on first). With its commitment a paper may name
+ * stories to BUY at their bury value; after the election, poorest paper
+ * first, each takes up to max_buys it can still afford into its own
+ * discard pile. A story RUN goes to its paper's discard pile and comes
+ * back when that deck reshuffles; a story BURIED is sold and leaves the
+ * game. An empty hand is no longer the end: pass and buy.
  * ---------------------------------------------------------------------
  */
 
@@ -61,7 +71,7 @@ require_once __DIR__ . '/game_data.php';
  * carries another version cannot be played by this engine; it is shown as
  * ended instead (see engine_is_current).
  */
-define('ENGINE_STATE_VERSION', 7);
+define('ENGINE_STATE_VERSION', 8);
 
 // ---------------------------------------------------------------------
 // Configuration
@@ -123,6 +133,14 @@ function engine_default_config() {
     'bots'               => 1,
     // 'easy' or 'hard': which rival papers the table plays against.
     'bot_level'          => 'easy',
+    // VARIANT: the newsroom deck-builder (VARIANT.md). Own decks of
+    // start_deck opening stories, an exchange of exchange_size stories for sale at
+    // their bury value, max_buys a round. Simulated against the shared deck:
+    // a buying paper beats a non-buyer 95%; buy styles near fair at 4-5 seats.
+    'deckbuild'          => 1,
+    'start_deck'         => 5,
+    'exchange_size'      => 6,
+    'max_buys'           => 1,
   ];
 }
 
@@ -201,6 +219,18 @@ function engine_setup(&$game, &$players, $mysqli = null) {
     'history'        => [],
   ];
 
+  if (!empty($config['deckbuild'])) {
+    // Each paper's own deck, dealt in seat order; the rest is the supply.
+    $game['state']['exchange'] = [];
+    foreach ($players as $seat => $p) {
+      $players[$seat]['private_state'] = [
+        'hand' => [],
+        'deck' => array_splice($game['state']['deck'], 0, (int) $config['start_deck']),
+        'discard' => [],
+      ];
+    }
+    engine_refill_exchange($game);
+  }
   foreach ($players as $seat => $p) {
     $players[$seat]['public_state'] = [
       'money'        => (int) $config['start_money'],
@@ -211,8 +241,10 @@ function engine_setup(&$game, &$players, $mysqli = null) {
       'negatives'    => 0,
       'hand_count'   => 0,
       'committed'    => false,
+      'bought'       => 0,
+      'spent_buying' => 0,
     ];
-    $players[$seat]['private_state'] = ['hand' => []];
+    if (!isset($players[$seat]['private_state']['deck'])) $players[$seat]['private_state'] = ['hand' => []];
     $players[$seat]['score'] = (int) $config['start_money'];
   }
 
@@ -229,8 +261,21 @@ function engine_setup(&$game, &$players, $mysqli = null) {
 // Deck handling
 // ---------------------------------------------------------------------
 
-/** Draw one card key, reshuffling the discard pile if the deck runs dry. */
-function engine_draw_one(&$game) {
+/**
+ * Draw one card key, reshuffling the discard pile if the deck runs dry.
+ * Newsroom: the paper's own deck and discard pile.
+ */
+function engine_draw_one(&$game, &$player) {
+  if (!empty($game['config']['deckbuild'])) {
+    $ps = &$player['private_state'];
+    if (empty($ps['deck'])) {
+      if (empty($ps['discard'])) return null;
+      $ps['deck'] = $ps['discard'];
+      $ps['discard'] = [];
+      shuffle($ps['deck']);
+    }
+    return array_shift($ps['deck']);
+  }
   if (empty($game['state']['deck'])) {
     if (empty($game['state']['discard'])) return null;
     $game['state']['deck'] = $game['state']['discard'];
@@ -245,12 +290,35 @@ function engine_draw(&$game, &$player, $n) {
   $limit = (int) ($game['config']['hand_limit'] ?? 10);
   $hand = $player['private_state']['hand'] ?? [];
   for ($i = 0; $i < $n && count($hand) < $limit; $i++) {
-    $card = engine_draw_one($game);
+    $card = engine_draw_one($game, $player);
     if ($card === null) break;
     $hand[] = $card;
   }
   $player['private_state']['hand'] = $hand;
-  $player['public_state']['hand_count'] = count($hand);
+  engine_count_cards($player);
+}
+
+/** Refresh the public counts of a paper's hand and (newsroom) own deck. */
+function engine_count_cards(&$player) {
+  $ps = $player['private_state'];
+  $player['public_state']['hand_count'] = count($ps['hand'] ?? []);
+  $player['public_state']['deck_count'] = count($ps['deck'] ?? []);
+  $player['public_state']['discard_count'] = count($ps['discard'] ?? []);
+}
+
+/** Newsroom: fill the exchange from the top of the supply. */
+function engine_refill_exchange(&$game) {
+  $size = (int) ($game['config']['exchange_size'] ?? 6);
+  if (!isset($game['state']['exchange'])) $game['state']['exchange'] = [];
+  while (count($game['state']['exchange']) < $size && !empty($game['state']['deck'])) {
+    $game['state']['exchange'][] = array_shift($game['state']['deck']);
+  }
+}
+
+/** Newsroom: what a story costs on the exchange -- what it would bury for. */
+function engine_price($key) {
+  $c = vg_card($key);
+  return $c ? max(1, (int) $c['profit']) : 0;
 }
 
 /**
@@ -263,8 +331,18 @@ function engine_release_cards(&$game, $previousYear, $mysqli) {
   $fresh = vg_cards_released($previousYear, (int) $e['year']);
   $game['state']['last_released'] = $fresh;
   if (!$fresh) return;
-  foreach ($fresh as $k) $game['state']['deck'][] = $k;
-  shuffle($game['state']['deck']);
+  if (!empty($game['config']['deckbuild'])) {
+    // The news goes on the exchange first; unsold stories it pushes off go
+    // back to the top of the supply.
+    $news = $fresh;
+    shuffle($news);
+    $game['state']['deck'] = array_merge($news, $game['state']['exchange'] ?? [], $game['state']['deck']);
+    $game['state']['exchange'] = [];
+    engine_refill_exchange($game);
+  } else {
+    foreach ($fresh as $k) $game['state']['deck'][] = $k;
+    shuffle($game['state']['deck']);
+  }
 
   $names = [];
   foreach ($fresh as $k) $names[] = vg_card($k)['name'];
@@ -346,7 +424,8 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
  * Check one commitment against the hand and the rules, and normalise it.
  *
  * params: { plays: [{card, action: 'profit'|'positive'|'negative',
- *                    side?: 'nation'|'states'}], reserve?: card }
+ *                    side?: 'nation'|'states'}], reserve?: card,
+ *           buys?: [card on the exchange, best first] }   (newsroom)
  */
 function engine_validate_commit($game, $player, $params) {
   $hand = $player['private_state']['hand'] ?? [];
@@ -402,7 +481,37 @@ function engine_validate_commit($game, $player, $params) {
       if ($reserve === null || (int) vg_card($k)['profit'] > (int) vg_card($reserve)['profit']) $reserve = $k;
     }
   }
-  return ['plays' => $out, 'reserve' => $reserve];
+  return ['plays' => $out, 'reserve' => $reserve, 'buys' => engine_validate_buys($game, $player, $out, $params)];
+}
+
+/**
+ * Newsroom: the stories a paper wants off the exchange, best first. Only the
+ * first max_buys it can still get are bought, when the round resolves; the
+ * rest are fallbacks in case a poorer paper takes one first. Each must be
+ * affordable with the money in hand plus what this round's burials pay.
+ */
+function engine_validate_buys($game, $player, $plays, $params) {
+  $buys = $params['buys'] ?? [];
+  if (empty($game['config']['deckbuild'])) return [];
+  if (!is_array($buys)) throw new Exception('Malformed purchase.');
+  $exchange = $game['state']['exchange'] ?? [];
+  if (count($buys) > count($exchange)) throw new Exception('You can only buy stories on the exchange.');
+  $mult = !empty($player['public_state']['is_patron']) ? max(1, (int) ($game['config']['patron_multiplier'] ?? 2)) : 1;
+  $cash = (int) ($player['public_state']['money'] ?? 0);
+  foreach ($plays as $pl) {
+    if ($pl['action'] === 'profit') $cash += (int) vg_card($pl['card'])['profit'] * $mult;
+  }
+  $out = [];
+  foreach ($buys as $k) {
+    $k = (string) $k;
+    if (!in_array($k, $exchange, true)) throw new Exception('That story is no longer on the exchange.');
+    if (in_array($k, $out, true)) throw new Exception('Each story can be bought once.');
+    if (engine_price($k) > $cash) {
+      throw new Exception('You cannot afford ' . vg_card($k)['name'] . ' (' . engine_price($k) . '), even with what you bury this round.');
+    }
+    $out[] = $k;
+  }
+  return $out;
 }
 
 /** Leave the table. The round resolves at once if everyone left has committed. */
@@ -440,7 +549,7 @@ function engine_run_bots(&$game, &$players, $mysqli) {
     $p = $players[$seat];
     if (empty($p['is_bot']) || !empty($p['conceded'])) continue;
     if (isset($game['state']['commits'][$seat])) continue;
-    if (empty($p['private_state']['hand'])) {
+    if (empty($p['private_state']['hand']) && empty($game['config']['deckbuild'])) {
       $players[$seat]['conceded'] = 1;       // nothing left to print
       continue;
     }
@@ -454,7 +563,8 @@ function engine_run_bots(&$game, &$players, $mysqli) {
       // The next round opens with the bots already in.
       foreach (engine_seat_list($players) as $seat) {
         $p = $players[$seat];
-        if (empty($p['is_bot']) || !empty($p['conceded']) || empty($p['private_state']['hand'])) continue;
+        if (empty($p['is_bot']) || !empty($p['conceded'])) continue;
+        if (empty($p['private_state']['hand']) && empty($game['config']['deckbuild'])) continue;
         $game['state']['commits'][$seat] = engine_bot_commit(engine_bot_view($game, $players, $seat), $players[$seat]);
         $players[$seat]['public_state']['committed'] = true;
       }
@@ -498,9 +608,46 @@ function engine_bot_view($game, $players, $seat) {
  *   5. Reserve the most profitable card it covered.
  */
 function engine_bot_commit($game, $player) {
-  if (($game['config']['bot_level'] ?? 'easy') === 'hard') {
-    return engine_bot_commit_hard($game, $player);
+  $commit = (($game['config']['bot_level'] ?? 'easy') === 'hard')
+    ? engine_bot_commit_hard($game, $player)
+    : engine_bot_commit_easy($game, $player);
+  $commit['buys'] = engine_bot_buys($game, $player, $commit['plays']);
+  return $commit;
+}
+
+/**
+ * Newsroom: what a bot wishes to buy, best first. Kept in step with
+ * make_buyer in tools/simulate.py: nothing with fewer than 4 elections
+ * left; keep 4 money after buying (counting this round's burials).
+ * Easy ("steady"): the most push per dollar. Hard ("rich_ev"): the
+ * dearest story that pushes at all, to bury later as Patron.
+ */
+function engine_bot_buys($game, $player, $plays) {
+  if (empty($game['config']['deckbuild'])) return [];
+  if ((int) ($game['config']['total_spaces'] ?? 17) - (int) $game['state']['space'] < 4) return [];
+  $mult = !empty($player['public_state']['is_patron']) ? max(1, (int) ($game['config']['patron_multiplier'] ?? 2)) : 1;
+  $cash = (int) ($player['public_state']['money'] ?? 0) - 4;
+  foreach ($plays as $pl) {
+    if ($pl['action'] === 'profit') $cash += (int) vg_card($pl['card'])['profit'] * $mult;
   }
+  $reach = function ($k) { $c = vg_card($k); return max(abs((int) $c['positive']), abs((int) $c['negative'])); };
+  $hard = (($game['config']['bot_level'] ?? 'easy') === 'hard');
+  $rank = [];
+  foreach ($game['state']['exchange'] ?? [] as $k) {
+    if (engine_price($k) > $cash) continue;
+    $profit = (int) vg_card($k)['profit'];
+    $rank[] = $hard ? ['k' => $k, 'a' => ($reach($k) === 0 ? 1 : 0), 'b' => -$profit]
+                    : ['k' => $k, 'a' => -$reach($k) / max(1, $profit), 'b' => $profit];
+  }
+  usort($rank, function ($x, $y) {
+    if ($x['a'] != $y['a']) return ($x['a'] < $y['a']) ? -1 : 1;
+    return $x['b'] - $y['b'];
+  });
+  return array_map(function ($r) { return $r['k']; }, $rank);
+}
+
+/** The easy bot's plays (see engine_bot_commit). */
+function engine_bot_commit_easy($game, $player) {
   $hand = $player['private_state']['hand'] ?? [];
   $n = max(1, count($hand) - 4 + (int) ($game['config']['draw_per_round'] ?? 2));
   $byProfit = $hand;
@@ -749,7 +896,7 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
     $reveal[$seat] = ['seat' => (int) $seat, 'plays' => $shown, 'earned' => $earned,
                       'influence' => ['nation' => (int) ($influence['nation'][$seat] ?? 0),
                                       'states' => (int) ($influence['states'][$seat] ?? 0)],
-                      'reserve' => $commits[$seat]['reserve'], 'kept' => null];
+                      'reserve' => $commits[$seat]['reserve'], 'kept' => null, 'bought' => []];
     unset($p);
   }
   $track = max((int) $config['track_min'], min((int) $config['track_max'], $track));
@@ -819,11 +966,16 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
       if ($keep) {
         $players[$s]['private_state']['hand'][] = $pl['card'];
         $reveal[$s]['kept'] = vg_card($pl['card'])['name'];
-      } else {
+      } elseif (empty($config['deckbuild'])) {
         $game['state']['discard'][] = $pl['card'];
+      } elseif ($pl['action'] === 'profit') {
+        $game['state']['trash'][] = $pl['card'];                  // sold: it leaves the game
+      } else {
+        $players[$s]['private_state']['discard'][] = $pl['card']; // run: it stays in the paper's deck
       }
     }
   }
+  if (!empty($config['deckbuild'])) engine_resolve_buys($game, $players, $commits, $reveal);
   foreach ($players as $s => $p) {
     if (!empty($p['conceded'])) continue;
     engine_draw($game, $players[$s], (int) $config['draw_per_round']);
@@ -917,6 +1069,44 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
 }
 
 /**
+ * Newsroom: sealed buys, resolved poorest paper first (a coin breaks a
+ * tie). Each takes the stories it named that are still on the exchange and
+ * that it can afford, up to max_buys, into its own discard pile. Then the
+ * exchange refills from the supply.
+ */
+function engine_resolve_buys(&$game, &$players, $commits, &$reveal) {
+  $max = (int) ($game['config']['max_buys'] ?? 1);
+  $order = [];
+  foreach ($commits as $s => $c) {
+    if (!isset($reveal[$s]) || !empty($players[$s]['conceded'])) continue;
+    $order[] = ['seat' => $s, 'money' => (int) $players[$s]['public_state']['money'], 'coin' => mt_rand()];
+  }
+  usort($order, function ($a, $b) {
+    if ($a['money'] !== $b['money']) return $a['money'] - $b['money'];
+    return ($a['coin'] < $b['coin']) ? -1 : 1;
+  });
+  foreach ($order as $o) {
+    $s = $o['seat'];
+    $got = 0;
+    foreach ($commits[$s]['buys'] ?? [] as $k) {
+      if ($got >= $max) break;
+      $at = array_search($k, $game['state']['exchange'] ?? [], true);
+      $price = engine_price($k);
+      if ($at === false || (int) $players[$s]['public_state']['money'] < $price) continue;
+      array_splice($game['state']['exchange'], $at, 1);
+      $players[$s]['public_state']['money'] = (int) $players[$s]['public_state']['money'] - $price;
+      $players[$s]['public_state']['bought'] = 1 + (int) ($players[$s]['public_state']['bought'] ?? 0);
+      $players[$s]['public_state']['spent_buying'] = $price + (int) ($players[$s]['public_state']['spent_buying'] ?? 0);
+      $players[$s]['private_state']['discard'][] = $k;
+      $reveal[$s]['bought'][] = ['card' => $k, 'name' => vg_card($k)['name'], 'price' => $price];
+      $got++;
+    }
+    if (!$got && !empty($commits[$s]['buys'])) $reveal[$s]['missed_buy'] = true;
+  }
+  engine_refill_exchange($game);
+}
+
+/**
  * {side: {seat: n}} as {side: [{seat, amount}]}: PHP writes a seat-0-only
  * map as a JSON list, which made exported logs ambiguous.
  */
@@ -941,8 +1131,9 @@ function engine_reveal_text($name, $r, $election) {
   $parts = [];
   if ($profit) $parts[] = 'buried ' . implode(', ', $profit) . ' for profit (+' . $r['earned'] . ')';
   if ($ran) $parts[] = 'ran ' . implode(', ', $ran);
-  $msg = $name . ' ' . implode('; ', $parts) . '.';
+  $msg = $name . ' ' . ($parts ? implode('; ', $parts) : 'passed') . '.';
   if ($r['kept']) $msg .= ' Kept ' . $r['kept'] . '.';
+  foreach ($r['bought'] ?? [] as $b) $msg .= ' Bought ' . $b['name'] . ' off the exchange (-' . $b['price'] . ').';
   if (mb_strlen($msg) > 480) $msg = mb_substr($msg, 0, 477) . '...';
   return $msg;
 }
@@ -1115,6 +1306,9 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'exposure_rank'   => $ranks[(int) $seat] ?? null,
       'exposure_penalty'=> (int) ($p['public_state']['exposure_penalty'] ?? 0),
       'hand_count'      => (int) ($p['public_state']['hand_count'] ?? 0),
+      'deck_count'      => (int) ($p['public_state']['deck_count'] ?? 0),
+      'discard_count'   => (int) ($p['public_state']['discard_count'] ?? 0),
+      'bought'          => (int) ($p['public_state']['bought'] ?? 0),
       'committed'       => $current && isset($state['commits'][$seat]),
       'score'           => (int) $p['score'],
       'final_score'     => $p['final_score'],
@@ -1145,23 +1339,15 @@ function engine_public_state($game, $players, $viewerSeat = null) {
   if ($viewerSeat !== null && isset($players[$viewerSeat])) {
     $me = $players[$viewerSeat];
     $mult = !empty($me['public_state']['is_patron']) ? max(1, (int) ($config['patron_multiplier'] ?? 2)) : 1;
-    $hand = [];
-    foreach (($current ? ($me['private_state']['hand'] ?? []) : []) as $key) {
-      $c = vg_card($key);
-      if (!$c) continue;
-      $hand[] = [
-        'key' => $key, 'name' => $c['name'], 'year' => $c['year'],
-        'flavor' => $c['flavor'], 'kind' => $c['kind'],
-        'profit' => (int) $c['profit'],
-        'profit_value' => (int) $c['profit'] * $mult,
-        'positive' => (int) $c['positive'],
-        'negative' => (int) $c['negative'],
-        'stability' => (int) $c['stability'],
-      ];
-    }
+    $hand = engine_card_views($current ? ($me['private_state']['hand'] ?? []) : [], $mult);
+    // Your own deck: what is in it, never the order.
+    $deck = engine_card_views($current ? ($me['private_state']['deck'] ?? []) : [], $mult);
+    usort($deck, function ($a, $b) { return strcmp($a['name'], $b['name']); });
     $you = [
       'seat' => (int) $viewerSeat,
       'hand' => $hand,
+      'deck' => $deck,
+      'discard' => engine_card_views($current ? ($me['private_state']['discard'] ?? []) : [], $mult),
       'commit' => $current ? ($state['commits'][$viewerSeat] ?? null) : null,
     ];
   }
@@ -1189,7 +1375,10 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'exposure_penalty'  => (int) ($config['exposure_penalty'] ?? 25),
       'bot_level'         => (string) ($config['bot_level'] ?? 'easy'),
       'history_shock'     => intdiv((int) ($config['history_shock'] ?? 0) * max(1, count($players)), 2),
+      'deckbuild'         => !empty($config['deckbuild']),
+      'max_buys'          => (int) ($config['max_buys'] ?? 1),
     ],
+    'exchange'          => engine_card_views($current ? ($state['exchange'] ?? []) : [], 1, true),
     'track'         => ['min' => (int) ($config['track_min'] ?? -5), 'max' => (int) ($config['track_max'] ?? 5)],
     'stability'     => (int) ($state['stability'] ?? 0),
     'stability_max' => (int) ($config['stability_max'] ?? 0),
@@ -1209,6 +1398,27 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     'you'           => $you,
     'available_actions' => engine_available_actions($game, $players, $viewerSeat),
   ];
+}
+
+/** Card keys as the client shows them (profit_value: what burying pays you). */
+function engine_card_views($keys, $mult = 1, $priced = false) {
+  $out = [];
+  foreach ($keys as $key) {
+    $c = vg_card($key);
+    if (!$c) continue;
+    $v = [
+      'key' => $key, 'name' => $c['name'], 'year' => $c['year'],
+      'flavor' => $c['flavor'], 'kind' => $c['kind'],
+      'profit' => (int) $c['profit'],
+      'profit_value' => (int) $c['profit'] * $mult,
+      'positive' => (int) $c['positive'],
+      'negative' => (int) $c['negative'],
+      'stability' => (int) $c['stability'],
+    ];
+    if ($priced) $v['price'] = engine_price($key);
+    $out[] = $v;
+  }
+  return $out;
 }
 
 /** Legal actions for one seat: the advisory mirror the UI renders from. */
@@ -1244,6 +1454,9 @@ function engine_build_export($mysqli, $game, $players, $viewerSeat = null) {
   $seats = [];
   foreach ($players as $seat => $p) {
     $private = ($hideOthers && (int) $seat !== (int) $viewerSeat) ? null : $p['private_state'];
+    if ($hideOthers && is_array($private) && isset($private['deck'])) {
+      sort($private['deck']);                 // what is in your deck, not its order
+    }
     $seats[] = [
       'seat'            => (int) $seat,
       'player_name'     => $p['player_name'],

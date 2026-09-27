@@ -103,10 +103,26 @@ class Checks:
             self.check(p["exposure"] == p["negatives"], "seat %d exposure counts its negatives" % p["seat"])
             self.check(p["exposure_rank"] == counts.index(p["exposure"]) + 1,
                        "seat %d exposure rank" % p["seat"])
-        # The hidden-information boundary: no seat's hand or commitment leaks.
+        # The hidden-information boundary: no seat's hand, deck or commitment leaks.
         for p in st["players"]:
-            self.check(not ({"private_state", "hand", "commit", "plays"} & set(p)),
+            self.check(not ({"private_state", "hand", "commit", "plays", "deck", "discard"} & set(p)),
                        "seat %d exposes nothing private" % p["seat"])
+        # The newsroom: the exchange and your own deck.
+        if st["rules"].get("deckbuild") and st.get("you") and st["status"] == "active":
+            me = [p for p in st["players"] if p["is_you"]][0]
+            you = st["you"]
+            self.check(len(you["deck"]) == me["deck_count"], "my deck list matches its public count")
+            self.check(len(you["discard"]) == me["discard_count"], "my discard list matches its public count")
+            self.check(len(you["hand"]) == me["hand_count"], "my hand matches its public count")
+            ex = st.get("exchange") or []
+            self.check(len(ex) <= 6, "the exchange holds at most six", "got %d" % len(ex))
+            mine = {c["key"] for c in you["hand"] + you["deck"] + you["discard"]}
+            for c in ex:
+                self.check(c["price"] == max(1, c["profit"]), "%s costs its bury value" % c["key"])
+                self.check(c["key"] not in mine, "%s is on the exchange and in my newsroom at once" % c["key"])
+                if race:
+                    self.check(c["year"] <= race["year"], "the exchange holds no story from the future",
+                               "%s (%s)" % (c["name"], c["year"]))
         return st
 
     def reveal(self, st, prev_money, prev_stability):
@@ -174,8 +190,13 @@ class Checks:
                 self.check(sd["kept"] is None, "the Patron keeps no reserve")
         me = [p for p in st["players"] if p["is_you"]][0]
         mine = [sd for sd in r["seats"] if sd["seat"] == me["seat"]][0]
-        self.check(me["money"] == prev_money + mine["earned"], "my money moved by exactly my profit",
-                   "%s -> %s (+%s)" % (prev_money, me["money"], mine["earned"]))
+        paid = sum(b["price"] for b in mine.get("bought", []))
+        self.check(me["money"] == prev_money + mine["earned"] - paid,
+                   "my money moved by exactly my profit less my purchases",
+                   "%s -> %s (+%s, -%s)" % (prev_money, me["money"], mine["earned"], paid))
+        for sd in r["seats"]:
+            self.check(len(sd.get("bought", [])) <= st["rules"].get("max_buys", 1),
+                       "seat %d bought at most max_buys" % sd["seat"])
 
 
 def choose(st):
@@ -186,7 +207,7 @@ def choose(st):
     """
     hand = st["you"]["hand"]
     if not hand:
-        return {"plays": []}
+        return {"plays": [], "buys": buys_for(st, [])}
     n = max(1, len(hand) - 4 + st["rules"]["draw_per_round"])
     reach = {"nation": 0, "states": 0}
     for c in hand:
@@ -220,7 +241,22 @@ def choose(st):
         if c["key"] not in used:
             plays.append({"card": c["key"], "action": "profit"})
     covered = [pl["card"] for pl in plays if pl["action"] != "profit"]
-    return {"plays": plays, "reserve": covered[0] if covered else None}
+    return {"plays": plays, "reserve": covered[0] if covered else None, "buys": buys_for(st, plays)}
+
+
+def buys_for(st, plays):
+    """The newsroom: like the easy bot, the most push per dollar it can
+    afford while keeping 4, until 4 elections are left."""
+    if not st["rules"].get("deckbuild") or st["total_spaces"] - st["space"] < 4:
+        return []
+    me = [p for p in st["players"] if p["is_you"]][0]
+    mult = st["rules"]["patron_multiplier"] if me["is_patron"] else 1
+    by_key = {c["key"]: c for c in st["you"]["hand"]}
+    cash = me["money"] - 4 + sum(by_key[pl["card"]]["profit"] * mult for pl in plays if pl["action"] == "profit")
+    reach = lambda c: max(abs(c["positive"]), abs(c["negative"]))
+    ok = [c for c in st.get("exchange") or [] if c["price"] <= cash]
+    ok.sort(key=lambda c: (-reach(c) / max(1, c["profit"]), c["profit"]))
+    return [c["key"] for c in ok]
 
 
 def main():
@@ -268,6 +304,10 @@ def main():
     refused("reserving a profit card is refused",
             {"plays": [{"card": hand[0]["key"], "action": "profit"}], "reserve": hand[0]["key"]},
             "can be reserved")
+    if first["rules"].get("deckbuild"):
+        refused("buying a story not on the exchange is refused",
+                {"plays": [], "buys": [hand[0]["key"]]}, "no longer on the exchange")
+        checks.check(len(first.get("exchange") or []) > 0, "the exchange opens with stories for sale")
     zero = [c for c in hand if c["positive"] == 0]
     if zero:
         refused("coverage a card does not have is refused",
@@ -294,6 +334,8 @@ def main():
         space = st["space"]
         passing = (space == 3)          # exercise the pass once a game
         prev_hand = len(st["you"]["hand"])
+        me_before = [p for p in st["players"] if p["is_you"]][0]
+        prev_owned = me_before.get("deck_count", 0) + me_before.get("discard_count", 0)
         params = {"plays": []} if passing else choose(st)
         res = call(args.base, "/playAction.php",
                    {"player_token": token, "action": "commit", "params": params})
@@ -308,8 +350,11 @@ def main():
         if passing and after["status"] == "active":
             mine = [sd for sd in after["last_reveal"]["seats"] if sd["seat"] == st["you"]["seat"]][0]
             checks.check(mine["plays"] == [] and mine["earned"] == 0, "a pass plays nothing and earns nothing")
-            checks.check(len(after["you"]["hand"]) == min(prev_hand + after["rules"]["draw_per_round"],
-                                                          after["rules"]["hand_limit"]),
+            drawable = prev_hand + after["rules"]["draw_per_round"]
+            if after["rules"].get("deckbuild"):
+                # Your own deck may run short; a story bought this round is drawable.
+                drawable = min(drawable, prev_hand + prev_owned + len(mine.get("bought", [])))
+            checks.check(len(after["you"]["hand"]) == min(drawable, after["rules"]["hand_limit"]),
                          "a pass still draws", "%d -> %d" % (prev_hand, len(after["you"]["hand"])))
 
     final = call(args.base, "/getState.php", params={"player_token": token})["state"]
@@ -329,10 +374,10 @@ def main():
     print("  winners       %d Nation, %d States" % (sides.count("nation"), sides.count("states")))
     print("  stability     %d/%d at the end" % (final["stability"], final["stability_max"]))
     for p in final["players"]:
-        print("  seat %d %-28s money %4s  Patron %s times  positive %s  negative %s"
+        print("  seat %d %-28s money %4s  Patron %s times  positive %s  negative %s  bought %s"
               % (p["seat"], p["player_name"],
                  p["final_score"] if p["final_score"] is not None else p["money"],
-                 p["patronages"], p["positives"], p["negatives"]))
+                 p["patronages"], p["positives"], p["negatives"], p.get("bought", 0)))
 
     matched = sum(1 for h in final.get("history", []) if h.get("matched_history"))
     if elections_seen:

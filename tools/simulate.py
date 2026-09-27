@@ -197,9 +197,9 @@ DEFAULTS = dict(
     exposure_penalty=25,     # paid by the most exposed paper if the Union breaks
     history_shock=2,         # per two seats: stability lost when an election goes against history
     # --- VARIANT: the newsroom deck-builder ---------------------------------
-    deckbuild=True,          # each paper draws from its own deck and buys stories off the wire
+    deckbuild=True,          # each paper draws from its own deck and buys stories off the exchange
     start_deck=5,            # opening stories dealt into each paper's own deck
-    wire_size=6,             # face-up stories for sale; fresh news goes on first
+    exchange_size=6,             # face-up stories for sale; fresh news goes on first
     price_rule="profit",     # a story costs its bury value (see Game.price) ...
     price_add=0,             # ... + price_add
     max_buys=1,              # stories a paper may buy a round
@@ -253,21 +253,21 @@ class Game:
         self.players = [Player(i, s) for i, s in enumerate(strategies)]
         for p in self.players:
             p.money = self.cfg["start_money"]
-        self.wire, self.trash = [], []
+        self.exchange, self.trash = [], []
         if self.cfg["deckbuild"]:
             # Each paper's own deck is dealt from the opening stories; the
-            # rest are the unsold supply, and the wire shows the first few.
+            # rest are the unsold supply, and the exchange shows the first few.
             for p in self.players:
                 p.deck, self.deck = self.deck[:self.cfg["start_deck"]], self.deck[self.cfg["start_deck"]:]
-            self.refill_wire()
+            self.refill_exchange()
         for p in self.players:
             self.draw(p, self.cfg["start_hand"])
         self.ended = None
         self.min_stability = self.stability
 
-    def refill_wire(self):
-        while len(self.wire) < self.cfg["wire_size"] and self.deck:
-            self.wire.append(self.deck.pop(0))
+    def refill_exchange(self):
+        while len(self.exchange) < self.cfg["exchange_size"] and self.deck:
+            self.exchange.append(self.deck.pop(0))
 
     def price(self, key):
         c = CARDS[key]
@@ -440,20 +440,20 @@ class Game:
             return
         fresh = released(YEARS[self.space - 2], YEARS[self.space - 1])
         if fresh and self.cfg["deckbuild"]:
-            # The news goes on the wire first; unsold stories it pushes off
+            # The news goes on the exchange first; unsold stories it pushes off
             # go back to the top of the supply.
             self.rng.shuffle(fresh)
-            self.deck = self.wire + self.deck
-            self.wire = []
+            self.deck = self.exchange + self.deck
+            self.exchange = []
             self.deck = fresh + self.deck
-            self.refill_wire()
+            self.refill_exchange()
         elif fresh:
             self.deck.extend(fresh)
             self.rng.shuffle(self.deck)
 
     def buy(self, wishes):
         """Sealed buys, resolved poorest paper first (seat breaks a tie):
-        each takes its wished stories still on the wire that it can afford,
+        each takes its wished stories still on the exchange that it can afford,
         up to max_buys. A bought story goes to the buyer's discard pile."""
         order = sorted(self.players, key=lambda p: (p.money, self.rng.random()))
         for p in order:
@@ -461,14 +461,14 @@ class Game:
             for key in wishes.get(p.seat, []):
                 if got >= self.cfg["max_buys"]:
                     break
-                if key in self.wire and p.money >= self.price(key):
-                    self.wire.remove(key)
+                if key in self.exchange and p.money >= self.price(key):
+                    self.exchange.remove(key)
                     p.money -= self.price(key)
                     p.spent_buying += self.price(key)
                     p.discard.append(key)
                     p.bought += 1
                     got += 1
-        self.refill_wire()
+        self.refill_exchange()
 
     def break_union(self):
         """The Union breaks: the game ends, the most exposed paper (most
@@ -713,7 +713,7 @@ def sniper(game, p):
 
 
 # =====================================================================
-# Buy policies (deckbuild): f(game, player, plays) -> wished wire stories,
+# Buy policies (deckbuild): f(game, player, plays) -> wished exchange stories,
 # best first. Named after a slash: "hard/steady". Decided at commit time,
 # blind, like the plays; affordability is checked when buys resolve.
 # =====================================================================
@@ -723,7 +723,7 @@ def reach(key):
 
 
 def make_buyer(rank, min_left=4, floor=4, deck_cap=None):
-    """Wish for wire stories (ranked by `rank`) while at least `min_left`
+    """Wish for exchange stories (ranked by `rank`) while at least `min_left`
     elections remain and the paper would keep `floor` money after buying
     (counting what this round's burials will pay). Stops once the paper
     owns `deck_cap` stories."""
@@ -736,7 +736,7 @@ def make_buyer(rank, min_left=4, floor=4, deck_cap=None):
         income = sum(CARDS[k]["profit"] * (game.cfg["patron_multiplier"] if p.patron else 1)
                      for k, m, _ in plays if m == "profit")
         cash = p.money + income - floor
-        return [k for k in sorted(game.wire, key=rank) if game.price(k) <= cash]
+        return [k for k in sorted(game.exchange, key=rank) if game.price(k) <= cash]
     return buyer
 
 
