@@ -52,24 +52,24 @@ export default function Clipping({ card, effect = null, size = 'md', lifted = fa
       : 'parchment relative flex flex-col shadow-card transition hover:-translate-y-0.5 hover:shadow-lift';
 
   return (
-    <div {...rest} className={md ? `${shell} h-52 w-40 shrink-0` : `${shell} w-full`} title={card.flavor}>
+    <div {...rest} className={md ? `${shell} h-40 w-36 shrink-0` : `${shell} w-full`} title={card.flavor}>
       <div className="flex items-baseline justify-between border-b border-ink-950/20 px-2 pb-0.5 pt-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-ink-950/60">
         <span>{card.year}</span>
         <span>{card.kind === 'profit' ? 'The press' : 'Event'}</span>
       </div>
 
-      <div className={md ? 'flex-1 px-2 pt-1.5' : 'px-2 pb-1 pt-1'}>
+      <div className={md ? 'min-h-0 flex-1 overflow-hidden px-2 pt-1' : 'px-2 pb-1 pt-1'}>
         <div
           className={
             md
-              ? 'font-display text-[17px] font-bold leading-[1.05] text-ink-950'
+              ? 'font-display text-[15px] font-bold leading-[1.05] text-ink-950'
               : 'font-display text-[15px] font-bold leading-tight text-ink-950'
           }
         >
           {card.name}
         </div>
         {md && (
-          <p className="mt-1.5 line-clamp-4 font-serif text-[10.5px] italic leading-snug text-ink-950/70">{card.flavor}</p>
+          <p className="mt-1 line-clamp-3 font-serif text-[10px] italic leading-snug text-ink-950/70">{card.flavor}</p>
         )}
       </div>
 

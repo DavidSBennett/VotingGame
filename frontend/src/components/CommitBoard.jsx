@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Clipping from './Clipping.jsx';
 import NationGauge from './NationGauge.jsx';
+import Collapsible from './Collapsible.jsx';
 
 /**
  * The table: three drop zones -- the States candidate, Cash in, the Nation
@@ -234,7 +235,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
   const zoneShell = (zone) => {
     const hot = over === zone;
     const target = holding && !locked && byKey[holding] && !refusal(byKey[holding], zone);
-    const base = 'relative flex min-h-[15rem] flex-col border p-3 transition duration-200';
+    const base = 'relative flex min-h-[10rem] flex-col overflow-y-auto border px-3 py-2 transition duration-200 lg:min-h-0';
     if (zone === 'states') {
       return hot
         ? `${base} border-oxblood-300 bg-oxblood-900/70 shadow-glow`
@@ -265,7 +266,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
           <div className={side === 'nation' ? 'label text-federal-300' : 'label text-oxblood-300'}>
             {side === 'nation' ? 'Nation · federal power' : 'States · states’ rights'}
           </div>
-          <div className="mt-1 font-display text-2xl font-semibold leading-tight text-cream-50">{c ? c.name : side}</div>
+          <div className="font-display text-xl font-semibold leading-tight text-cream-50">{c ? c.name : side}</div>
           {c && <div className="font-serif text-xs italic text-cream-200/70">{c.party}</div>}
         </div>
         <div className="divider" />
@@ -291,22 +292,37 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
   // ---- render ------------------------------------------------------------
 
   return (
-    <section className="animate-fade">
-      <div className="mb-3">
+    <section className="flex flex-col gap-2 animate-fade lg:min-h-0 lg:flex-1">
+      <Collapsible
+        title="The temper of the nation"
+        storageKey="temper"
+        summary={
+          history.length
+            ? `States ${history.filter((h) => h.winner_side === 'states').length} · Federal ${history.filter((h) => h.winner_side === 'nation').length} · last ${
+                history[history.length - 1].track > 0
+                  ? `Federal +${history[history.length - 1].track}`
+                  : history[history.length - 1].track < 0
+                    ? `States +${-history[history.length - 1].track}`
+                    : 'level'
+              }${committed.some((c) => SIDES.includes(place[c.key])) ? ` · your push ${pushText(summary.push)}` : ''}`
+            : 'no election decided yet'
+        }
+      >
         <NationGauge
+          bare
           history={history}
           min={track.min}
           max={track.max}
           planned={committed.some((c) => SIDES.includes(place[c.key])) ? summary.push : null}
         />
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
+      </Collapsible>
+      <div className="grid gap-2 md:grid-cols-3 lg:min-h-0 lg:flex-1">
         {candidateZone('states')}
 
         <div {...zoneHandlers('cash')} className={zoneShell('cash')}>
           <div className="text-center">
             <div className="label">The counting house</div>
-            <div className="mt-1 font-display text-2xl font-semibold leading-tight text-cream-50">Cash in</div>
+            <div className="font-display text-xl font-semibold leading-tight text-cream-50">Cash in</div>
             <div className="font-serif text-xs italic text-cream-200/70">
               {me && me.is_patron ? 'You are Patron — profit pays double' : 'Money is the only score'}
             </div>
@@ -331,7 +347,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
       </div>
 
       {notice && (
-        <p className="mt-3 border-l-2 border-oxblood-500 bg-oxblood-900/40 px-3 py-1.5 font-serif text-sm italic text-cream-100">
+        <p className="shrink-0 border-l-2 border-oxblood-500 bg-oxblood-900/40 px-3 py-1 font-serif text-sm italic text-cream-100">
           {notice}
         </p>
       )}
@@ -341,11 +357,11 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
         {...zoneHandlers('hand')}
         className={
           over === 'hand'
-            ? 'mt-4 border border-gold-300 bg-gradient-to-b from-wood-800 to-wood-900 p-4 shadow-glow transition'
-            : 'mt-4 border border-wood-700 bg-gradient-to-b from-wood-800 to-wood-950 p-4 transition'
+            ? 'shrink-0 border border-gold-300 bg-gradient-to-b from-wood-800 to-wood-900 px-3 pb-1 pt-1.5 shadow-glow transition'
+            : 'shrink-0 border border-wood-700 bg-gradient-to-b from-wood-800 to-wood-950 px-3 pb-1 pt-1.5 transition'
         }
       >
-        <div className="section-title mb-3">Your desk · {loose.length}</div>
+        <div className="section-title mb-1">Your desk · {loose.length}</div>
         {cards.length === 0 ? (
           <p className="text-center font-serif text-sm italic text-cream-200/50">Your desk is empty.</p>
         ) : loose.length === 0 ? (
@@ -353,7 +369,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
             Every clipping is on the table. Drag one back here to keep it.
           </p>
         ) : (
-          <div className="flex gap-3 overflow-x-auto pb-2 pt-1">
+          <div className="flex gap-2 overflow-x-auto pb-1.5 pt-1">
             {loose.map((card) => (
               <Clipping
                 key={card.key}
@@ -367,14 +383,14 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
           </div>
         )}
         {!locked && cards.length > 0 && (
-          <p className="mt-2 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-cream-200/40">
+          <p className="text-center font-mono text-[9px] uppercase tracking-[0.2em] text-cream-200/40">
             Drag a clipping to a candidate or the counting house — or tap it, then tap where it goes
           </p>
         )}
       </div>
 
       {/* The commitment line */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-gold-500/40 bg-ink-900/90 px-4 py-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border border-gold-500/40 bg-ink-900/90 px-3 py-1.5">
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 font-mono text-[11px] uppercase tracking-[0.12em]">
           <span className="text-cream-200/70">
             committing <span className="text-cream-50">{committed.length}</span> · keeping{' '}

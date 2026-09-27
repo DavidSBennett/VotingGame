@@ -10,7 +10,7 @@
  * The track starts level every election, so this is the record of where
  * the argument has landed, not a position carried forward.
  */
-export default function NationGauge({ history = [], min = -5, max = 5, planned = null }) {
+export default function NationGauge({ history = [], min = -5, max = 5, planned = null, bare = false }) {
   const span = max - min;
   const pos = (v) => ((Math.max(min, Math.min(max, v)) - min) / span) * 100;
   const last = history.length ? history[history.length - 1] : null;
@@ -25,14 +25,14 @@ export default function NationGauge({ history = [], min = -5, max = 5, planned =
   for (let v = min; v <= max; v++) ticks.push(v);
 
   return (
-    <section className="panel px-4 pb-3 pt-3 animate-fade">
+    <section className={bare ? 'animate-fade' : 'panel px-4 pb-1.5 pt-1.5 animate-fade'}>
       <div className="flex items-baseline justify-between gap-3">
         <div className="text-left">
           <div className="label text-oxblood-300">States&rsquo; rights</div>
-          <div className="font-display text-2xl font-bold leading-none text-oxblood-300">{statesWon}</div>
+          <div className="font-display text-xl font-bold leading-none text-oxblood-300">{statesWon}</div>
         </div>
         <div className="text-center">
-          <div className="section-title plain text-[11px]">The temper of the nation</div>
+          {!bare && <div className="section-title plain text-[11px]">The temper of the nation</div>}
           <div className="mt-0.5 font-serif text-xs italic text-cream-200/60">
             {last
               ? `${last.year}: ${last.track > 0 ? `Federal +${last.track}` : last.track < 0 ? `States +${-last.track}` : 'level'} · average lean ${
@@ -43,11 +43,11 @@ export default function NationGauge({ history = [], min = -5, max = 5, planned =
         </div>
         <div className="text-right">
           <div className="label text-federal-300">Federal power</div>
-          <div className="font-display text-2xl font-bold leading-none text-federal-300">{nationWon}</div>
+          <div className="font-display text-xl font-bold leading-none text-federal-300">{nationWon}</div>
         </div>
       </div>
 
-      <div className="relative mt-4 h-10">
+      <div className="relative mt-1 h-8">
         {/* The rope: oxblood to the left of centre, federal blue to the right. */}
         <div className="absolute inset-x-0 top-1/2 flex h-2.5 -translate-y-1/2">
           <div className="h-full flex-1 bg-gradient-to-r from-oxblood-500 to-oxblood-900" />
@@ -58,7 +58,7 @@ export default function NationGauge({ history = [], min = -5, max = 5, planned =
         {ticks.map((v) => (
           <div
             key={v}
-            className={v === 0 ? 'absolute top-0 h-10 w-px bg-gold-300/70' : 'absolute top-[11px] h-[18px] w-px bg-ink-950/60'}
+            className={v === 0 ? 'absolute top-0 h-8 w-px bg-gold-300/70' : 'absolute top-[8px] h-4 w-px bg-ink-950/60'}
             style={{ left: `${pos(v)}%` }}
           />
         ))}

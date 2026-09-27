@@ -3,7 +3,7 @@
  * the side that won it, with a small notch where the result departed from
  * history; the current race in gold.
  */
-export default function BoardStrip({ space, totalSpaces, history, years = [] }) {
+export default function BoardStrip({ space, totalSpaces, history, years = [], compact = false }) {
   const bySpace = {};
   (history || []).forEach((h) => {
     bySpace[h.space] = h;
@@ -48,7 +48,7 @@ export default function BoardStrip({ space, totalSpaces, history, years = [] }) 
               >
                 {h ? h.year : years[n - 1] || n}
               </span>
-              {h && (
+              {h && !compact && (
                 <span className="max-w-[4.5rem] truncate font-display text-[11px] italic text-cream-200/60">
                   {h.winner_name.split(' ').slice(-1)[0]}
                 </span>

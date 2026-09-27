@@ -8,6 +8,7 @@ import Rules from '../components/Rules.jsx';
 import News from '../components/News.jsx';
 import CommitBoard from '../components/CommitBoard.jsx';
 import BoardStrip from '../components/BoardStrip.jsx';
+import Collapsible from '../components/Collapsible.jsx';
 
 /**
  * The game screen: a masthead, a status line, the timeline of elections,
@@ -112,46 +113,21 @@ export default function GameShell({ seat, onLeave }) {
   const waiting = state.players.filter((p) => !p.conceded && !p.committed);
 
   return (
-    <div className="min-h-full">
-      {/* Masthead */}
-      <header className="border-b border-gold-500/40 bg-ink-900/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-baseline gap-3">
-            <h1 className="font-display text-3xl font-bold text-cream-50">The Fourth Estate</h1>
-            <span className="hidden font-serif text-sm italic text-gold-300 sm:inline">
-              {active && state.race ? `The campaign of ${state.race.year}` : ended ? 'The final count' : 'The table is filling'}
-            </span>
-          </div>
-          <nav className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setRulesOpen(true)} className="btn">
-              How to play
-            </button>
-            {state.last_reveal && (
-              <button type="button" onClick={() => setRevealOpen(true)} className="btn">
-                Last returns
-              </button>
-            )}
-            <button type="button" onClick={() => setReportOpen(true)} className="btn">
-              Playtest note
-            </button>
-            <button type="button" onClick={() => downloadExport(seat.player_token, state.game_id)} className="btn">
-              Download
-            </button>
-            <button type="button" onClick={leave} className="btn">
-              {ended ? 'Lobby' : 'Leave'}
-            </button>
-          </nav>
-        </div>
-
-        {/* Status line */}
-        <div className="border-t border-gold-500/20">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-cream-200/70">
+    // On a desktop the whole game fits one screen: the board takes the
+    // height left after the bars, and only the zones and the wire scroll
+    // inside themselves. Phones scroll the page as before.
+    <div className="flex min-h-full flex-col lg:h-screen lg:overflow-hidden">
+      {/* Masthead and status, one slim bar */}
+      <header className="shrink-0 border-b border-gold-500/40 bg-ink-900/90 backdrop-blur">
+        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-6 gap-y-1 px-4 py-1.5">
+          <h1 className="font-display text-2xl font-bold leading-none text-cream-50">The Fourth Estate</h1>
+          <div className="flex flex-1 flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[10px] uppercase tracking-[0.18em] text-cream-200/70">
             <span>
               Election <span className="text-cream-50">{Math.min(state.space, state.total_spaces)}</span>/{state.total_spaces}
             </span>
             <span className="flex items-center gap-2">
               Union
-              <span className="relative inline-block h-1.5 w-24 bg-ink-950">
+              <span className="relative inline-block h-1.5 w-20 bg-ink-950">
                 <span
                   className={
                     stabilityPct > 50
@@ -169,11 +145,11 @@ export default function GameShell({ seat, onLeave }) {
             </span>
             {me && (
               <span>
-                Your purse <span className="text-gold-300">${me.money}</span>
+                Purse <span className="text-gold-300">${me.money}</span>
               </span>
             )}
             {state.president && (
-              <span>
+              <span className="hidden xl:inline">
                 In office <span className="text-cream-50">{state.president.name.split(' ').slice(-1)[0]}</span>
                 {state.president.patron_seat !== null && (
                   <>
@@ -182,23 +158,45 @@ export default function GameShell({ seat, onLeave }) {
                 )}
               </span>
             )}
-            <span className="ml-auto font-mono text-[9px] text-cream-200/30">{state.join_code} · #{state.state_version}</span>
           </div>
+          <nav className="flex flex-wrap gap-1.5">
+            <button type="button" onClick={() => setRulesOpen(true)} className="btn px-2 py-1">
+              Rules
+            </button>
+            {state.last_reveal && (
+              <button type="button" onClick={() => setRevealOpen(true)} className="btn px-2 py-1">
+                Returns
+              </button>
+            )}
+            <button type="button" onClick={() => setReportOpen(true)} className="btn px-2 py-1">
+              Note
+            </button>
+            <button type="button" onClick={() => downloadExport(seat.player_token, state.game_id)} className="btn px-2 py-1">
+              Export
+            </button>
+            <button type="button" onClick={leave} className="btn px-2 py-1">
+              {ended ? 'Lobby' : 'Leave'}
+            </button>
+          </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6">
-        <div className="panel mb-6 px-4 pb-3 pt-4">
-          <BoardStrip space={state.space} totalSpaces={state.total_spaces} history={state.history} years={state.years} />
-        </div>
+      <main className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-2 px-4 py-2 lg:min-h-0">
+        <Collapsible
+          title="The board"
+          storageKey="board"
+          summary={`${state.history.length} of ${state.total_spaces} decided · States ${state.history.filter((h) => h.winner_side === 'states').length} · Nation ${state.history.filter((h) => h.winner_side === 'nation').length}`}
+        >
+          <BoardStrip space={state.space} totalSpaces={state.total_spaces} history={state.history} years={state.years} compact />
+        </Collapsible>
 
         {actionError && (
-          <div className="mb-4 border-l-2 border-oxblood-500 bg-oxblood-900/50 px-4 py-2 font-serif italic text-cream-100">
+          <div className="shrink-0 border-l-2 border-oxblood-500 bg-oxblood-900/50 px-4 py-1.5 font-serif italic text-cream-100">
             {actionError}
           </div>
         )}
         {error && !actionError && (
-          <div className="mb-4 border-l-2 border-gold-500 bg-ink-900 px-4 py-2 font-serif text-sm italic text-cream-200/80">
+          <div className="shrink-0 border-l-2 border-gold-500 bg-ink-900 px-4 py-1.5 font-serif text-sm italic text-cream-200/80">
             {error}
           </div>
         )}
@@ -206,21 +204,22 @@ export default function GameShell({ seat, onLeave }) {
         {/* minmax(0,1fr) and min-w-0: without them the column grows to its
             widest content -- the desk's row of clippings -- and the whole
             page scrolls sideways on a phone. */}
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <div className="min-w-0 space-y-5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_17rem]">
+          <div className="flex min-w-0 flex-col gap-2 lg:min-h-0 lg:overflow-y-auto">
             {active && state.race && (
               <>
-                <section className="text-center animate-fade">
-                  <div className="label">
-                    Election {state.race.space} of {state.total_spaces}
+                <section className="flex shrink-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 animate-fade">
+                  <div className="flex min-w-0 items-baseline gap-3">
+                    <h2 className="whitespace-nowrap font-display text-3xl font-bold leading-none text-cream-50">
+                      The Campaign of {state.race.year}
+                    </h2>
+                    {state.race.note && (
+                      <p className="hidden min-w-0 truncate font-serif text-sm italic text-cream-200/70 md:block" title={state.race.note}>
+                        {state.race.note}
+                      </p>
+                    )}
                   </div>
-                  <h2 className="mt-1 font-display text-4xl font-bold text-cream-50 sm:text-5xl">
-                    The Campaign of {state.race.year}
-                  </h2>
-                  {state.race.note && (
-                    <p className="mx-auto mt-2 max-w-2xl font-serif text-[15px] italic text-cream-200/80">{state.race.note}</p>
-                  )}
-                  <div className="mx-auto mt-3 flex max-w-3xl flex-wrap justify-center gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {state.players.map((p) => (
                       <span
                         key={p.seat}
@@ -238,7 +237,7 @@ export default function GameShell({ seat, onLeave }) {
                   </div>
                 </section>
 
-                <News news={state.news} space={state.space} />
+                <News news={state.news} space={state.space} compact />
 
                 <CommitBoard
                   hand={state.you ? state.you.hand : []}
@@ -253,11 +252,6 @@ export default function GameShell({ seat, onLeave }) {
                   track={state.track}
                 />
 
-                {waiting.length > 0 && waiting.every((p) => !p.is_you) && (
-                  <p className="text-center font-serif italic text-cream-200/60">
-                    Waiting for {waiting.map((p) => p.player_name).join(', ')}…
-                  </p>
-                )}
               </>
             )}
 
@@ -327,17 +321,20 @@ export default function GameShell({ seat, onLeave }) {
           </div>
 
           {/* The side: the presses, and the wire */}
-          <aside className="min-w-0 space-y-5">
-            <section className="panel p-4">
-              <div className="section-title mb-3">The presses</div>
-              <ul className="space-y-3">
+          <aside className="flex min-w-0 flex-col gap-2 lg:min-h-0">
+            <Collapsible
+              title="The presses"
+              storageKey="presses"
+              summary={state.players.map((p) => `${p.is_you ? 'You' : p.player_name.replace(/^The /, '')} $${p.money}${p.is_patron ? ' ★' : ''}`).join(' · ')}
+            >
+              <ul className="space-y-2">
                 {state.players.map((p) => (
                   <li
                     key={p.seat}
                     className={p.is_you ? 'border-l-2 border-gold-300 pl-3' : 'border-l-2 border-transparent pl-3'}
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-display text-lg leading-tight text-cream-50">
+                      <span className="font-display text-base leading-tight text-cream-50">
                         {p.player_name}
                         {p.is_you && <span className="ml-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-gold-300">you</span>}
                       </span>
@@ -360,9 +357,16 @@ export default function GameShell({ seat, onLeave }) {
                   </li>
                 ))}
               </ul>
-            </section>
+            </Collapsible>
 
-            <EventLog events={events} />
+            <Collapsible
+              title="The wire"
+              storageKey="wire"
+              fill
+              summary={events && events.length ? events[events.length - 1].message : null}
+            >
+              <EventLog events={events} bare />
+            </Collapsible>
           </aside>
         </div>
       </main>
