@@ -249,6 +249,8 @@ export default function GameShell({ seat, onLeave }) {
                   rules={state.rules}
                   stability={state.stability}
                   seats={state.players}
+                  history={state.history}
+                  track={state.track}
                 />
 
                 {waiting.length > 0 && waiting.every((p) => !p.is_you) && (

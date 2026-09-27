@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Clipping from './Clipping.jsx';
+import NationGauge from './NationGauge.jsx';
 
 /**
  * The table: three drop zones -- the States candidate, Cash in, the Nation
@@ -34,7 +35,7 @@ function effectOf(card, zone) {
   return { mode, push: card[mode], stability: card.stability };
 }
 
-export default function CommitBoard({ hand, race, commit, busy, onCommit, rules, stability, seats = [] }) {
+export default function CommitBoard({ hand, race, commit, busy, onCommit, rules, stability, seats = [], history = [], track = { min: -5, max: 5 } }) {
   const [place, setPlace] = useState({});       // card key -> 'cash' | 'states' | 'nation'
   const [reserve, setReserve] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -291,6 +292,14 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
 
   return (
     <section className="animate-fade">
+      <div className="mb-3">
+        <NationGauge
+          history={history}
+          min={track.min}
+          max={track.max}
+          planned={committed.some((c) => SIDES.includes(place[c.key])) ? summary.push : null}
+        />
+      </div>
       <div className="grid gap-3 md:grid-cols-3">
         {candidateZone('states')}
 
