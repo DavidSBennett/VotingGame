@@ -32,6 +32,17 @@ function PushCell({ sign, push, cost }) {
   );
 }
 
+/**
+ * What a card offers one side: whichever of its coverage stats pushes that
+ * way (at most one does -- positive and negative always point opposite).
+ */
+function sideCell(card, side) {
+  const want = side === 'nation' ? 1 : -1;
+  if (card.positive * want > 0) return <PushCell sign="+" push={card.positive} cost={0} />;
+  if (card.negative * want > 0) return <PushCell sign="−" push={card.negative} cost={card.stability} />;
+  return <PushCell sign="+" push={0} cost={0} />;
+}
+
 export default function Clipping({ card, effect = null, size = 'md', lifted = false, dim = false, ...rest }) {
   const md = size === 'md';
   const shell = lifted
@@ -79,21 +90,18 @@ export default function Clipping({ card, effect = null, size = 'md', lifted = fa
             : `${effect.mode === 'negative' ? 'Hostile' : 'Favourable'} · ${effect.push > 0 ? 'Nation' : 'States'} +${Math.abs(effect.push)}${effect.mode === 'negative' ? ` · Union −${effect.stability}` : ''}`}
         </div>
       ) : (
+        // The foot is laid out like the table it is played on: what the card
+        // does for the States man on the left, its profit in the middle (the
+        // counting house), what it does for the Nation man on the right.
         <div className="flex items-stretch divide-x divide-ink-950/15 border-t border-ink-950/20 font-mono text-[11px] font-medium">
+          {sideCell(card, 'states')}
           <span className="flex-1 py-1 text-center text-wood-700" title="Profit">
             ${card.profit}
             {card.profit_value !== undefined && card.profit_value !== card.profit && (
               <span className="text-gold-500">→{card.profit_value}</span>
             )}
           </span>
-          {card.kind === 'profit' ? (
-            <span className="flex-[2] py-1 text-center font-serif text-[10px] italic text-ink-950/50">no coverage</span>
-          ) : (
-            <>
-              <PushCell sign="+" push={card.positive} cost={0} />
-              <PushCell sign="−" push={card.negative} cost={card.stability} />
-            </>
-          )}
+          {sideCell(card, 'nation')}
         </div>
       )}
     </div>
