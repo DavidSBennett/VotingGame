@@ -49,6 +49,9 @@ export default function Rules({ rules, open = false }) {
           </li>
           <li>All the pushes are added up. The side the track leans toward wins.</li>
           <li>
+            If the winner is not the man history elected, the Union shudders and loses stability too.
+          </li>
+          <li>
             The most influence on the winner makes you <span className="text-amber-300">Patron</span>: your profit
             plays pay {mult}× next round.
           </li>

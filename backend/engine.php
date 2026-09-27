@@ -43,7 +43,9 @@
  *      failing that, whoever won in history.
  *   3. The most influence on the winner makes that paper PATRON: its profit
  *      plays pay double next round. A tie leaves nobody Patron.
- *   4. Everyone except the new Patron takes its reserved coverage card
+ *   4. If the winner is not the man history elected, the Union loses
+ *      history_shock (per two seats), which can break it too.
+ *   5. Everyone except the new Patron takes its reserved coverage card
  *      back. Every other committed card is spent. Everyone draws
  *      draw_per_round, and the Union recovers stability_recovery.
  *
@@ -93,8 +95,16 @@ function engine_default_config() {
     // every round breaks it ~59% of the time heads-up, ~32% at three seats,
     // 0% at four or more. (At 10 / 2 recovery refunded nearly every
     // negative play and stability never moved.)
-    'stability_start'    => 14,
+    //
+    // Ceiling 10 and a history shock of 2 (both per two seats): careful
+    // papers change history in about a third of races, and the Union then
+    // breaks in 0% / 16% / 9% / 25% of games at 2 / 3 / 4 / 5 seats. A paper
+    // that backs the unhistorical man on purpose to shake the Union while
+    // ahead lost to the bot (30% heads-up). At 14 and no shock, careful play
+    // never broke it and the ceiling was never felt.
+    'stability_start'    => 10,
     'stability_recovery' => 1,
+    'history_shock'      => 2,
     // Paid by the most exposed paper when the Union breaks. Careful papers
     // (~1.3 negative plays a game) essentially never break it; two papers
     // playing a negative every round broke it 42% of the time, and there the
@@ -128,6 +138,7 @@ function engine_config_knobs() {
     'stability_start'    => [4, 30],
     'stability_recovery' => [0, 6],
     'exposure_penalty'   => [0, 100],
+    'history_shock'      => [0, 6],
   ];
 }
 
@@ -603,21 +614,9 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
       engine_log($mysqli, $game, $s, 'reveal',
         engine_reveal_text($players[$s]['player_name'], $r, $election), $r, $players[$s]['player_name']);
     }
-    $penalty = (int) ($config['exposure_penalty'] ?? 25);
-    $blamed = engine_most_exposed($players);
-    $names = [];
-    foreach ($blamed as $s) {
-      $players[$s]['public_state']['money'] = (int) $players[$s]['public_state']['money'] - $penalty;
-      $players[$s]['public_state']['exposure_penalty'] = $penalty;
-      $names[] = $players[$s]['player_name'];
-    }
-    if ($blamed) {
-      engine_log($mysqli, $game, null, 'exposure_penalty',
-        'The Union breaks. ' . implode(' and ', $names) . (count($names) === 1 ? ', the most exposed paper, loses ' : ', the most exposed papers, each lose ')
-        . $penalty . '.', ['seats' => $blamed, 'penalty' => $penalty]);
-    }
+    list($blamed, $penalty) = engine_charge_exposure($game, $players, $mysqli);
     $game['state']['last_reveal'] = [
-      'space' => $space, 'year' => $election['year'], 'broke' => true,
+      'space' => $space, 'year' => $election['year'], 'broke' => true, 'broke_by' => 'coverage',
       'track' => $track, 'stability_spent' => $spent,
       'stability_before' => $before, 'stability_after' => 0,
       'blamed' => $blamed, 'penalty' => $penalty,
@@ -697,14 +696,38 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
     'historical_winner' => $election['historical_winner'],
   ]);
 
-  // 5. The Union settles a little.
-  $recover = intdiv((int) ($config['stability_recovery'] ?? 0) * max(1, count($players)), 2);
-  $max = (int) ($config['stability_max'] ?? $before);
+  // 5. History bends: a winner the country did not historically elect
+  //    shakes the Union. Charged before recovery, so recovery cannot simply
+  //    refund it; a break here ends the game like any other.
+  $shock = 0;
+  if ($side !== $election['historical_winner']) {
+    $shock = intdiv((int) ($config['history_shock'] ?? 0) * max(1, count($players)), 2);
+    $game['state']['stability'] = max(0, (int) $game['state']['stability'] - $shock);
+    if ($shock > 0) {
+      engine_log($mysqli, $game, null, 'history_shock',
+        $winner['name'] . ' was never meant to win ' . $election['year'] . '. The Union shudders (-' . $shock . ').',
+        ['shock' => $shock, 'stability' => (int) $game['state']['stability']]);
+    }
+  }
+  $brokeByHistory = ((int) $game['state']['stability'] <= 0);
+  $blamed = [];
+  $penalty = 0;
+  if ($brokeByHistory) {
+    list($blamed, $penalty) = engine_charge_exposure($game, $players, $mysqli);
+  }
+
+  // 6. The Union settles a little.
   $after = (int) $game['state']['stability'];
-  $game['state']['stability'] = min($max, $after + $recover);
+  if (!$brokeByHistory) {
+    $recover = intdiv((int) ($config['stability_recovery'] ?? 0) * max(1, count($players)), 2);
+    $max = (int) ($config['stability_max'] ?? $before);
+    $game['state']['stability'] = min($max, $after + $recover);
+  }
 
   $game['state']['last_reveal'] = [
-    'space' => $space, 'year' => $election['year'], 'broke' => false,
+    'space' => $space, 'year' => $election['year'], 'broke' => $brokeByHistory,
+    'broke_by' => $brokeByHistory ? 'history' : null,
+    'history_shock' => $shock, 'blamed' => $blamed, 'penalty' => $penalty,
     'winner_side' => $side, 'winner_name' => $winner['name'], 'loser_name' => $loser['name'],
     'decided_by' => $decidedBy, 'track' => $track,
     'influence_totals' => ['nation' => array_sum($influence['nation']), 'states' => array_sum($influence['states'])],
@@ -725,6 +748,12 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
     'name' => $winner['name'], 'year' => $election['year'], 'side' => $side,
     'patron_seat' => $patron,
   ];
+
+  if ($brokeByHistory) {
+    $game['state']['commits'] = [];
+    engine_end_game($game, $players, 'the_union_breaks', $mysqli);
+    return;
+  }
 
   // Open the next round.
   $game['state']['commits'] = [];
@@ -826,6 +855,29 @@ function engine_ended_text($reason) {
     'rules_changed'    => 'This game was started under the old rules.',
   ];
   return $text[$reason] ?? 'The game ended.';
+}
+
+/**
+ * The Union has broken: charge the most exposed paper(s) and log it.
+ *
+ * @return array [blamed seats, penalty]
+ */
+function engine_charge_exposure(&$game, &$players, $mysqli) {
+  $penalty = (int) ($game['config']['exposure_penalty'] ?? 25);
+  $blamed = engine_most_exposed($players);
+  $names = [];
+  foreach ($blamed as $s) {
+    $players[$s]['public_state']['money'] = (int) $players[$s]['public_state']['money'] - $penalty;
+    $players[$s]['public_state']['exposure_penalty'] = $penalty;
+    $names[] = $players[$s]['player_name'];
+  }
+  if ($blamed) {
+    engine_log($mysqli, $game, null, 'exposure_penalty',
+      'The Union breaks. ' . implode(' and ', $names)
+      . (count($names) === 1 ? ', the most exposed paper, loses ' : ', the most exposed papers, each lose ')
+      . $penalty . '.', ['seats' => $blamed, 'penalty' => $penalty]);
+  }
+  return [$blamed, $penalty];
 }
 
 /**
@@ -989,6 +1041,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'hand_limit'        => (int) ($config['hand_limit'] ?? 10),
       'stability_recovery'=> intdiv((int) ($config['stability_recovery'] ?? 2) * max(1, count($players)), 2),
       'exposure_penalty'  => (int) ($config['exposure_penalty'] ?? 25),
+      'history_shock'     => intdiv((int) ($config['history_shock'] ?? 0) * max(1, count($players)), 2),
     ],
     'track'         => ['min' => (int) ($config['track_min'] ?? -5), 'max' => (int) ($config['track_max'] ?? 5)],
     'stability'     => (int) ($state['stability'] ?? 0),

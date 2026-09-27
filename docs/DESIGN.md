@@ -57,8 +57,10 @@ The historical result breaks a dead tie and nothing else.
 One track, **States −5 … 0 … +5 Nation** (states' rights against federal
 power). It starts every round at 0.
 
-**Stability of the Union** starts at 14 per two seats. Negative coverage
-spends it; each election restores 1 per two seats.
+**Stability of the Union** starts at (and cannot exceed) 10 per two seats.
+Negative coverage spends it; **an election won by the man history did not
+elect costs 2 per two seats**; each election then restores 1 per two
+seats.
 
 **Exposure** is public: the number of cards each paper has played
 negatively this game, ranked (1 = most exposed; equal counts share a rank).
@@ -137,6 +139,18 @@ once, and only if stability stays above 4. Profit the rest.
 times per setting. It parses the content **out of the PHP**, so the data
 cannot drift; the rules are a hand-port of `engine.php`, kept in step by
 hand. Every number in `engine_default_config()` came from a run.
+
+### History shock and a lower ceiling (2026-09-27)
+
+Stability ceiling 10 per two seats (from 14), and an election won against
+history costs 2 per two seats, charged before recovery. Careful bots change
+history in about a third of races; the Union then breaks in 0% / 16% / 9% /
+25% of games at 2 / 3 / 4 / 5 seats (median: at election 12). A paper that,
+when ahead, backs the unhistorical man to shake the Union onto a more exposed
+rival won 30% heads-up and 26% at three seats: not an exploit. A flat
+(unscaled) shock left four-seat games immune; a shock of 3 broke 17–58% of
+games. Never playing negatively edges slightly ahead (38% at three seats,
+fair 33%): negative coverage is riskier, not dead.
 
 ### Exposure (2026-09-27)
 
@@ -360,3 +374,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-27 | Stability 14 per two seats, recovery 1 | At 10 / 2 the gauge never moved; griefer now breaks it 59% heads-up, 32% at three |
 | 2026-09-27 | Exposure rank; a broken Union costs the most exposed paper 25 instead of everyone losing | Smallest penalty with the full deterrent effect; careful play never breaks the Union |
 | 2026-09-27 | A paper may pass a round (commit no cards) | No passing line beat a fair share: pass-to-6 won 19% heads-up, pass-to-full-then-dump 0% |
+| 2026-09-27 | Changing history costs the Union 2 per two seats; ceiling lowered from 14 to 10 | Careful play now breaks the Union in 0/16/9/25% of games at 2-5 seats; backing the unhistorical man on purpose loses |

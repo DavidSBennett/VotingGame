@@ -46,6 +46,7 @@ export default function Reveal({ reveal, seats, track }) {
               : '')
           : `${decided}. ${reveal.patron_name ? `${reveal.patron_name} is Patron.` : 'Nobody is Patron.'}`}
         {!reveal.broke && reveal.stability_spent > 0 && ` Hostile coverage cost the Union ${reveal.stability_spent}.`}
+        {reveal.history_shock > 0 && ` History was changed: the Union shuddered (−${reveal.history_shock}).`}
       </p>
 
       <ul className="mt-3 space-y-2 text-sm">

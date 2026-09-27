@@ -134,6 +134,10 @@ class Checks:
             if sd["kept"] is not None:
                 kept = [pl for pl in sd["plays"] if pl["name"] == sd["kept"]]
                 self.check(kept and kept[0]["action"] != "profit", "only a coverage card is kept")
+        if r["broke"] and r.get("broke_by") == "history":
+            self.check(st["status"] == "ended" and st["ended_reason"] == "the_union_breaks",
+                       "a Union broken by history ends the game")
+            return
         if r["broke"]:
             self.check(st["status"] == "ended" and st["ended_reason"] == "the_union_breaks",
                        "a broken Union ends the game")
@@ -148,7 +152,14 @@ class Checks:
             best = max(live, key=lambda p: p["final_score"])
             self.check(st["winner_seat"] == best["seat"], "the richest paper still wins after a break")
             return
-        self.check(r["stability_after"] == prev_stability - spent, "stability paid for hostile coverage")
+        shock = r.get("history_shock", 0)
+        self.check(r["stability_after"] == max(0, prev_stability - spent - shock),
+                   "stability paid for hostile coverage and bent history",
+                   "%s vs %s - %s - %s" % (r["stability_after"], prev_stability, spent, shock))
+        hist = [h for h in st["history"] if h["space"] == r["space"]]
+        if hist:
+            expect = 0 if hist[0]["matched_history"] else st["rules"]["history_shock"]
+            self.check(shock == expect, "history shock only when history is changed", "%s vs %s" % (shock, expect))
         if r["decided_by"] == "track":
             self.check(r["track"] != 0 and (r["track"] > 0) == (r["winner_side"] == "nation"),
                        "the side the track leans toward wins")

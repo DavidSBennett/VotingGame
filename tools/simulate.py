@@ -191,9 +191,10 @@ DEFAULTS = dict(
     track_min=-5,
     track_max=5,
     min_commit=0,            # a paper may pass; no passing line beat a fair share
-    stability_start=14,      # per two seats, scaled to the table
+    stability_start=10,      # per two seats, scaled to the table (the ceiling)
     stability_recovery=1,    # per two seats, after each election
     exposure_penalty=25,     # paid by the most exposed paper if the Union breaks
+    history_shock=2,         # per two seats: stability lost when an election goes against history
 )
 
 
@@ -314,11 +315,7 @@ class Game:
             # The Union breaks: the game ends here, and the most exposed
             # paper (most negative plays over the game; ties all pay) loses
             # exposure_penalty. Everyone else keeps what they have.
-            self.ended = "the_union_breaks"
-            top = max(p.negatives for p in self.players)
-            self.blamed = [p.seat for p in self.players if p.negatives == top and top > 0]
-            for s in self.blamed:
-                self.players[s].money -= self.cfg["exposure_penalty"]
+            self.break_union()
             self.history.append(dict(space=self.space, broke=True, spent=spent))
             return
 
@@ -367,7 +364,17 @@ class Game:
             matched=(winner == e["historical_winner"]),
         ))
 
-        # 5. The country settles a little; the next round's cards arrive.
+        # 5. History bends: a winner the country did not historically elect
+        #    shakes the Union. A break here ends the game like any other,
+        #    and the most exposed paper pays.
+        if winner != e["historical_winner"] and self.cfg["history_shock"]:
+            self.stability -= self.cfg["history_shock"] * len(self.players) // 2
+            self.min_stability = min(self.min_stability, self.stability)
+            if self.stability <= 0:
+                self.break_union()
+                return
+
+        # 6. The country settles a little; the next round's cards arrive.
         self.stability = min(self.stability_max,
                              self.stability + self.cfg["stability_recovery"] * len(self.players) // 2)
         self.space += 1
@@ -378,6 +385,15 @@ class Game:
         if fresh:
             self.deck.extend(fresh)
             self.rng.shuffle(self.deck)
+
+    def break_union(self):
+        """The Union breaks: the game ends, the most exposed paper (most
+        negative plays; ties all pay) loses exposure_penalty."""
+        self.ended = "the_union_breaks"
+        top = max(p.negatives for p in self.players)
+        self.blamed = [p.seat for p in self.players if p.negatives == top and top > 0]
+        for seat in self.blamed:
+            self.players[seat].money -= self.cfg["exposure_penalty"]
 
     def run(self):
         while self.ended is None:
