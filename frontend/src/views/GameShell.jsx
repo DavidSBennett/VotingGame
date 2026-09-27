@@ -7,7 +7,7 @@ import Reveal from '../components/Reveal.jsx';
 import Rules from '../components/Rules.jsx';
 import News from '../components/News.jsx';
 import RacePanel from '../components/RacePanel.jsx';
-import Hand from '../components/Hand.jsx';
+import CommitBoard from '../components/CommitBoard.jsx';
 import BoardStrip from '../components/BoardStrip.jsx';
 
 /**
@@ -188,7 +188,7 @@ export default function GameShell({ seat, onLeave }) {
               <Reveal reveal={state.last_reveal} seats={state.players} track={state.track} />
               <News news={state.news} space={state.space} />
               <RacePanel race={state.race} seats={state.players} />
-              <Hand
+              <CommitBoard
                 hand={state.you ? state.you.hand : []}
                 race={state.race}
                 commit={state.you ? state.you.commit : null}

@@ -1,24 +1,11 @@
 /**
- * The current election: the States candidate against the Nation candidate,
- * and which papers have sealed their commitment. What they committed stays
- * hidden until the reveal.
+ * The current election: who is standing, and which papers have sealed their
+ * commitment. The candidates themselves are the drop zones on the
+ * commitment board; what each paper committed stays hidden until the reveal.
  */
 export default function RacePanel({ race, seats }) {
   if (!race) return null;
   const waiting = seats.filter((p) => !p.conceded && !p.committed);
-
-  const column = (c) => (
-    <div key={c.side} className="rounded border border-slate-700 bg-slate-900 p-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-medium text-slate-100">{c.name}</span>
-        <span className={c.side === 'nation' ? 'text-xs text-sky-300' : 'text-xs text-rose-300'}>
-          {c.side === 'nation' ? 'Nation' : 'States'}
-        </span>
-      </div>
-      <div className="text-xs text-slate-500">{c.party}</div>
-      <p className="mt-2 text-xs italic text-slate-500">{c.note}</p>
-    </div>
-  );
 
   return (
     <section className="rounded-lg border border-slate-700 bg-slate-800 p-4">
@@ -31,9 +18,13 @@ export default function RacePanel({ race, seats }) {
         </span>
       </div>
       {race.note && <p className="mb-3 text-xs italic text-slate-500">{race.note}</p>}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {column(race.states)}
-        {column(race.nation)}
+      <div className="grid gap-3 text-xs text-slate-500 sm:grid-cols-2">
+        <p>
+          <span className="text-rose-300">{race.states.name}</span> — {race.states.note}
+        </p>
+        <p>
+          <span className="text-sky-300">{race.nation.name}</span> — {race.nation.note}
+        </p>
       </div>
       <ul className="mt-3 flex flex-wrap gap-2 text-xs">
         {seats.map((p) => (
