@@ -16,7 +16,7 @@
  * ---------------------------------------------------------------------
  * THE RULES IN ONE PLACE  (docs/DESIGN.md has the reasoning)
  *
- * You are a newspaper, 1796 to 1860. Fourteen elections, one ROUND each,
+ * You are a newspaper, 1796 to 1860. Seventeen elections, one ROUND each,
  * every race a Nation candidate against a States candidate. Most MONEY at
  * the end wins, and money comes ONLY from playing cards for profit.
  *
@@ -61,7 +61,7 @@ require_once __DIR__ . '/game_data.php';
  * carries another version cannot be played by this engine; it is shown as
  * ended instead (see engine_is_current).
  */
-define('ENGINE_STATE_VERSION', 6);
+define('ENGINE_STATE_VERSION', 7);
 
 // ---------------------------------------------------------------------
 // Configuration
@@ -78,7 +78,7 @@ define('ENGINE_STATE_VERSION', 6);
 function engine_default_config() {
   return [
     'engine_version'     => ENGINE_STATE_VERSION,
-    'total_spaces'       => 14,
+    'total_spaces'       => 17,
     'start_hand'         => 5,
     'draw_per_round'     => 2,
     'hand_limit'         => 10,
@@ -132,7 +132,7 @@ function engine_default_config() {
  */
 function engine_config_knobs() {
   return [
-    'total_spaces'       => [1, 14],
+    'total_spaces'       => [1, 17],
     'start_hand'         => [3, 8],
     'draw_per_round'     => [1, 4],
     'start_money'        => [0, 50],
@@ -570,23 +570,30 @@ function engine_bot_commit($game, $player) {
 /**
  * The HARD bot, distilled from the playtests the easy bot kept losing
  * (games 24, 29 and 31: 162-150, 170-159, 224-152). Kept in step with
- * make_hard in tools/simulate.py (keep 1, cushion 2).
+ * make_hard in tools/simulate.py (keep 1, cushion 1).
  *
  *   1. Patron? Sell the hand at double, keeping back the one card that is
  *      cheapest to cover with, for the next bid.
  *   2. Otherwise win the Patronage as cheaply as the table allows: on the
  *      side the hand pushes hardest, add the lowest-profit coverage until
  *      influence reaches the target -- 1 if every rival is the sitting
- *      Patron (who will be selling), else 3. At most one hostile card, and
+ *      Patron (who will be selling), else 2. At most one hostile card, and
  *      only while stability stays above 3 after it.
  *   3. Keep everything else for the next Patron round, selling only the
  *      cheapest cards the draw would otherwise waste at the hand limit.
+ *   4. The final election carries nothing forward: sell the whole hand.
  *
- * Simulated: beats the easy bot 99% heads-up and the human line from those
- * games 66%; two easy bots and one hard, the hard bot wins 84%.
+ * Simulated over seventeen elections: beats the easy bot 100% heads-up and
+ * the human line from those games 60%; two easy bots and one hard, the
+ * hard bot wins 90%.
  */
 function engine_bot_commit_hard($game, $player) {
   $hand = $player['private_state']['hand'] ?? [];
+  if ((int) $game['state']['space'] >= (int) ($game['config']['total_spaces'] ?? 17)) {
+    $plays = [];
+    foreach ($hand as $k) $plays[] = ['card' => $k, 'action' => 'profit', 'side' => null];
+    return ['plays' => $plays, 'reserve' => null];
+  }
   $maxPush = function ($c) { return max(abs((int) $c['positive']), abs((int) $c['negative'])); };
 
   if (!empty($player['public_state']['is_patron'])) {
@@ -629,7 +636,7 @@ function engine_bot_commit_hard($game, $player) {
 
   // Every rival the sitting Patron? They will be selling: one card will do.
   $stability = (int) ($game['state']['stability'] ?? 0);
-  $target = !empty($game['rivals_all_patron']) ? 1 : 3;
+  $target = !empty($game['rivals_all_patron']) ? 1 : 2;
 
   $options = [];
   foreach ($hand as $k) {
@@ -1165,7 +1172,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     'variant'       => $game['variant'],
     'phase'         => $game['phase'],
     'space'         => $space,
-    'total_spaces'  => (int) ($config['total_spaces'] ?? 14),
+    'total_spaces'  => (int) ($config['total_spaces'] ?? 17),
     'current_seat'  => null,
     'max_players'   => (int) $game['max_players'],
     'winner_seat'   => $game['winner_seat'],
@@ -1266,7 +1273,7 @@ function engine_build_export($mysqli, $game, $players, $viewerSeat = null) {
       'status'        => $game['status'],
       'phase'         => $game['phase'],
       'spaces_played' => count($game['state']['history'] ?? []),
-      'total_spaces'  => (int) ($game['config']['total_spaces'] ?? 14),
+      'total_spaces'  => (int) ($game['config']['total_spaces'] ?? 17),
       'winner_seat'   => $game['winner_seat'],
       'ended_reason'  => $game['ended_reason'],
       'created_at'    => $game['created_at'],

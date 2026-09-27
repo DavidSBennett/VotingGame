@@ -19,7 +19,7 @@ function Body({ rules }) {
   return (
     <div className="font-serif text-[15px] leading-relaxed text-ink-950/85">
       <p>
-        You run a partisan newspaper, 1796 to 1860. Fourteen elections, each a{' '}
+        You run a partisan newspaper, 1796 to 1860. Seventeen elections, each a{' '}
         <span className="font-semibold text-federal-700">Nation</span> man (federal power) against a{' '}
         <span className="font-semibold text-oxblood-700">States</span> man (states&rsquo; rights).{' '}
         <em>The richest paper at the end wins</em> — and money comes only from selling your clippings.

@@ -119,7 +119,7 @@ export default function Lobby({ onSeated }) {
         </div>
         <h1 className="mt-3 font-display text-6xl font-bold leading-none text-cream-50 sm:text-7xl">The Fourth Estate</h1>
         <p className="mx-auto mt-4 max-w-2xl font-display text-xl italic text-gold-300">
-          Print the stories, make the presidents, and sell the papers. Fourteen elections; the richest press wins.
+          Print the stories, make the presidents, and sell the papers. Seventeen elections; the richest press wins.
         </p>
         <div className="mx-auto mt-6 flex max-w-xs items-center gap-3">
           <span className="h-px flex-1 bg-gold-500/50" />

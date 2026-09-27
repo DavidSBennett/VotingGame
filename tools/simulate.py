@@ -1,6 +1,6 @@
 """Playout harness for The Fourth Estate.
 
-The game in one paragraph: fourteen elections, one sealed round each. Every
+The game in one paragraph: seventeen elections, one sealed round each. Every
 paper commits cards blind, each played for PROFIT (money, the only score),
 POSITIVE coverage or NEGATIVE coverage. Coverage pushes the Nation/States
 track and counts as influence on a candidate you name; negative coverage
@@ -126,7 +126,7 @@ ELECTIONS = php_function_array("game_data.php", "vg_elections")
 
 
 def check_parity():
-    assert len(ELECTIONS) == 14, "expected 14 spaces, parsed %d" % len(ELECTIONS)
+    assert len(ELECTIONS) == 17, "expected 17 spaces, parsed %d" % len(ELECTIONS)
     for i, e in enumerate(ELECTIONS, 1):
         assert e["space"] == i, e["year"]
         assert e["historical_winner"] in ("nation", "states"), e["year"]
@@ -172,7 +172,7 @@ def released(after_year, through_year):
 check_balance()
 OPENING = released(None, YEARS[0])
 assert len(OPENING) >= 26, "opening deck of %d cannot deal five hands" % len(OPENING)
-LATE_SPACE = 11      # 1848: only a reporting boundary now, not a rule
+LATE_SPACE = 14      # 1848: only a reporting boundary now, not a rule
 SIDES = ("nation", "states")
 
 
@@ -181,7 +181,7 @@ SIDES = ("nation", "states")
 # =====================================================================
 
 DEFAULTS = dict(
-    total_spaces=14,
+    total_spaces=17,
     start_hand=5,
     draw_per_round=2,
     hand_limit=10,
@@ -561,9 +561,12 @@ def make_hard(keep_on_dump=0, cushion=2, neg_margin=3):
          only while stability stays above `neg_margin` after it.
       3. Keep everything else, except sell the cheapest cards the draw
          would otherwise waste at the hand limit.
+      4. The final election carries nothing forward: sell the whole hand.
     """
     def strat(game, p):
         hand = list(p.hand)
+        if game.space >= game.cfg["total_spaces"]:
+            return [(k, "profit", None) for k in hand], None
         if p.patron:
             keep = sorted(hand, key=lambda k: (CARDS[k]["profit"], -max(abs(CARDS[k]["positive"]), abs(CARDS[k]["negative"]))))[:keep_on_dump]
             return [(k, "profit", None) for k in hand if k not in keep], None
@@ -627,7 +630,7 @@ STRATEGIES = {
     "hoarder": strat_hoarder,
     "casher": strat_casher,
     "bot": make_bot(),                    # the server's EASY bot
-    "hard": make_hard(keep_on_dump=1, cushion=2),   # the server's HARD bot
+    "hard": make_hard(keep_on_dump=1, cushion=1),   # the server's HARD bot
     "sniper": sniper,                     # the human line from games 29 and 31
     "positive": strat_positive_only,
     "all_cover": strat_all_cover,

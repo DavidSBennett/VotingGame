@@ -1,5 +1,5 @@
 /**
- * The fourteen elections as a timeline: each past race marked in the ink of
+ * The seventeen elections as a timeline: each past race marked in the ink of
  * the side that won it, with a small notch where the result departed from
  * history; the current race in gold.
  */
@@ -12,7 +12,8 @@ export default function BoardStrip({ space, totalSpaces, history, years = [], co
   for (let i = 1; i <= totalSpaces; i++) cells.push(i);
 
   return (
-    <div className="relative px-1">
+    <div className="overflow-x-auto">
+    <div className="relative min-w-[34rem] px-1">
       <div className="absolute left-3 right-3 top-[13px] h-px bg-gold-500/40" />
       <ol className="relative flex justify-between">
         {cells.map((n) => {
@@ -57,6 +58,7 @@ export default function BoardStrip({ space, totalSpaces, history, years = [], co
           );
         })}
       </ol>
+    </div>
     </div>
   );
 }

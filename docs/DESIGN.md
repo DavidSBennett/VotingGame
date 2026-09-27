@@ -24,29 +24,34 @@ Convention helps the States side even if you are backing the Nation man.
 
 ---
 
-## 2. The board — fourteen races
+## 2. The board — seventeen races
 
-1796 to 1860 inclusive is seventeen elections; the three that were not
-contests are cut (1804, Jefferson 162–14; 1816, Monroe 183–34; 1820,
-Monroe unopposed). Each race is a **Nation** candidate against a **States**
+1796 to 1860 inclusive: every election is on the board. The three
+near-walkovers (1804, Jefferson 162–14; 1816, Monroe 183–34; 1820, Monroe
+unopposed but for one elector's vote for John Quincy Adams) were cut in
+v1 and restored on 2026-09-27; they are where history is easiest to bend,
+and they give the 1800s and 1810s cards a race of their own. Each race is a **Nation** candidate against a **States**
 candidate. Content is in [`backend/game_data.php`](../backend/game_data.php).
 
 | # | Year | Nation | States | Historically |
 | --- | --- | --- | --- | --- |
 | 1 | 1796 | John Adams | Thomas Jefferson | Nation |
 | 2 | 1800 | John Adams | Thomas Jefferson | States |
-| 3 | 1808 | C.C. Pinckney | James Madison | States |
-| 4 | 1812 | DeWitt Clinton | James Madison | States |
-| 5 | 1824 | John Quincy Adams | Andrew Jackson | Nation |
-| 6 | 1828 | John Quincy Adams | Andrew Jackson | States |
-| 7 | 1832 | Henry Clay | Andrew Jackson | States |
-| 8 | 1836 | W.H. Harrison | Martin Van Buren | States |
-| 9 | 1840 | W.H. Harrison | Martin Van Buren | Nation |
-| 10 | 1844 | Henry Clay | James K. Polk | States |
-| 11 | 1848 | Zachary Taylor | Lewis Cass | Nation |
-| 12 | 1852 | Winfield Scott | Franklin Pierce | States |
-| 13 | 1856 | John C. Frémont | James Buchanan | States |
-| 14 | 1860 | Abraham Lincoln | Stephen A. Douglas | Nation |
+| 3 | 1804 | C.C. Pinckney | Thomas Jefferson | States |
+| 4 | 1808 | C.C. Pinckney | James Madison | States |
+| 5 | 1812 | DeWitt Clinton | James Madison | States |
+| 6 | 1816 | Rufus King | James Monroe | States |
+| 7 | 1820 | John Quincy Adams | James Monroe | States |
+| 8 | 1824 | John Quincy Adams | Andrew Jackson | Nation |
+| 9 | 1828 | John Quincy Adams | Andrew Jackson | States |
+| 10 | 1832 | Henry Clay | Andrew Jackson | States |
+| 11 | 1836 | W.H. Harrison | Martin Van Buren | States |
+| 12 | 1840 | W.H. Harrison | Martin Van Buren | Nation |
+| 13 | 1844 | Henry Clay | James K. Polk | States |
+| 14 | 1848 | Zachary Taylor | Lewis Cass | Nation |
+| 15 | 1852 | Winfield Scott | Franklin Pierce | States |
+| 16 | 1856 | John C. Frémont | James Buchanan | States |
+| 17 | 1860 | Abraham Lincoln | Stephen A. Douglas | Nation |
 
 The historical result breaks a dead tie and nothing else.
 
@@ -83,7 +88,7 @@ that wins.
 Example: *The Bill of Rights* — profit 1; positive States +3; negative
 Nation +1 at a cost of 2 stability.
 
-**Balance rule:** within every one of the 14 release batches, the Nation
+**Balance rule:** within every one of the 17 release batches, the Nation
 push on offer equals the States push on offer, counting both coverage
 options of every card. `tools/simulate.py` refuses to run if a batch
 drifts. Negative coverage is where most of the balancing was done.
@@ -136,9 +141,10 @@ once, and only if stability stays above 4. Profit the rest.
 31: 162–150, 170–159, 224–152). As Patron it sells its hand at double,
 keeping one cheap-to-cover card back; otherwise it wins the Patronage as
 cheaply as the table allows (influence 1 if every rival is the selling
-Patron, else 3), at most one hostile card while stability allows, and keeps
-the rest for its next Patron round. Simulated: beats Easy 99% heads-up and
-the human line from those games 66%.
+Patron, else 2), at most one hostile card while stability allows, and keeps
+the rest for its next Patron round. In the final election, with nothing to
+carry forward, it sells its whole hand. Simulated over seventeen elections:
+beats Easy 100% heads-up and the human line from those games 57–60%.
 
 ---
 
@@ -385,3 +391,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-27 | A paper may pass a round (commit no cards) | No passing line beat a fair share: pass-to-6 won 19% heads-up, pass-to-full-then-dump 0% |
 | 2026-09-27 | Changing history costs the Union 2 per two seats; ceiling lowered from 14 to 10 | Careful play now breaks the Union in 0/16/9/25% of games at 2-5 seats; backing the unhistorical man on purpose loses |
 | 2026-09-27 | Bot difficulty: Easy (the original bot) and Hard (distilled from playtests 24, 29, 31) | Hard beats Easy 99% and the human line 66%; the human beat Easy 224-152 in game 31 |
+| 2026-09-27 | 1804, 1816 and 1820 restored: seventeen elections. Batches re-balanced by one point on Marbury, the Embargo, the Tariff of 1816, the Panic of 1819, the Missouri Compromise and the Monroe Doctrine | Union breaks among bots rose (3 seats 17% -> 27%, 5 seats 20% -> 30%); Hard fell to 27% against the human line until it learned to sell out in the final election and bid to 2, now 57-60% |
