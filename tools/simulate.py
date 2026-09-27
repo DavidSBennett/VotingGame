@@ -196,7 +196,17 @@ DEFAULTS = dict(
     stability_recovery=1,    # per two seats, after each election
     exposure_penalty=25,     # paid by the most exposed paper if the Union breaks
     history_shock=2,         # per two seats: stability lost when an election goes against history
+    # --- VARIANT: the newsroom deck-builder ---------------------------------
+    deckbuild=True,          # each paper draws from its own deck and buys stories off the wire
+    start_deck=5,            # opening stories dealt into each paper's own deck
+    wire_size=6,             # face-up stories for sale; fresh news goes on first
+    price_rule="profit",     # a story costs its bury value (see Game.price) ...
+    price_add=0,             # ... + price_add
+    max_buys=1,              # stories a paper may buy a round
 )
+
+# main's rules, for comparison: one shared deck, nothing to buy.
+SHARED = dict(deckbuild=False)
 
 
 def sign(x):
@@ -213,6 +223,10 @@ class Player:
         self.strategy = strategy
         self.money = 0
         self.hand = []
+        self.deck = []           # deckbuild: this paper's own draw pile
+        self.discard = []        # deckbuild: this paper's own discard pile
+        self.bought = 0
+        self.spent_buying = 0
         self.patron = False
         self.patronages = 0
         self.profits = 0
@@ -239,12 +253,43 @@ class Game:
         self.players = [Player(i, s) for i, s in enumerate(strategies)]
         for p in self.players:
             p.money = self.cfg["start_money"]
+        self.wire, self.trash = [], []
+        if self.cfg["deckbuild"]:
+            # Each paper's own deck is dealt from the opening stories; the
+            # rest are the unsold supply, and the wire shows the first few.
+            for p in self.players:
+                p.deck, self.deck = self.deck[:self.cfg["start_deck"]], self.deck[self.cfg["start_deck"]:]
+            self.refill_wire()
         for p in self.players:
             self.draw(p, self.cfg["start_hand"])
         self.ended = None
         self.min_stability = self.stability
 
-    def draw_one(self):
+    def refill_wire(self):
+        while len(self.wire) < self.cfg["wire_size"] and self.deck:
+            self.wire.append(self.deck.pop(0))
+
+    def price(self, key):
+        c = CARDS[key]
+        base = c["profit"]
+        rule = self.cfg["price_rule"]
+        if rule == "profit_only_double" and c["kind"] == "profit":
+            base = 2 * c["profit"]
+        elif rule == "patron_value":
+            # what it would pay the Patron, less its push
+            base = 2 * c["profit"] - reach(key)
+        elif rule == "plus_weak":
+            base = c["profit"] + (3 - reach(key))
+        return max(1, base + self.cfg["price_add"])
+
+    def draw_one(self, p=None):
+        if self.cfg["deckbuild"]:
+            if not p.deck:
+                if not p.discard:
+                    return None
+                p.deck, p.discard = p.discard, []
+                self.rng.shuffle(p.deck)
+            return p.deck.pop(0)
         if not self.deck:
             if not self.discard:
                 return None
@@ -256,7 +301,7 @@ class Game:
         for _ in range(n):
             if len(p.hand) >= self.cfg["hand_limit"]:
                 return
-            c = self.draw_one()
+            c = self.draw_one(p)
             if c is None:
                 return
             p.hand.append(c)
@@ -279,13 +324,18 @@ class Game:
     def play_round(self):
         # 1. Everyone commits blind.
         commits = {}
+        wishes = {}
         for p in self.players:
-            plays, reserve = STRATEGIES[p.strategy](self, p)
+            name, _, buy_policy = p.strategy.partition("/")
+            buy_policy = buy_policy or DEFAULT_BUY.get(name, "steady")
+            plays, reserve = STRATEGIES[name](self, p) if p.hand else ([], None)
             self.validate(p, plays, reserve)
             covered = [pl[0] for pl in plays if pl[1] != "profit"]
             if reserve is None and covered:
                 reserve = max(covered, key=lambda k: CARDS[k]["profit"])
             commits[p.seat] = (plays, reserve)
+            if self.cfg["deckbuild"]:
+                wishes[p.seat] = BUYERS[buy_policy](self, p, plays)
 
         # 2. Reveal. Profit pays; coverage pushes, counts influence on the
         #    named candidate, and negative coverage costs stability.
@@ -350,11 +400,17 @@ class Game:
         #    round and avoiding the Patronage became the winning line.)
         for p in self.players:
             plays, reserve = commits[p.seat]
-            for key, _, _ in plays:
+            for key, mode, _ in plays:
                 if key == reserve and p.seat != patron:
                     p.hand.append(key)
-                else:
+                elif not self.cfg["deckbuild"]:
                     self.discard.append(key)
+                elif mode == "profit":
+                    self.trash.append(key)      # a buried story is sold: it leaves the game
+                else:
+                    p.discard.append(key)       # a story run stays in the paper's deck
+        if self.cfg["deckbuild"]:
+            self.buy(wishes)
         for p in self.players:
             self.draw(p, self.cfg["draw_per_round"])
 
@@ -383,9 +439,36 @@ class Game:
             self.ended = "board_completed"
             return
         fresh = released(YEARS[self.space - 2], YEARS[self.space - 1])
-        if fresh:
+        if fresh and self.cfg["deckbuild"]:
+            # The news goes on the wire first; unsold stories it pushes off
+            # go back to the top of the supply.
+            self.rng.shuffle(fresh)
+            self.deck = self.wire + self.deck
+            self.wire = []
+            self.deck = fresh + self.deck
+            self.refill_wire()
+        elif fresh:
             self.deck.extend(fresh)
             self.rng.shuffle(self.deck)
+
+    def buy(self, wishes):
+        """Sealed buys, resolved poorest paper first (seat breaks a tie):
+        each takes its wished stories still on the wire that it can afford,
+        up to max_buys. A bought story goes to the buyer's discard pile."""
+        order = sorted(self.players, key=lambda p: (p.money, self.rng.random()))
+        for p in order:
+            got = 0
+            for key in wishes.get(p.seat, []):
+                if got >= self.cfg["max_buys"]:
+                    break
+                if key in self.wire and p.money >= self.price(key):
+                    self.wire.remove(key)
+                    p.money -= self.price(key)
+                    p.spent_buying += self.price(key)
+                    p.discard.append(key)
+                    p.bought += 1
+                    got += 1
+        self.refill_wire()
 
     def break_union(self):
         """The Union breaks: the game ends, the most exposed paper (most
@@ -629,6 +712,58 @@ def sniper(game, p):
     return [(k, mode, side)], None
 
 
+# =====================================================================
+# Buy policies (deckbuild): f(game, player, plays) -> wished wire stories,
+# best first. Named after a slash: "hard/steady". Decided at commit time,
+# blind, like the plays; affordability is checked when buys resolve.
+# =====================================================================
+
+def reach(key):
+    return max(abs(CARDS[key]["positive"]), abs(CARDS[key]["negative"]))
+
+
+def make_buyer(rank, min_left=4, floor=4, deck_cap=None):
+    """Wish for wire stories (ranked by `rank`) while at least `min_left`
+    elections remain and the paper would keep `floor` money after buying
+    (counting what this round's burials will pay). Stops once the paper
+    owns `deck_cap` stories."""
+    def buyer(game, p, plays):
+        if game.cfg["total_spaces"] - game.space < min_left:
+            return []
+        owned = len(p.hand) + len(p.deck) + len(p.discard)
+        if deck_cap is not None and owned >= deck_cap:
+            return []
+        income = sum(CARDS[k]["profit"] * (game.cfg["patron_multiplier"] if p.patron else 1)
+                     for k, m, _ in plays if m == "profit")
+        cash = p.money + income - floor
+        return [k for k in sorted(game.wire, key=rank) if game.price(k) <= cash]
+    return buyer
+
+
+BUYERS = {
+    "none": lambda game, p, plays: [],
+    # the most push per dollar: a paper buying influence
+    "steady": make_buyer(lambda k: (-reach(k) / max(1, CARDS[k]["profit"]), CARDS[k]["profit"])),
+    # the dearest stories: a paper buying things to bury as Patron
+    "rich": make_buyer(lambda k: -CARDS[k]["profit"]),
+    # the dearest story that also pushes
+    "rich_ev": make_buyer(lambda k: (reach(k) == 0, -CARDS[k]["profit"])),
+    # the cheapest story, whatever it is
+    "cheap": make_buyer(lambda k: (CARDS[k]["profit"], -reach(k))),
+    # buys push per dollar every round it can, down to 1 money, until 2 are left
+    "greedy": make_buyer(lambda k: (-reach(k) / max(1, CARDS[k]["profit"]), CARDS[k]["profit"]),
+                         min_left=2, floor=1),
+    # buys only while its deck is thin
+    "thin": make_buyer(lambda k: (-reach(k) / max(1, CARDS[k]["profit"]), CARDS[k]["profit"]),
+                       deck_cap=8),
+}
+
+
+# What each strategy buys when no "/policy" is named. The server's bots:
+# easy = bot/steady, hard = hard/rich_ev (engine_bot_buys).
+DEFAULT_BUY = {"hard": "rich_ev", "hoarder": "none", "casher": "none", "spoiler": "none"}
+
+
 STRATEGIES = {
     "hoarder": strat_hoarder,
     "casher": strat_casher,
@@ -752,17 +887,61 @@ def sweep(games, seed):
     print()
 
 
+def newsroom(games, seed):
+    """The deck-builder: does buying pay, is any one way of buying dominant,
+    and how does it compare with main's shared deck?"""
+    print("=" * 76)
+    print("NEWSROOM (deck-builder), %d games per line" % games)
+    print("=" * 76)
+    a = run_matchup(["hard/rich_ev", "hard/none"], games, None, seed)
+    b = run_matchup(["bot/steady", "bot/none"], games, None, seed)
+    print("  a paper that buys beats one that never does:   hard %s   easy %s"
+          % (pct(a["wins"][0] / games), pct(b["wins"][0] / games)))
+    policies = ["steady", "rich", "rich_ev", "cheap", "greedy"]
+    for n in (2, 3, 4, 5):
+        row = []
+        for pol in policies:
+            won = 0
+            for rot in range(n):
+                seats = ["hard/steady"] * n
+                seats[rot] = "hard/" + pol
+                won += run_matchup(seats, games // n, None, seed + rot)["wins"][rot]
+            row.append("%s %s" % (pol, pct(won / (games // n * n))))
+        print("  one buyer among %d hard/steady (fair %s): %s" % (n, pct(1 / n), "  ".join(row)))
+    print()
+    print("  %-26s %12s %12s" % ("", "shared deck", "newsroom"))
+    for label, seats in (("hard vs easy bot", ["hard", "bot"]),
+                         ("human line vs hard bot", ["sniper", "hard"]),
+                         ("casher vs 2 easy bots", ["casher", "bot", "bot"])):
+        s_ = run_matchup(seats, games, SHARED, seed)
+        d_ = run_matchup(seats, games, None, seed)
+        print("  %-26s %12s %12s" % (label, pct(s_["wins"][0] / games), pct(d_["wins"][0] / games)))
+    for n in (2, 3, 4, 5):
+        s_ = run_matchup(["hard"] * n, games, SHARED, seed)
+        d_ = run_matchup(["hard"] * n, games, None, seed)
+        top = lambda r: statistics.mean(max(m) for m in zip(*r["money"]))
+        print("  %d hard bots: Union broke   %12s %12s   winning money %5.0f / %5.0f"
+              % (n, pct(s_["broke"] / games), pct(d_["broke"] / games), top(s_), top(d_)))
+    print()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--games", type=int, default=800)
     ap.add_argument("--seed", type=int, default=20260927)
     ap.add_argument("--sweep", action="store_true")
+    ap.add_argument("--newsroom", action="store_true", help="the deck-builder report")
+    ap.add_argument("--shared", action="store_true", help="main's rules: one shared deck")
     args = ap.parse_args()
+    if args.shared:
+        DEFAULTS.update(SHARED)
     print()
     print("Parsed %d cards (%d in the opening deck, %d profit-only) and %d races from backend/game_data.php"
           % (len(CARDS), len(OPENING), sum(1 for c in CARDS.values() if c["kind"] == "profit"), len(ELECTIONS)))
     print()
-    if args.sweep:
+    if args.newsroom:
+        newsroom(args.games, args.seed)
+    elif args.sweep:
         sweep(args.games, args.seed)
     else:
         standard(args.games, args.seed)
