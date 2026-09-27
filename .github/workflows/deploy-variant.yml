@@ -1,19 +1,18 @@
-name: Build & Deploy to GreenGeeks (SSH)
+name: Build & Deploy the VARIANT (SSH)
 
-# Push-triggered runs are unreliable on this host, so the real deploy path
-# is always manual:
-#     gh workflow run deploy.yml
+# Publishes the `variant` branch -- an experimental copy of the game -- to
+# its own subdomain, with its own database. It never touches the live game.
+#     gh workflow run deploy-variant.yml --ref variant
 #     gh run watch
-# then confirm the run headSha matches HEAD before believing anything is live.
 on:
   push:
-    branches: [ main ]
+    branches: [ variant ]
   workflow_dispatch:
 
 env:
   # The subdomain this install serves. Used for the rsync target path and
   # the post-deploy OPcache flush. Change in ONE place.
-  SUBDOMAIN: voting.thehistorians.org
+  SUBDOMAIN: variant.thehistorians.org
   # The OPcache flush token is the OPCACHE_TOKEN Actions secret. Never put
   # it here: this repository is public.
 
@@ -21,11 +20,9 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      # Only main is the real game. A dispatch with --ref variant (or any
-      # other branch) must never overwrite the live site.
-      - name: Refuse anything but main
+      - name: Refuse anything but the variant branch
         run: |
-          test "$GITHUB_REF" = "refs/heads/main" || { echo "deploy.yml publishes main only (got $GITHUB_REF)"; exit 1; }
+          test "$GITHUB_REF" = "refs/heads/variant" || { echo "deploy-variant.yml publishes variant only (got $GITHUB_REF)"; exit 1; }
 
       - name: Checkout
         uses: actions/checkout@v4
