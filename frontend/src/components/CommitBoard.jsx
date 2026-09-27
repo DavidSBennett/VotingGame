@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import Clipping from './Clipping.jsx';
 
 /**
- * The commitment board: three drop zones -- the States candidate, Cash in,
- * the Nation candidate -- and your hand below them.
+ * The table: three drop zones -- the States candidate, Cash in, the Nation
+ * candidate -- above your desk of clippings.
  *
- * Drag a card (or tap it, then tap a zone) to commit it:
+ * Drag a clipping (or tap it, then tap a zone) to commit it:
  *
  *   Cash in       played for PROFIT (doubled if you are the Patron)
  *   a candidate   played for the coverage stat that pushes toward that
@@ -12,13 +13,12 @@ import { useEffect, useMemo, useState } from 'react';
  *                 and negative push opposite ways, so at most one fits
  *                 each candidate; a card with nothing for him is refused.
  *
- * Nothing is sent until you press Commit, and nobody sees it until every
- * paper has committed. The server re-checks every rule; this only adds up
- * your own choices so you can see what you are about to do.
+ * Nothing is sent until you press Commit (or Pass), and nobody sees it
+ * until every paper has committed. The server re-checks every rule; this
+ * only adds up your own choices.
  */
 const SIDES = ['states', 'nation'];
 const pushText = (p) => (p > 0 ? `Nation +${p}` : p < 0 ? `States +${-p}` : '—');
-const pushShort = (p) => (p > 0 ? `N+${p}` : `S+${-p}`);
 const want = (side) => (side === 'nation' ? 1 : -1);
 
 /** The coverage mode a card uses for a side, or null if it has none. */
@@ -26,6 +26,12 @@ function modeFor(card, side) {
   if (card.positive * want(side) > 0) return 'positive';
   if (card.negative * want(side) > 0) return 'negative';
   return null;
+}
+
+function effectOf(card, zone) {
+  if (zone === 'cash') return { mode: 'profit', money: card.profit_value };
+  const mode = modeFor(card, zone);
+  return { mode, push: card[mode], stability: card.stability };
 }
 
 export default function CommitBoard({ hand, race, commit, busy, onCommit, rules, stability, seats = [] }) {
@@ -40,7 +46,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
   const cards = hand || [];
   const byKey = useMemo(() => Object.fromEntries(cards.map((c) => [c.key, c])), [cards]);
 
-  // A new round, or a commitment arriving from the server, resets the board.
+  // A new round, or a commitment arriving from the server, resets the table.
   const handKey = cards.map((c) => c.key).join(',');
   useEffect(() => {
     const next = {};
@@ -62,31 +68,28 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
   const negativesPlaced = (except) =>
     cards.filter((c) => c.key !== except && SIDES.includes(place[c.key]) && modeFor(c, place[c.key]) === 'negative').length;
 
-  /** Why a card cannot go to a zone, or null if it can. */
   const refusal = (card, zone) => {
     if (zone === 'cash' || zone === 'hand') return null;
     const mode = modeFor(card, zone);
     if (!mode) return `${card.name} has no coverage that helps ${race ? race[zone].name : zone}.`;
     if (mode === 'negative' && negativesPlaced(card.key) >= rules.max_negative) {
-      return `Only ${rules.max_negative} card a round can run negative coverage.`;
+      return `Only ${rules.max_negative} card a round can run hostile coverage.`;
     }
     return null;
   };
 
   const drop = (key, zone) => {
     if (locked || !byKey[key]) return;
+    // The dropped clipping is remounted in its new zone, so its dragend
+    // never fires: always clear the drag state here.
+    setDragging(null);
+    setOver(null);
     const why = refusal(byKey[key], zone);
     if (why) {
       setNotice(why);
-      setDragging(null);
-      setOver(null);
       return;
     }
     setNotice(null);
-    // The dropped card is remounted in its new zone, so its dragend never
-    // fires; clear the drag state here as well.
-    setDragging(null);
-    setOver(null);
     setPlace((prev) => {
       const next = { ...prev };
       if (zone === 'hand') delete next[key];
@@ -105,7 +108,6 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
     onDragLeave: () => setOver((o) => (o === zone ? null : o)),
     onDrop: (e) => {
       e.preventDefault();
-      setOver(null);
       drop(e.dataTransfer.getData('text/plain'), zone);
     },
     onClick: () => {
@@ -130,7 +132,6 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
     },
   });
 
-  // The totals of what is on the board.
   const summary = useMemo(() => {
     let money = 0;
     let push = 0;
@@ -141,9 +142,8 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
       if (z === 'cash') money += c.profit_value;
       if (SIDES.includes(z)) {
         const mode = modeFor(c, z);
-        const p = c[mode];
-        push += p;
-        influence[z] += Math.abs(p);
+        push += c[mode];
+        influence[z] += Math.abs(c[mode]);
         if (mode === 'negative') cost += c.stability;
       }
     });
@@ -159,326 +159,236 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
   const rivalTop = Math.max(0, ...seats.filter((p) => !p.is_you).map((p) => p.exposure));
   const wouldLead = negatives > 0 && myExposure >= rivalTop;
   const danger = summary.cost > 0 && stability - summary.cost <= 3;
+  const holding = dragging || selected;
 
   const submit = () => {
     const plays = committed.map((c) => {
       const z = place[c.key];
-      return z === 'cash'
-        ? { card: c.key, action: 'profit' }
-        : { card: c.key, action: modeFor(c, z), side: z };
+      return z === 'cash' ? { card: c.key, action: 'profit' } : { card: c.key, action: modeFor(c, z), side: z };
     });
     onCommit({ plays, reserve: effectiveReserve || undefined });
   };
 
-  // ---- pieces ------------------------------------------------------------
+  // ---- pieces (render functions, not components: see Clipping) ----------
 
-  const renderCard = (c, zone) => {
-    const mode = SIDES.includes(zone) ? modeFor(c, zone) : null;
-    const lift = dragging === c.key || selected === c.key;
-    return (
-      <div
-        key={c.key}
+  const placedCard = (c, zone) => (
+    <div key={c.key} className="animate-rise">
+      <Clipping
+        card={c}
+        size="sm"
+        effect={effectOf(c, zone)}
+        lifted={holding === c.key}
         {...cardHandlers(c.key)}
-        title={c.flavor}
-        className={
-          lift
-            ? 'cursor-grab rounded border border-amber-400 bg-slate-900 p-2 text-left shadow-lg ring-2 ring-amber-400'
-            : locked
-              ? 'rounded border border-slate-700 bg-slate-900 p-2 text-left'
-              : 'cursor-grab rounded border border-slate-600 bg-slate-900 p-2 text-left hover:border-slate-400'
-        }
-      >
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-sm font-medium leading-tight text-slate-100">{c.name}</span>
-          <span className="font-mono text-xs text-slate-500">{c.year}</span>
-        </div>
-
-        {zone === 'cash' ? (
-          <div className="mt-1 font-mono text-xs text-emerald-400">
-            profit +{c.profit_value}
-            {c.profit_value !== c.profit && ' (Patron ×2)'}
-          </div>
-        ) : mode ? (
-          <div className={mode === 'negative' ? 'mt-1 font-mono text-xs text-red-300' : 'mt-1 font-mono text-xs text-slate-200'}>
-            {mode} {pushText(c[mode])} · influence {Math.abs(c[mode])}
-            {mode === 'negative' && ` · union −${c.stability}`}
-          </div>
-        ) : (
-          <div className="mt-1 flex flex-wrap gap-1 font-mono text-xs">
-            <span className="whitespace-nowrap rounded bg-emerald-950 px-1 text-emerald-300" title="Profit">
-              ${c.profit}
-              {c.profit_value !== c.profit && `→${c.profit_value}`}
-            </span>
-            {c.kind === 'profit' ? (
-              <span className="whitespace-nowrap px-1 text-slate-500">profit card</span>
-            ) : (
-              <>
-                {c.positive !== 0 && (
-                  <span
-                    className={
-                      c.positive > 0
-                        ? 'whitespace-nowrap rounded bg-sky-950 px-1 text-sky-300'
-                        : 'whitespace-nowrap rounded bg-rose-950 px-1 text-rose-300'
-                    }
-                    title="Positive coverage"
-                  >
-                    + {pushShort(c.positive)}
-                  </span>
-                )}
-                {c.negative !== 0 && (
-                  <span
-                    className={
-                      c.negative > 0
-                        ? 'whitespace-nowrap rounded bg-sky-950 px-1 text-sky-300'
-                        : 'whitespace-nowrap rounded bg-rose-950 px-1 text-rose-300'
-                    }
-                    title={`Negative coverage: costs the Union ${c.stability}`}
-                  >
-                    − {pushShort(c.negative)}
-                    <span className="text-red-400"> ☠{c.stability}</span>
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {zone && !locked && (
-          <div className="mt-1 flex items-center justify-between gap-2 text-xs">
-            {SIDES.includes(zone) ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setReserve(c.key);
-                }}
-                className={effectiveReserve === c.key ? 'text-amber-300' : 'text-slate-500 hover:text-amber-300'}
-                title="Reserve: back to your hand unless you become Patron"
-              >
-                {effectiveReserve === c.key ? '★ reserved' : '☆ reserve'}
-              </button>
-            ) : (
-              <span />
-            )}
+        style={{ cursor: locked ? 'default' : 'grab' }}
+      />
+      {(!locked || (SIDES.includes(zone) && effectiveReserve === c.key)) && (
+        <div className="mt-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.15em]">
+          {SIDES.includes(zone) ? (
+            <button
+              type="button"
+              disabled={locked}
+              onClick={(e) => {
+                e.stopPropagation();
+                setReserve(c.key);
+              }}
+              className={effectiveReserve === c.key ? 'text-gold-300' : 'text-cream-200/50 hover:text-gold-300'}
+              title="Reserve: back to your desk unless you become Patron"
+            >
+              {effectiveReserve === c.key ? '★ Reserved' : '☆ Reserve'}
+            </button>
+          ) : (
+            <span />
+          )}
+          {!locked && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 drop(c.key, 'hand');
               }}
-              className="text-slate-500 hover:text-slate-200"
+              className="text-cream-200/50 hover:text-cream-50"
             >
-              ↩ back to hand
+              ↩ Desk
             </button>
-          </div>
-        )}
-        {zone && locked && SIDES.includes(zone) && effectiveReserve === c.key && (
-          <div className="mt-1 text-xs text-amber-300">★ reserved</div>
-        )}
-      </div>
-    );
-  };
+          )}
+        </div>
+      )}
+    </div>
+  );
 
-  /** What the card being dragged or selected would do in a zone. */
-  const hint = (zone) => {
-    const key = dragging || selected;
-    if (!key || !byKey[key] || locked) return null;
-    const c = byKey[key];
-    const why = refusal(c, zone);
-    if (why) return <span className="text-slate-500">won&rsquo;t fit here</span>;
-    if (zone === 'cash') return <span className="text-emerald-300">drop: profit +{c.profit_value}</span>;
+  const preview = (zone) => {
+    if (!holding || !byKey[holding] || locked) return null;
+    const c = byKey[holding];
+    if (refusal(c, zone)) return <span className="text-cream-200/40">won&rsquo;t fit</span>;
+    if (zone === 'cash') return <span className="text-gold-300">sell for ${c.profit_value}</span>;
     const mode = modeFor(c, zone);
     return (
-      <span className={mode === 'negative' ? 'text-red-300' : 'text-slate-200'}>
-        drop: {mode} {pushText(c[mode])}
-        {mode === 'negative' && `, union −${c.stability}`}
+      <span className={mode === 'negative' ? 'text-oxblood-300' : 'text-cream-50'}>
+        {mode === 'negative' ? 'hostile' : 'favourable'} {pushText(c[mode])}
+        {mode === 'negative' && ` · union −${c.stability}`}
       </span>
     );
   };
 
-  const zoneClass = (zone, tone) => {
+  const zoneShell = (zone) => {
     const hot = over === zone;
-    const base = 'flex min-h-[11rem] flex-col rounded-lg border-2 p-3 transition-colors';
-    if (tone === 'states') {
-      return hot ? `${base} border-rose-400 bg-rose-950` : `${base} border-dashed border-rose-900 bg-slate-900`;
+    const target = holding && !locked && byKey[holding] && !refusal(byKey[holding], zone);
+    const base = 'relative flex min-h-[15rem] flex-col border p-3 transition duration-200';
+    if (zone === 'states') {
+      return hot
+        ? `${base} border-oxblood-300 bg-oxblood-900/70 shadow-glow`
+        : target
+          ? `${base} border-oxblood-500 bg-oxblood-900/40`
+          : `${base} border-oxblood-700/60 bg-oxblood-900/25`;
     }
-    if (tone === 'nation') {
-      return hot ? `${base} border-sky-400 bg-sky-950` : `${base} border-dashed border-sky-900 bg-slate-900`;
+    if (zone === 'nation') {
+      return hot
+        ? `${base} border-federal-300 bg-federal-900/80 shadow-glow`
+        : target
+          ? `${base} border-federal-500 bg-federal-900/50`
+          : `${base} border-federal-700/60 bg-federal-900/30`;
     }
-    return hot ? `${base} border-emerald-400 bg-emerald-950` : `${base} border-dashed border-emerald-900 bg-slate-900`;
+    return hot
+      ? `${base} border-gold-300 bg-wood-800/70 shadow-glow`
+      : target
+        ? `${base} border-gold-400 bg-wood-900/60`
+        : `${base} border-gold-500/40 bg-wood-950/40`;
   };
 
-  const renderCandidateZone = (side) => {
+  const candidateZone = (side) => {
     const c = race ? race[side] : null;
+    const placed = inZone(side);
     return (
-      <div key={side} {...zoneHandlers(side)} className={zoneClass(side, side)}>
-        <div className="flex items-baseline justify-between gap-2">
-          <span className={side === 'nation' ? 'font-medium text-sky-200' : 'font-medium text-rose-200'}>
-            {c ? c.name : side}
+      <div key={side} {...zoneHandlers(side)} className={zoneShell(side)}>
+        <div className="text-center">
+          <div className={side === 'nation' ? 'label text-federal-300' : 'label text-oxblood-300'}>
+            {side === 'nation' ? 'Nation · federal power' : 'States · states’ rights'}
+          </div>
+          <div className="mt-1 font-display text-2xl font-semibold leading-tight text-cream-50">{c ? c.name : side}</div>
+          {c && <div className="font-serif text-xs italic text-cream-200/70">{c.party}</div>}
+        </div>
+        <div className="divider" />
+        <div className="mb-2 flex items-baseline justify-between font-mono text-[10px] uppercase tracking-[0.15em]">
+          <span className="text-cream-200/60">
+            {summary.influence[side] > 0 ? `your influence ${summary.influence[side]}` : 'coverage'}
           </span>
-          <span className={side === 'nation' ? 'text-xs text-sky-400' : 'text-xs text-rose-400'}>
-            {side === 'nation' ? 'Nation' : 'States'}
-          </span>
+          <span>{preview(side)}</span>
         </div>
-        {c && <div className="text-xs text-slate-500">{c.party}</div>}
-        <div className="mt-1 text-xs">
-          {summary.influence[side] > 0 ? (
-            <span className="text-slate-300">your influence {summary.influence[side]}</span>
-          ) : (
-            <span className="text-slate-600">drop coverage here</span>
-          )}
-          <span className="ml-2">{hint(side)}</span>
-        </div>
-        <div className="mt-2 space-y-2">
-          {inZone(side).map((card) => renderCard(card, side))}
-        </div>
+        {placed.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center border border-dashed border-cream-200/15 font-serif text-sm italic text-cream-200/35">
+            {locked ? '—' : 'Drop coverage here'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
+            {placed.map((card) => placedCard(card, side))}
+          </div>
+        )}
       </div>
     );
   };
 
   // ---- render ------------------------------------------------------------
 
-  if (cards.length === 0) {
-    return (
-      <section className="rounded-lg border border-slate-700 bg-slate-800 p-4">
-        <p className="text-sm text-slate-500">No cards in hand.</p>
-        {!commit && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onCommit({ plays: [] })}
-            className="mt-3 rounded bg-amber-600 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-500 disabled:opacity-40"
-          >
-            Pass this round
-          </button>
-        )}
-      </section>
-    );
-  }
-
   return (
-    <section className="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xs uppercase tracking-widest text-slate-400">Your commitment</h2>
-        <span className="text-xs text-slate-500">
-          {locked
-            ? commit.plays.length === 0
-              ? 'You passed — waiting for the others'
-              : 'Committed — sealed until everyone is in'
-            : 'Drag cards (or tap a card, then a zone), or pass. Sealed until everyone is in.'}
-        </span>
-      </div>
-
+    <section className="animate-fade">
       <div className="grid gap-3 md:grid-cols-3">
-        {renderCandidateZone('states')}
-        <div {...zoneHandlers('cash')} className={zoneClass('cash', 'cash')}>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="font-medium text-emerald-200">Cash in</span>
-            <span className="text-xs text-emerald-400">profit</span>
+        {candidateZone('states')}
+
+        <div {...zoneHandlers('cash')} className={zoneShell('cash')}>
+          <div className="text-center">
+            <div className="label">The counting house</div>
+            <div className="mt-1 font-display text-2xl font-semibold leading-tight text-cream-50">Cash in</div>
+            <div className="font-serif text-xs italic text-cream-200/70">
+              {me && me.is_patron ? 'You are Patron — profit pays double' : 'Money is the only score'}
+            </div>
           </div>
-          <div className="text-xs text-slate-500">
-            {me && me.is_patron ? 'You are Patron: profit pays double' : 'Money is the only score'}
+          <div className="divider" />
+          <div className="mb-2 flex items-baseline justify-between font-mono text-[10px] uppercase tracking-[0.15em]">
+            <span className="text-cream-200/60">{summary.money > 0 ? `profit $${summary.money}` : 'profit'}</span>
+            <span>{preview('cash')}</span>
           </div>
-          <div className="mt-1 text-xs">
-            {summary.money > 0 ? (
-              <span className="text-emerald-300">+{summary.money}</span>
-            ) : (
-              <span className="text-slate-600">drop cards to sell here</span>
-            )}
-            <span className="ml-2">{hint('cash')}</span>
-          </div>
-          <div className="mt-2 space-y-2">
-            {inZone('cash').map((card) => renderCard(card, 'cash'))}
-          </div>
+          {inZone('cash').length === 0 ? (
+            <div className="flex flex-1 items-center justify-center border border-dashed border-cream-200/15 font-serif text-sm italic text-cream-200/35">
+              {locked ? '—' : 'Sell clippings here'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
+              {inZone('cash').map((card) => placedCard(card, 'cash'))}
+            </div>
+          )}
         </div>
-        {renderCandidateZone('nation')}
+
+        {candidateZone('nation')}
       </div>
 
-      {notice && <p className="mt-2 text-sm text-amber-300">{notice}</p>}
+      {notice && (
+        <p className="mt-3 border-l-2 border-oxblood-500 bg-oxblood-900/40 px-3 py-1.5 font-serif text-sm italic text-cream-100">
+          {notice}
+        </p>
+      )}
 
+      {/* The desk */}
       <div
         {...zoneHandlers('hand')}
         className={
           over === 'hand'
-            ? 'mt-4 rounded-lg border-2 border-slate-400 bg-slate-900 p-3'
-            : 'mt-4 rounded-lg border-2 border-dashed border-slate-700 bg-slate-900 p-3'
+            ? 'mt-4 border border-gold-300 bg-gradient-to-b from-wood-800 to-wood-900 p-4 shadow-glow transition'
+            : 'mt-4 border border-wood-700 bg-gradient-to-b from-wood-800 to-wood-950 p-4 transition'
         }
       >
-        <div className="mb-2 text-xs uppercase tracking-widest text-slate-500">
-          Your hand · {loose.length} kept
-        </div>
-        {loose.length === 0 ? (
-          <p className="text-xs text-slate-600">Every card is committed. Drag one back here to keep it.</p>
+        <div className="section-title mb-3">Your desk · {loose.length}</div>
+        {cards.length === 0 ? (
+          <p className="text-center font-serif text-sm italic text-cream-200/50">Your desk is empty.</p>
+        ) : loose.length === 0 ? (
+          <p className="text-center font-serif text-sm italic text-cream-200/50">
+            Every clipping is on the table. Drag one back here to keep it.
+          </p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {loose.map((card) => renderCard(card, null))}
+          <div className="flex gap-3 overflow-x-auto pb-2 pt-1">
+            {loose.map((card) => (
+              <Clipping
+                key={card.key}
+                card={card}
+                lifted={holding === card.key}
+                dim={locked}
+                {...cardHandlers(card.key)}
+                style={{ cursor: locked ? 'default' : 'grab' }}
+              />
+            ))}
           </div>
+        )}
+        {!locked && cards.length > 0 && (
+          <p className="mt-2 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-cream-200/40">
+            Drag a clipping to a candidate or the counting house — or tap it, then tap where it goes
+          </p>
         )}
       </div>
 
-      <div className="mt-4 rounded border border-slate-700 bg-slate-900 p-3 text-sm text-slate-300">
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          <span>
-            Committing <span className="font-mono text-slate-100">{committed.length}</span>, keeping{' '}
-            <span className="font-mono text-slate-100">{loose.length}</span>
+      {/* The commitment line */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-gold-500/40 bg-ink-900/90 px-4 py-3">
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 font-mono text-[11px] uppercase tracking-[0.12em]">
+          <span className="text-cream-200/70">
+            committing <span className="text-cream-50">{committed.length}</span> · keeping{' '}
+            <span className="text-cream-50">{loose.length}</span>
           </span>
-          <span className="text-emerald-400">profit +{summary.money}</span>
-          <span className="text-slate-400">your push {pushText(summary.push)}</span>
-          {summary.cost > 0 && <span className={danger ? 'text-red-400' : 'text-amber-400'}>union −{summary.cost}</span>}
-          {negatives > 0 && <span className={wouldLead ? 'text-red-400' : 'text-slate-400'}>exposure → {myExposure}</span>}
+          <span className="text-gold-300">profit ${summary.money}</span>
+          <span className="text-cream-200/70">push {pushText(summary.push)}</span>
+          {summary.cost > 0 && <span className={danger ? 'text-oxblood-300' : 'text-gold-400'}>union −{summary.cost}</span>}
+          {negatives > 0 && <span className={wouldLead ? 'text-oxblood-300' : 'text-cream-200/70'}>exposure → {myExposure}</span>}
         </div>
-        {wouldLead && (
-          <p className="mt-1 text-xs text-red-400">
-            This makes you {myExposure > rivalTop ? 'the most exposed paper' : 'joint most exposed'}. If the Union
-            breaks, you lose {rules.exposure_penalty}.
-          </p>
-        )}
-        {danger && (
-          <p className="mt-1 text-xs text-red-400">
-            Stability is {stability}. If the table spends it all, the Union breaks and the game ends.
-          </p>
-        )}
-        {committed.length === 0 && !locked && (
-          <p className="mt-1 text-xs text-slate-500">
-            Nothing on the board: you can pass. You still draw {rules.draw_per_round} at the end of the round.
-          </p>
-        )}
-        {covered.length > 0 && !effectiveReserve && !locked && (
-          <p className="mt-1 text-xs text-slate-500">
-            No reserve starred: your most profitable coverage card will be kept.
-          </p>
-        )}
-        <div className="mt-3 flex flex-wrap gap-2">
+
+        <div className="flex items-center gap-2">
           {locked ? (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="rounded border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:border-amber-500"
-            >
-              Change my commitment
-            </button>
+            <>
+              <span className="font-serif text-sm italic text-cream-200/70">
+                {commit.plays.length === 0 ? 'You passed. Waiting for the others…' : 'Sealed. Waiting for the others…'}
+              </span>
+              <button type="button" onClick={() => setEditing(true)} className="btn">
+                Change
+              </button>
+            </>
           ) : (
             <>
-              {committed.length > 0 ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={submit}
-                  className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-500 disabled:opacity-40"
-                >
-                  Commit {committed.length} {committed.length === 1 ? 'card' : 'cards'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={submit}
-                  className="rounded border border-slate-500 px-4 py-2 text-sm font-medium text-slate-200 hover:border-amber-500 disabled:opacity-40"
-                  title="Commit nothing this round. You still draw at the end of it."
-                >
-                  Pass this round
-                </button>
-              )}
               {committed.length > 0 && (
                 <button
                   type="button"
@@ -487,14 +397,43 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
                     setReserve(null);
                     setNotice(null);
                   }}
-                  className="rounded px-3 py-2 text-sm text-slate-400 hover:text-slate-200"
+                  className="btn"
                 >
-                  Clear the board
+                  Clear
                 </button>
               )}
+              <button type="button" disabled={busy} onClick={submit} className="btn-solid">
+                {committed.length > 0
+                  ? `Commit ${committed.length} ${committed.length === 1 ? 'clipping' : 'clippings'}`
+                  : 'Pass this round'}
+              </button>
             </>
           )}
         </div>
+
+        {(wouldLead || danger || (covered.length > 0 && !effectiveReserve && !locked) || (committed.length === 0 && !locked)) && (
+          <div className="w-full space-y-0.5 font-serif text-xs italic">
+            {wouldLead && (
+              <p className="text-oxblood-300">
+                This makes you {myExposure > rivalTop ? 'the most exposed paper' : 'joint most exposed'}. If the Union
+                breaks, you lose {rules.exposure_penalty}.
+              </p>
+            )}
+            {danger && (
+              <p className="text-oxblood-300">
+                The Union stands at {stability}. If the table spends it all, the Union breaks and the game ends.
+              </p>
+            )}
+            {covered.length > 0 && !effectiveReserve && !locked && (
+              <p className="text-cream-200/50">No reserve starred: your most profitable coverage will be kept.</p>
+            )}
+            {committed.length === 0 && !locked && (
+              <p className="text-cream-200/50">
+                Nothing on the table: you may pass. You still draw {rules.draw_per_round} at the round&rsquo;s end.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

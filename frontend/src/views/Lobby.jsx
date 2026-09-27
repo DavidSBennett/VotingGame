@@ -4,20 +4,27 @@ import HighScores from '../components/HighScores.jsx';
 import Rules from '../components/Rules.jsx';
 
 /**
- * Lobby: name yourself, then open a table or take a seat at one.
+ * The lobby, laid out as a title page: kicker, masthead, an italic line of
+ * premise, then the business of the day -- open a table, take a seat, read
+ * the rules, see the circulation board.
  *
  * A table has a 4-character join code so a player at the same table can
  * join from their own phone without being sent a link.
  */
 export default function Lobby({ onSeated }) {
-  const [playerName, setPlayerName] = useState(
-    () => localStorage.getItem('votinggame.name') || ''
-  );
+  const [playerName, setPlayerName] = useState(() => {
+    try {
+      return localStorage.getItem('votinggame.name') || '';
+    } catch {
+      return '';
+    }
+  });
   const [joinCode, setJoinCode] = useState('');
   const [rivals, setRivals] = useState(1);
   const [games, setGames] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [showRules, setShowRules] = useState(false);
 
   const refreshGames = async () => {
     try {
@@ -45,29 +52,27 @@ export default function Lobby({ onSeated }) {
 
   const guard = () => {
     if (!playerName.trim()) {
-      setError('Enter a name first.');
+      setError('Sign your name first — every paper needs an editor.');
       return false;
     }
     return true;
   };
+
+  const seated = (data) =>
+    onSeated({
+      game_id: data.game_id,
+      join_code: data.join_code,
+      player_token: data.player_token,
+      seat: data.seat,
+      player_name: playerName.trim(),
+    });
 
   const doCreate = async () => {
     if (!guard()) return;
     setBusy(true);
     setError(null);
     try {
-      const data = await createGame({
-        player_name: playerName.trim(),
-        max_players: 1,
-        bots: rivals,
-      });
-      onSeated({
-        game_id: data.game_id,
-        join_code: data.join_code,
-        player_token: data.player_token,
-        seat: data.seat,
-        player_name: playerName.trim(),
-      });
+      seated(await createGame({ player_name: playerName.trim(), max_players: 1, bots: rivals }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -80,17 +85,7 @@ export default function Lobby({ onSeated }) {
     setBusy(true);
     setError(null);
     try {
-      const data = await joinGame({
-        player_name: playerName.trim(),
-        join_code: code.trim().toUpperCase(),
-      });
-      onSeated({
-        game_id: data.game_id,
-        join_code: data.join_code,
-        player_token: data.player_token,
-        seat: data.seat,
-        player_name: playerName.trim(),
-      });
+      seated(await joinGame({ player_name: playerName.trim(), join_code: code.trim().toUpperCase() }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -98,137 +93,138 @@ export default function Lobby({ onSeated }) {
     }
   };
 
+  const openTables = games.filter((g) => g.joinable);
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-100">
-          The Fourth Estate
-        </h1>
-        <p className="mt-1 text-sm text-slate-400">
-          You are a partisan press, 1796 to 1860. Print the stories, back the candidates,
-          and collect when they win. Fourteen elections; the richest paper wins.
+    <div className="mx-auto max-w-5xl px-4 pb-16 pt-10">
+      {/* Title page */}
+      <header className="text-center animate-fade">
+        <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-gold-500">
+          A card game of the partisan press · 1796–1860
+        </div>
+        <h1 className="mt-3 font-display text-6xl font-bold leading-none text-cream-50 sm:text-7xl">The Fourth Estate</h1>
+        <p className="mx-auto mt-4 max-w-2xl font-display text-xl italic text-gold-300">
+          Print the stories, make the presidents, and sell the papers. Fourteen elections; the richest press wins.
         </p>
+        <div className="mx-auto mt-6 flex max-w-xs items-center gap-3">
+          <span className="h-px flex-1 bg-gold-500/50" />
+          <span className="text-xs text-gold-500">◆</span>
+          <span className="h-px flex-1 bg-gold-500/50" />
+        </div>
       </header>
 
       {error && (
-        <div className="mb-4 rounded border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+        <div className="mx-auto mt-6 max-w-xl border-l-2 border-oxblood-500 bg-oxblood-900/50 px-4 py-2 font-serif italic text-cream-100">
           {error}
         </div>
       )}
 
-      <section className="mb-8 rounded-lg border border-slate-700 bg-slate-800 p-5 shadow-panel">
-        <label className="block text-xs uppercase tracking-wide text-slate-400" htmlFor="name">
-          Your name
-        </label>
-        <input
-          id="name"
-          value={playerName}
-          onChange={(e) => rememberName(e.target.value)}
-          maxLength={40}
-          placeholder="Name at the table"
-          className="mt-1 w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-amber-500"
-        />
+      <div className="mt-10 grid gap-6 md:grid-cols-2">
+        {/* Open a table */}
+        <section className="panel p-6 animate-rise">
+          <div className="label">Solo · against rival papers</div>
+          <h2 className="mt-1 font-display text-3xl font-semibold text-cream-50">Open a table</h2>
 
-        <div className="mt-4">
-          <span className="block text-xs uppercase tracking-wide text-slate-400">
-            Rival papers
-          </span>
-          <div className="mt-1 flex gap-2">
-            {[1, 2, 3, 4].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setRivals(n)}
-                className={
-                  n === rivals
-                    ? 'h-9 w-9 rounded border border-amber-500 bg-amber-600 font-mono text-slate-950'
-                    : 'h-9 w-9 rounded border border-slate-600 bg-slate-900 font-mono text-slate-300 hover:border-amber-500'
-                }
-              >
-                {n}
-              </button>
-            ))}
+          <label className="mt-5 block" htmlFor="name">
+            <span className="label text-cream-200/60">The editor</span>
+            <input
+              id="name"
+              value={playerName}
+              onChange={(e) => rememberName(e.target.value)}
+              maxLength={40}
+              placeholder="Your name, as it will appear on the masthead"
+              className="mt-1 w-full border-b border-gold-500/50 bg-transparent px-0 py-2 font-display text-2xl text-cream-50 outline-none placeholder:font-serif placeholder:text-base placeholder:italic placeholder:text-cream-200/30 focus:border-gold-300"
+            />
+          </label>
+
+          <div className="mt-5">
+            <span className="label text-cream-200/60">Rival papers</span>
+            <div className="mt-2 inline-flex border border-gold-500/50">
+              {[1, 2, 3, 4].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRivals(n)}
+                  className={
+                    n === rivals
+                      ? 'h-9 w-11 bg-cream-100 font-display text-lg font-semibold text-ink-950'
+                      : 'h-9 w-11 font-display text-lg text-cream-200/70 transition hover:text-gold-300'
+                  }
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 font-serif text-sm italic text-cream-200/50">
+              {rivals === 1 ? 'Head to head — the balanced setting.' : `A crowded field of ${rivals + 1} papers.`}
+            </p>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
-            Solo play against computer-run papers. One rival is the balanced setting.
-          </p>
-        </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={doCreate}
-            disabled={busy}
-            className="rounded bg-amber-600 px-4 py-2 font-medium text-slate-950 hover:bg-amber-500 disabled:opacity-50"
-          >
-            Open a table
+          <button type="button" onClick={doCreate} disabled={busy} className="btn-solid mt-6 w-full">
+            Start the presses
           </button>
+        </section>
 
-          <span className="text-slate-500">or</span>
+        {/* Join a table */}
+        <section className="panel flex flex-col p-6 animate-rise">
+          <div className="label">With friends</div>
+          <h2 className="mt-1 font-display text-3xl font-semibold text-cream-50">Take a seat</h2>
 
-          <input
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            maxLength={8}
-            placeholder="CODE"
-            className="w-28 rounded border border-slate-600 bg-slate-900 px-3 py-2 font-mono uppercase tracking-widest text-slate-100 outline-none focus:border-amber-500"
-          />
-          <button
-            type="button"
-            onClick={() => doJoin(joinCode)}
-            disabled={busy || !joinCode.trim()}
-            className="rounded border border-slate-600 px-4 py-2 font-medium text-slate-200 hover:border-amber-500 disabled:opacity-50"
-          >
-            Join
+          <div className="mt-5 flex items-end gap-3">
+            <label className="flex-1" htmlFor="code">
+              <span className="label text-cream-200/60">Table code</span>
+              <input
+                id="code"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                maxLength={8}
+                placeholder="CODE"
+                className="mt-1 w-full border-b border-gold-500/50 bg-transparent px-0 py-2 font-mono text-2xl uppercase tracking-[0.4em] text-cream-50 outline-none placeholder:text-cream-200/20 focus:border-gold-300"
+              />
+            </label>
+            <button type="button" onClick={() => doJoin(joinCode)} disabled={busy || !joinCode.trim()} className="btn">
+              Join
+            </button>
+          </div>
+
+          <div className="mt-6 flex-1">
+            <span className="label text-cream-200/60">Open tables</span>
+            {openTables.length === 0 ? (
+              <p className="mt-2 font-serif text-sm italic text-cream-200/40">No table is waiting for players.</p>
+            ) : (
+              <ul className="mt-2 divide-y divide-gold-500/15">
+                {openTables.map((g) => (
+                  <li key={g.game_id} className="flex items-center justify-between py-2">
+                    <div>
+                      <span className="font-mono tracking-[0.3em] text-gold-300">{g.join_code}</span>
+                      <span className="ml-3 font-serif text-sm text-cream-200/70">
+                        {g.seated}/{g.max_players} · {g.players.join(', ')}
+                      </span>
+                    </div>
+                    <button type="button" onClick={() => doJoin(g.join_code)} disabled={busy} className="btn">
+                      Sit
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <button type="button" onClick={() => setShowRules((v) => !v)} className="btn mt-4 self-start">
+            {showRules ? 'Hide the rules' : 'How to play'}
           </button>
-        </div>
-      </section>
-
-      <div className="mb-8">
-        <Rules open />
+        </section>
       </div>
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold text-slate-100">Tables</h2>
-        {games.length === 0 ? (
-          <p className="text-sm text-slate-500">No tables yet. Open one.</p>
-        ) : (
-          <ul className="space-y-2">
-            {games.map((g) => (
-              <li
-                key={g.game_id}
-                className="flex items-center justify-between rounded border border-slate-700 bg-slate-800 px-4 py-3"
-              >
-                <div>
-                  <span className="font-mono text-lg tracking-widest text-amber-400">
-                    {g.join_code}
-                  </span>
-                  <span className="ml-3 text-sm text-slate-300">
-                    {g.seated}/{g.max_players} seated
-                  </span>
-                  <span className="ml-3 text-xs uppercase tracking-wide text-slate-500">
-                    {g.status}
-                    {g.status === 'active' ? ` · round ${g.round_number}` : ''}
-                  </span>
-                  {g.players.length > 0 && (
-                    <div className="mt-1 text-xs text-slate-400">{g.players.join(', ')}</div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => doJoin(g.join_code)}
-                  disabled={busy || !g.joinable}
-                  className="rounded border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:border-amber-500 disabled:opacity-40"
-                >
-                  {g.joinable ? 'Take a seat' : 'In progress'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {showRules && (
+        <div className="mt-6 animate-rise">
+          <Rules inline />
+        </div>
+      )}
 
-      <HighScores />
+      <div className="mt-12">
+        <HighScores />
+      </div>
     </div>
   );
 }

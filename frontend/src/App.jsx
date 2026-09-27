@@ -24,7 +24,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-full bg-slate-900 text-slate-200">
+    <div className="min-h-full text-cream-100">
       {seat ? (
         <GameShell seat={seat} onLeave={leaveSeat} />
       ) : (

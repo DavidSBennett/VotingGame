@@ -1056,6 +1056,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
                                       'kind' => $c['kind']] : null;
                        }, $state['last_released'] ?? []))),
     'history'       => $state['history'] ?? [],
+    'years'         => array_map(function ($e) { return (int) $e['year']; }, vg_elections()),
     'deck_count'    => count($state['deck'] ?? []),
     'players'       => $seats,
     'you'           => $you,

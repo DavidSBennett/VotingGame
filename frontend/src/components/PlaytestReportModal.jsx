@@ -33,28 +33,24 @@ export default function PlaytestReportModal({ playerToken, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-lg rounded-lg border border-slate-700 bg-slate-900 p-6 shadow-panel">
-        <h2 className="text-lg font-semibold text-slate-100">Playtest note</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 p-4 backdrop-blur-sm animate-fade" onClick={onClose}>
+      <div
+        className="parchment w-full max-w-lg border border-gold-500 p-6 shadow-lift animate-rise"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink-950/60">Letters to the editor</div>
+        <h2 className="font-display text-3xl font-bold text-ink-950">Playtest note</h2>
 
         {done ? (
           <>
-            <p className="mt-3 text-sm text-slate-300">
-              Filed with a snapshot of the current position. Thank you.
-            </p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-4 rounded bg-amber-600 px-4 py-2 font-medium text-slate-950 hover:bg-amber-500"
-            >
+            <p className="mt-3 font-serif text-ink-950/80">Filed with a snapshot of the current position. Thank you.</p>
+            <button type="button" onClick={onClose} className="mt-5 bg-ink-950 px-5 py-2 font-display text-sm font-semibold uppercase tracking-[0.2em] text-cream-100">
               Close
             </button>
           </>
         ) : (
           <>
-            <p className="mt-1 text-sm text-slate-400">
-              What worked, what dragged, what you did not understand.
-            </p>
+            <p className="mt-1 font-serif italic text-ink-950/70">What worked, what dragged, what you did not understand.</p>
 
             <div className="mt-4 flex gap-2">
               {[1, 2, 3, 4, 5].map((n) => (
@@ -64,8 +60,8 @@ export default function PlaytestReportModal({ playerToken, onClose }) {
                   onClick={() => setRating(n === rating ? 0 : n)}
                   className={
                     n <= rating
-                      ? 'h-10 w-10 rounded border border-amber-500 bg-amber-600 font-mono text-slate-950'
-                      : 'h-10 w-10 rounded border border-slate-600 bg-slate-800 font-mono text-slate-300 hover:border-amber-500'
+                      ? 'h-10 w-10 border border-ink-950 bg-ink-950 font-display text-lg text-gold-300'
+                      : 'h-10 w-10 border border-ink-950/30 font-display text-lg text-ink-950/60 hover:border-ink-950'
                   }
                 >
                   {n}
@@ -78,24 +74,20 @@ export default function PlaytestReportModal({ playerToken, onClose }) {
               onChange={(e) => setNotes(e.target.value)}
               rows={6}
               placeholder="Notes"
-              className="mt-4 w-full rounded border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-amber-500"
+              className="mt-4 w-full border border-ink-950/30 bg-cream-50/70 px-3 py-2 font-serif text-ink-950 outline-none placeholder:text-ink-950/40 focus:border-ink-950"
             />
 
-            {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+            {error && <p className="mt-2 font-serif text-sm text-oxblood-700">{error}</p>}
 
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded border border-slate-600 px-4 py-2 text-slate-300 hover:border-slate-400"
-              >
+            <div className="mt-4 flex justify-end gap-3">
+              <button type="button" onClick={onClose} className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-950/60 hover:text-ink-950">
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={send}
                 disabled={busy || (!notes.trim() && rating === 0)}
-                className="rounded bg-amber-600 px-4 py-2 font-medium text-slate-950 hover:bg-amber-500 disabled:opacity-50"
+                className="bg-ink-950 px-5 py-2 font-display text-sm font-semibold uppercase tracking-[0.2em] text-cream-100 disabled:opacity-40"
               >
                 File it
               </button>

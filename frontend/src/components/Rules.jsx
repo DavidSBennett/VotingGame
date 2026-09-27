@@ -1,67 +1,106 @@
 /**
- * The whole rulebook. Numbers come from the game's own config when there is
- * one, so the rules shown can never disagree with the rules played.
+ * The whole rulebook, printed on a parchment sheet. Numbers come from the
+ * game's own config when there is one, so the rules shown can never
+ * disagree with the rules played.
+ *
+ * `inline` renders it in place (the lobby); otherwise it is a sheet over
+ * the table with a close button.
  */
-export default function Rules({ rules, open = false }) {
+function Body({ rules }) {
   const mult = rules ? rules.patron_multiplier : 2;
   const draw = rules ? rules.draw_per_round : 2;
   const maxNeg = rules ? rules.max_negative : 1;
   const penalty = rules ? rules.exposure_penalty : 25;
 
+  const H = ({ children }) => (
+    <h3 className="mt-5 font-mono text-[10px] uppercase tracking-[0.3em] text-ink-950/60">{children}</h3>
+  );
+
   return (
-    <details open={open} className="rounded-lg border border-slate-700 bg-slate-800 p-4">
-      <summary className="cursor-pointer text-xs uppercase tracking-widest text-slate-400">
-        How to play
-      </summary>
-      <div className="mt-3 space-y-2 text-sm text-slate-300">
-        <p>
-          You run a newspaper, 1796 to 1860. Fourteen elections, each a{' '}
-          <span className="text-sky-300">Nation</span> candidate (federal power) against a{' '}
-          <span className="text-rose-300">States</span> candidate (states&rsquo; rights).{' '}
-          <span className="text-slate-100">The richest paper at the end wins</span> — and money comes only from
-          playing cards for profit.
-        </p>
-        <p>
-          Each election is one round, played by every paper <span className="text-slate-100">in secret</span>.
-          Commit as many cards as you like — or none, and pass. Each card can be played one way:
-        </p>
-        <ul className="list-disc space-y-1 pl-5">
-          <li>
-            <span className="text-emerald-400">Profit</span> — take its profit in money.
-          </li>
-          <li>
-            <span className="text-sky-300">Positive</span> coverage — its positive push goes on the track, and counts
-            as that much influence on the candidate you name.
-          </li>
-          <li>
-            <span className="text-red-300">Negative</span> coverage — its negative push, the same way, but it costs
-            the Union stability. Only {maxNeg} card{maxNeg === 1 ? '' : 's'} a round.
-          </li>
-        </ul>
-        <p>Mark one coverage card to reserve. When everyone is in, all cards are revealed:</p>
-        <ul className="list-disc space-y-1 pl-5">
-          <li>
-            Negative coverage is paid from the Union&rsquo;s stability.{' '}
-            Every negative card you play adds to your <span className="text-red-300">exposure</span>.{' '}
-            <span className="text-red-400">
-              If stability reaches zero, the Union breaks, the game ends, and the most exposed paper loses {penalty}.
-            </span>
-          </li>
-          <li>All the pushes are added up. The side the track leans toward wins.</li>
-          <li>
-            If the winner is not the man history elected, the Union shudders and loses stability too.
-          </li>
-          <li>
-            The most influence on the winner makes you <span className="text-amber-300">Patron</span>: your profit
-            plays pay {mult}× next round.
-          </li>
-          <li>Everyone except the new Patron takes their reserved coverage card back.</li>
-          <li>Everyone draws {draw} cards, and the Union recovers a little.</li>
-          <li>
-            Cards are dated: the deck opens on the Revolution, and each round adds the events since the last.
-          </li>
-        </ul>
+    <div className="font-serif text-[15px] leading-relaxed text-ink-950/85">
+      <p>
+        You run a partisan newspaper, 1796 to 1860. Fourteen elections, each a{' '}
+        <span className="font-semibold text-federal-700">Nation</span> man (federal power) against a{' '}
+        <span className="font-semibold text-oxblood-700">States</span> man (states&rsquo; rights).{' '}
+        <em>The richest paper at the end wins</em> — and money comes only from selling your clippings.
+      </p>
+
+      <H>Each round, in secret</H>
+      <p>Put as many clippings on the table as you like, or none and pass. Where you put one decides what it does:</p>
+      <ul className="mt-1 list-none space-y-1 pl-0">
+        <li>
+          <span className="font-semibold text-wood-700">Cash in</span> — sell it for its profit.
+        </li>
+        <li>
+          <span className="font-semibold text-ink-950">On a candidate</span> — run the coverage that helps him: its push
+          goes on the track, and counts as your influence on him. If that coverage is{' '}
+          <span className="font-semibold text-oxblood-700">hostile</span>, it costs the Union stability — only {maxNeg}{' '}
+          such clipping a round.
+        </li>
+      </ul>
+      <p className="mt-1">Star one clipping you ran as coverage to reserve it.</p>
+
+      <H>The reveal</H>
+      <ul className="list-none space-y-1 pl-0">
+        <li>Every push is added up. The side the track leans toward wins the election.</li>
+        <li>
+          The most influence on the winner makes you <span className="font-semibold">Patron</span>: next round your sales
+          pay {mult}×.
+        </li>
+        <li>Everyone but the new Patron takes their reserved clipping back. Everyone draws {draw}.</li>
+      </ul>
+
+      <H>The Union</H>
+      <ul className="list-none space-y-1 pl-0">
+        <li>Hostile coverage wears it down, and so does any election that goes against history.</li>
+        <li>Each election it recovers a little.</li>
+        <li>
+          Every hostile clipping adds to your <span className="font-semibold">exposure</span>.{' '}
+          <span className="text-oxblood-700">
+            If the Union breaks, the game ends at once and the most exposed paper loses {penalty}.
+          </span>
+        </li>
+      </ul>
+
+      <H>The deck</H>
+      <p>
+        Clippings are dated. The deck opens on the Revolution, and each campaign brings the news of the years since the
+        last. Some are the business of the press itself — worth money, but they push nobody.
+      </p>
+    </div>
+  );
+}
+
+export default function Rules({ rules, inline = false, onClose }) {
+  if (inline) {
+    return (
+      <div className="parchment border border-gold-500 p-6 shadow-card sm:p-8">
+        <div className="text-center font-display text-2xl font-bold text-ink-950">How to play</div>
+        <div className="mx-auto mb-2 mt-2 h-px w-1/2 bg-ink-950/30" />
+        <Body rules={rules} />
       </div>
-    </details>
+    );
+  }
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/80 p-4 backdrop-blur-sm animate-fade"
+      onClick={onClose}
+    >
+      <div
+        className="parchment relative my-8 w-full max-w-2xl border border-gold-500 p-6 shadow-lift animate-rise sm:p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-950/60 hover:text-ink-950"
+        >
+          Close ✕
+        </button>
+        <div className="text-center font-display text-3xl font-bold text-ink-950">How to play</div>
+        <div className="mx-auto mb-2 mt-2 h-px w-1/2 bg-ink-950/30" />
+        <Body rules={rules} />
+      </div>
+    </div>
   );
 }

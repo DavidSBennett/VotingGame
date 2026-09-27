@@ -1,26 +1,26 @@
 /**
- * The in-game feed: the tail of vg_event_log, oldest first.
- *
- * Same rows the export contains, so what a player saw during the game and
- * what I read afterwards are the same record.
+ * The wire: the tail of vg_event_log, newest first, like dispatches pinned
+ * to the newsroom wall. The same rows the export contains.
  */
 export default function EventLog({ events }) {
+  const rows = [...(events || [])].reverse();
   return (
-    <div className="rounded border border-slate-700 bg-slate-800 p-4">
-      <h2 className="mb-2 text-sm uppercase tracking-wide text-slate-400">Log</h2>
-      {(!events || events.length === 0) && (
-        <p className="text-sm text-slate-500">Nothing has happened yet.</p>
+    <section className="panel p-4">
+      <div className="section-title mb-3">The wire</div>
+      {rows.length === 0 ? (
+        <p className="text-center font-serif text-sm italic text-cream-200/50">Nothing has happened yet.</p>
+      ) : (
+        <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
+          {rows.map((e) => (
+            <li key={e.event_id} className="border-b border-gold-500/15 pb-2">
+              <span className="mr-2 font-mono text-[9px] uppercase tracking-[0.15em] text-gold-500">
+                {e.round_number ? `R${e.round_number}` : '—'}
+              </span>
+              <span className="font-serif text-[13px] leading-snug text-cream-100/90">{e.message || e.event_type}</span>
+            </li>
+          ))}
+        </ul>
       )}
-      <ul className="max-h-96 space-y-1 overflow-y-auto text-sm">
-        {(events || []).map((e) => (
-          <li key={e.event_id} className="border-b border-slate-700 pb-1 text-slate-300">
-            <span className="mr-2 font-mono text-xs text-slate-500">
-              {e.round_number ? `r${e.round_number}` : '—'}
-            </span>
-            {e.message || e.event_type}
-          </li>
-        ))}
-      </ul>
-    </div>
+    </section>
   );
 }
