@@ -194,7 +194,8 @@ export default function GameShell({ seat, onLeave }) {
                 commit={state.you ? state.you.commit : null}
                 busy={busy}
                 onCommit={(params) => act('commit', params)}
-                payout={state.rules.payout}
+                rules={state.rules}
+                stability={state.stability}
               />
             </>
           )}
@@ -223,6 +224,32 @@ export default function GameShell({ seat, onLeave }) {
         </div>
 
         <aside className="space-y-5">
+          {(state.status === 'active' || state.stability_max > 0) && (
+            <section className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+              <div className="mb-1 flex items-baseline justify-between">
+                <h2 className="text-xs uppercase tracking-widest text-slate-400">Stability of the Union</h2>
+                <span className="font-mono text-sm text-slate-300">
+                  {state.stability}/{state.stability_max}
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded bg-slate-900">
+                <div
+                  className={
+                    state.stability > state.stability_max / 2
+                      ? 'h-2 bg-emerald-500'
+                      : state.stability > state.stability_max / 4
+                        ? 'h-2 bg-amber-500'
+                        : 'h-2 bg-red-500'
+                  }
+                  style={{ width: `${state.stability_max ? (100 * state.stability) / state.stability_max : 0}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Negative coverage spends it; each election restores {state.rules.stability_recovery}. At zero,
+                every paper loses.
+              </p>
+            </section>
+          )}
           {state.president && (
             <section className="rounded-lg border border-slate-700 bg-slate-800 p-4">
               <h2 className="mb-1 text-xs uppercase tracking-widest text-slate-400">
@@ -232,7 +259,7 @@ export default function GameShell({ seat, onLeave }) {
               <div className="text-xs text-slate-500">
                 elected {state.president.year}
                 {state.president.patron_seat !== null
-                  ? ` · ${seatName(state.president.patron_seat)} is Patron (+${state.rules.patron_bonus} per cash)`
+                  ? ` · ${seatName(state.president.patron_seat)} is Patron (profit ×${state.rules.patron_multiplier})`
                   : ' · no Patron'}
               </div>
             </section>

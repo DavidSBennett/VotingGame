@@ -2,7 +2,7 @@
 
 **Working title:** *The Fourth Estate* (placeholder).
 
-Status: v2 with sealed rounds is live. v1 (three tracks, stability,
+Status: sealed rounds with three-stat cards and a stability track are live. v1 (three tracks, stability,
 key cards) was played once and retired; §8 keeps what it taught. Not yet
 playtested by a human beyond that first game.
 
@@ -52,82 +52,74 @@ The historical result breaks a dead tie and nothing else.
 
 ---
 
-## 3. The track
+## 3. The track and the Union
 
-One track, **States −5 … 0 … +5 Nation**. It starts every campaign at 0
-and returns to 0 after every election: each race is argued fresh.
+One track, **States −5 … 0 … +5 Nation** (states' rights against federal
+power). It starts every round at 0.
+
+**Stability of the Union** starts at 10 per two seats. Negative coverage
+spends it; each election restores 2 per two seats. **At zero the Union
+breaks: the game ends and every paper loses** (all score zero).
 
 ---
 
 ## 4. Cards
 
-94 dated cards, each with two numbers: a **value** (3–8) and a **push**
-(States 2 … Nation 2, fixed by history).
+94 dated cards. Each has up to three stats:
 
-**Cards are released over time.** A card enters the deck at the first
-campaign held in or after its year, so nothing turns up before it
-happened. The opening deck is the 30 cards up to 1796 — the Stamp Act,
-Common Sense, the Articles, Shays' Rebellion, the Federalist, the Postal
-Act — and each later campaign shuffles in the years since the last: the
-Louisiana Purchase in 1808, the telegraph in 1844, Kansas in 1856. The UI
-announces each batch.
+- **Profit** — money when played for profit. The only way to score.
+- **Positive coverage** — a signed push (−3 … +3).
+- **Negative coverage** — a signed push, usually weaker and always the
+  other way, plus the **stability** it costs. Each card touches stability
+  once at most, and only when played negatively.
 
-Two kinds:
+Example: *The Bill of Rights* — profit 1; positive States +3; negative
+Nation +1 at a cost of 2 stability.
 
-- **Event** cards argue: they carry a push.
-- **Profit** cards are the business of the press itself — the first daily,
-  the Postal Act of 1792, Niles' Register, the penny press, the telegraph,
-  the Associated Press, the rotary press, cheap postage. High value, **no
-  push**: cash them, or stake them without moving the country.
+**Balance rule:** within every one of the 14 release batches, the Nation
+push on offer equals the States push on offer, counting both coverage
+options of every card. `tools/simulate.py` refuses to run if a batch
+drifts. Negative coverage is where most of the balancing was done.
 
-The 54 cards from 1795 on came from the v1 content by a fixed formula; the
-founding era, the gap years (1809–12, 1837–44) and the profit cards were
-written by hand. All of it is recorded in the header of `game_data.php`,
-and every number is a first draft worth arguing with.
+8 cards are profit-only (the business of the press: the Postal Act, the
+telegraph, the rotary press…). Cards enter the deck at the first campaign
+held in or after their year; the opening deck is the 30 cards to 1796.
 
 ---
 
 ## 5. A round
 
 Each election is **one round**, played by every paper **at once, blind**.
-Everyone starts with 5 cards.
+Commit any number of cards (at least one), each played for:
 
-**Commit.** Choose any number of cards from your hand (at least one). For
-each, choose:
+- **Profit** — its profit in money. **Doubled if you are the Patron.**
+- **Positive** — its positive push, counted as that much **influence** on
+  the candidate you name.
+- **Negative** — its negative push the same way, and it costs the Union
+  its stability. **At most one card a round.**
 
-- **Cash** — take its value. **+2 on each card cashed if you are the
-  Patron.**
-- **Print** — its push goes on the track, and its value is staked as
-  influence on the candidate you name.
-
-Mark one committed card to **reserve**. Others see only *that* you have
-committed. Bots commit the moment a round opens, from their own hand and
-the public table only.
+Mark one **coverage** card to reserve.
 
 ## 6. The reveal
 
-When every paper still playing has committed:
-
-1. Every printed push is added up on a track from States −5 to Nation +5.
-   The side it leans toward wins. At 0, the bigger total stake wins;
-   failing that, the historical winner.
-2. Stakes on the winner pay back **1.5×** (rounded down per paper). Stakes
-   on the loser are lost.
-3. The single largest stake on the winner makes that paper **Patron**
-   until the next election. A tie leaves nobody Patron.
-4. Everyone **except the new Patron** takes its reserved card back into
-   hand. Every other committed card is spent.
-5. Everyone draws **2** (hand limit 10), and the next round's cards are
-   released.
+1. Negative plays are paid from stability. At zero, everyone loses.
+2. Every push is added up. The side the track leans toward wins. Level:
+   the greater total influence wins; failing that, history.
+3. The most influence on the winner makes that paper **Patron**: its
+   profit plays pay double next round. A tie leaves nobody Patron.
+4. Everyone except the new Patron takes its reserved coverage card back;
+   everything else committed is spent. Everyone draws 2; the Union
+   recovers.
 
 ## 7. The end
 
-After 1860 the richest paper wins; conceded seats cannot. If every human
-concedes, the game ends where it stands.
+After 1860 the richest paper wins; conceded seats cannot. If the Union
+breaks, nobody wins.
 
-**The bot**: keep four cards and commit the rest. Patron? Cash them all.
-Otherwise print every card that pushes the way the hand leans (history
-breaks a tie) and cash the cards that push nobody.
+**The bot**: keep four cards, commit the rest. Patron? Profit them all.
+Otherwise pick the side the hand can push hardest and, cheapest first,
+cover a card for it when its push is at least its profit — negatively only
+once, and only if stability stays above 4. Profit the rest.
 
 ---
 
@@ -137,6 +129,31 @@ breaks a tie) and cash the cards that push nobody.
 times per setting. It parses the content **out of the PHP**, so the data
 cannot drift; the rules are a hand-port of `engine.php`, kept in step by
 hand. Every number in `engine_default_config()` came from a run.
+
+### Three-stat cards and the Union (2026-09-27)
+
+Cards became profit / positive / negative with a stability cost, money
+comes only from profit, and a stability track was added. 400–600 games per
+setting:
+
+- **With the Patron's only reward a per-card bonus, coverage was
+  worthless** — a pure casher beat the bot 99.8% at +3 per card.
+- **The reserve was the real culprit.** A non-Patron took back a card that
+  had already paid profit, so a pure casher replayed its best card (the
+  Postal Act) every round and avoiding the Patronage was the winning line.
+  **Reserve limited to coverage cards** → at Patron ×2 a pure casher wins
+  1.8% heads-up and under 4% at any table size.
+- **Uncapped negative coverage let one paper break the Union** in 80–100%
+  of games. **One negative card a round** plus recovery 2 per two seats →
+  a paper that plays negatively every round breaks it ~0%. At recovery 0–1
+  it still broke it 90–100%.
+- A bot that never plays negatively ties the full bot (50/50): negative
+  coverage is a situational tool, not a requirement.
+- Nation wins ~45% of races before 1848 and ~52% after (history: 3 of 10,
+  2 of 4). The Patron still never repeats.
+- **Open:** heads-up, 33% of races end level on the track with equal
+  influence, so history decides them; the Union almost never breaks among
+  careful players, so stability is a safety net more than a pressure.
 
 ### Sealed rounds (2026-09-26)
 
@@ -307,3 +324,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-26 | v2 goes live: engine rewritten, v1 data and simulator deleted, games from v1 shown as ended | — |
 | 2026-09-26 | Cards released by date; 40 new cards (the founding, the gap years, profit cards); the crisis rule removed | Opening deck of 30 deals five hands; pinned races stay under 10% |
 | 2026-09-26 | Sealed rounds: one blind commitment per election, any number of cards, cash or print; Patron keeps no reserve; draw 2 | Round robin above; the Patron bonus sets cash against print |
+| 2026-09-27 | Three-stat cards (profit / positive / negative + stability), every release batch push-balanced; stakes removed; stability track (at zero everyone loses); Patron profit x2; one negative a round; reserve limited to coverage cards | See 'Three-stat cards and the Union' |

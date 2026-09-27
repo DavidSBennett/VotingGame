@@ -18,32 +18,34 @@
  *
  * You are a newspaper, 1796 to 1860. Fourteen elections, one ROUND each,
  * every race a Nation candidate against a States candidate. Most MONEY at
- * the end wins.
+ * the end wins, and money comes ONLY from playing cards for profit.
  *
- * Each round, every paper commits BLIND, all at once:
+ * Each card has up to three stats: profit, positive coverage, negative
+ * coverage (plus the stability its negative coverage costs). Each round,
+ * every paper commits BLIND, all at once: any number of cards (at least
+ * one), each played for
  *
- *   Choose any number of cards from your hand (at least one). For each,
- *   choose CASH (take its value, +patron_bonus if you are the Patron) or
- *   PRINT (its push goes on the track, and its value is staked as
- *   influence on the candidate you name). Mark one committed card to
- *   reserve.
+ *   PROFIT     its profit in money -- doubled if you are the Patron;
+ *   POSITIVE   its positive push on the track, counted as that much
+ *              influence on the candidate you name;
+ *   NEGATIVE   its negative push the same way, and it costs the Union its
+ *              stability. At most max_negative such cards a round.
  *
- * When every paper has committed, all reveal:
+ * Mark one card you played for coverage to reserve. When every paper has
+ * committed, all reveal:
  *
- *   1. Every printed push is added up on a track from States -5 to Nation
- *      +5. The side it leans toward wins. At 0, the bigger total stake
- *      wins; failing that, whoever won in history.
- *   2. Stakes on the winner pay back payout_num/payout_den times. Stakes on
- *      the loser are gone.
- *   3. The largest stake on the winner makes that paper the PATRON until
- *      the next election. A tie leaves nobody Patron.
- *   4. Every paper except the new Patron takes its reserved card back into
- *      hand. Every other committed card is spent.
- *   5. Everyone draws draw_per_round cards.
+ *   1. Stability pays for every negative play. At zero the Union breaks,
+ *      the game ends, and EVERYONE loses.
+ *   2. Every push is added up on a track from States -5 to Nation +5. The
+ *      side it leans toward wins. Level: the bigger total influence wins;
+ *      failing that, whoever won in history.
+ *   3. The most influence on the winner makes that paper PATRON: its profit
+ *      plays pay double next round. A tie leaves nobody Patron.
+ *   4. Everyone except the new Patron takes its reserved coverage card
+ *      back. Every other committed card is spent. Everyone draws
+ *      draw_per_round, and the Union recovers stability_recovery.
  *
- * Cards are dated: each round shuffles in the events of the years since
- * the last one, so the deck opens on the Revolution and reaches Kansas in
- * the 1850s. After 1860 the richest paper wins.
+ * Cards are dated: each round shuffles in the events since the last one.
  * ---------------------------------------------------------------------
  */
 
@@ -55,7 +57,7 @@ require_once __DIR__ . '/game_data.php';
  * carries another version cannot be played by this engine; it is shown as
  * ended instead (see engine_is_current).
  */
-define('ENGINE_STATE_VERSION', 5);
+define('ENGINE_STATE_VERSION', 6);
 
 // ---------------------------------------------------------------------
 // Configuration
@@ -71,26 +73,30 @@ define('ENGINE_STATE_VERSION', 5);
  */
 function engine_default_config() {
   return [
-    'engine_version'  => ENGINE_STATE_VERSION,
-    'total_spaces'    => 14,
-    'start_hand'      => 5,
-    'draw_per_round'  => 2,
-    'hand_limit'      => 10,
-    'start_money'     => 12,
-    // Paid on EACH card the Patron cashes, the round after winning it. The
-    // lever on cash against print: at 0 a pure casher beat the bot 89%, at
-    // 3 it won 15%; at 2 it wins ~40%.
-    'patron_bonus'    => 2,
-    // Winning stakes pay stake * payout_num / payout_den, rounded down per
-    // paper. A fraction rather than 1.5 so the money stays integer.
-    'payout_num'      => 3,
-    'payout_den'      => 2,
-    'track_min'       => -5,
-    'track_max'       => 5,
-    'min_commit'      => 1,
-    'min_players'     => 1,
-    'max_players'     => 5,
-    'bots'            => 1,
+    'engine_version'     => ENGINE_STATE_VERSION,
+    'total_spaces'       => 14,
+    'start_hand'         => 5,
+    'draw_per_round'     => 2,
+    'hand_limit'         => 10,
+    'start_money'        => 12,
+    // The Patron's profit plays pay this many times over, the round after.
+    // With the reserve limited to coverage cards, x2 makes covering worth
+    // it: a pure casher wins under 4% at any table size.
+    'patron_multiplier'  => 2,
+    // One negative card per paper per round. Uncapped, a single paper
+    // flooding negative coverage broke the Union in 80-100% of games.
+    'max_negative'       => 1,
+    // Per two seats, scaled to the table. With recovery 2 even a paper that
+    // plays negatively every round breaks the Union ~0% of the time; with
+    // recovery 0-1 it broke it 90-100%.
+    'stability_start'    => 10,
+    'stability_recovery' => 2,
+    'track_min'          => -5,
+    'track_max'          => 5,
+    'min_commit'         => 1,
+    'min_players'        => 1,
+    'max_players'        => 5,
+    'bots'               => 1,
   ];
 }
 
@@ -100,11 +106,13 @@ function engine_default_config() {
  */
 function engine_config_knobs() {
   return [
-    'total_spaces'   => [1, 14],
-    'start_hand'     => [3, 8],
-    'draw_per_round' => [1, 4],
-    'start_money'    => [0, 50],
-    'patron_bonus'   => [0, 6],
+    'total_spaces'       => [1, 14],
+    'start_hand'         => [3, 8],
+    'draw_per_round'     => [1, 4],
+    'start_money'        => [0, 50],
+    'patron_multiplier'  => [1, 4],
+    'stability_start'    => [4, 30],
+    'stability_recovery' => [0, 6],
   ];
 }
 
@@ -146,9 +154,15 @@ function engine_setup(&$game, &$players, $mysqli = null) {
   $deck = $opening;
   shuffle($deck);
 
+  // Stability and its recovery are expressed per two seats and scaled here.
+  $seatCount = max(1, count($players));
+  $stabilityMax = intdiv((int) $config['stability_start'] * $seatCount, 2);
+  $game['config']['stability_max'] = $stabilityMax;
+
   $game['state'] = [
     'engine_version' => ENGINE_STATE_VERSION,
     'space'          => 1,
+    'stability'      => $stabilityMax,
     'commits'        => [],       // seat => {plays, reserve}. HIDDEN until reveal.
     'patron_seat'    => null,
     'last_released'  => $opening,
@@ -165,7 +179,8 @@ function engine_setup(&$game, &$players, $mysqli = null) {
       'is_patron'    => false,
       'patronages'   => 0,
       'cards_played' => 0,
-      'prints'       => 0,
+      'positives'    => 0,
+      'negatives'    => 0,
       'hand_count'   => 0,
       'committed'    => false,
     ];
@@ -300,10 +315,10 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
 }
 
 /**
- * Check one commitment against the hand and normalise it.
+ * Check one commitment against the hand and the rules, and normalise it.
  *
- * params: { plays: [{card, action: 'cash'|'print', side?: 'nation'|'states'}],
- *           reserve?: card }
+ * params: { plays: [{card, action: 'profit'|'positive'|'negative',
+ *                    side?: 'nation'|'states'}], reserve?: card }
  */
 function engine_validate_commit($game, $player, $params) {
   $hand = $player['private_state']['hand'] ?? [];
@@ -315,36 +330,48 @@ function engine_validate_commit($game, $player, $params) {
 
   $out = [];
   $seen = [];
+  $negatives = 0;
   foreach ($plays as $pl) {
     if (!is_array($pl)) throw new Exception('Malformed commitment.');
     $card = (string) ($pl['card'] ?? '');
     if (!in_array($card, $hand, true)) throw new Exception('A committed card is not in your hand.');
     if (isset($seen[$card])) throw new Exception('Each card can be committed once.');
     $seen[$card] = true;
+    $def = vg_card($card);
     $mode = (string) ($pl['action'] ?? '');
-    if ($mode === 'cash') {
-      $out[] = ['card' => $card, 'action' => 'cash', 'side' => null];
-    } elseif ($mode === 'print') {
-      $side = (string) ($pl['side'] ?? '');
-      if ($side !== 'nation' && $side !== 'states') {
-        throw new Exception('Choose which candidate each printed card backs.');
-      }
-      $out[] = ['card' => $card, 'action' => 'print', 'side' => $side];
-    } else {
-      throw new Exception('Each committed card must be cashed or printed.');
+    if ($mode === 'profit') {
+      $out[] = ['card' => $card, 'action' => 'profit', 'side' => null];
+      continue;
     }
+    if ($mode !== 'positive' && $mode !== 'negative') {
+      throw new Exception('Each committed card is played for profit, positive or negative coverage.');
+    }
+    if ((int) $def[$mode] === 0) {
+      throw new Exception($def['name'] . ' has no ' . $mode . ' coverage.');
+    }
+    $side = (string) ($pl['side'] ?? '');
+    if ($side !== 'nation' && $side !== 'states') {
+      throw new Exception('Name the candidate each coverage card backs.');
+    }
+    if ($mode === 'negative') $negatives++;
+    $out[] = ['card' => $card, 'action' => $mode, 'side' => $side];
+  }
+  $maxNeg = (int) ($game['config']['max_negative'] ?? 1);
+  if ($negatives > $maxNeg) {
+    throw new Exception('You may play only ' . $maxNeg . ' card' . ($maxNeg === 1 ? '' : 's') . ' for negative coverage a round.');
   }
 
-  $reserve = isset($params['reserve']) ? (string) $params['reserve'] : null;
-  if ($reserve !== null && $reserve !== '' && !isset($seen[$reserve])) {
-    throw new Exception('The reserved card must be one you committed.');
+  $covered = [];
+  foreach ($out as $pl) if ($pl['action'] !== 'profit') $covered[] = $pl['card'];
+  $reserve = isset($params['reserve']) ? (string) $params['reserve'] : '';
+  if ($reserve !== '' && !in_array($reserve, $covered, true)) {
+    throw new Exception('Only a card you played for coverage can be reserved.');
   }
-  if ($reserve === null || $reserve === '') {
-    // Unmarked: keep back the most valuable committed card.
-    foreach ($out as $pl) {
-      if ($reserve === null || (int) vg_card($pl['card'])['value'] > (int) vg_card($reserve)['value']) {
-        $reserve = $pl['card'];
-      }
+  if ($reserve === '') {
+    // Unmarked: keep back the most profitable card played for coverage.
+    $reserve = null;
+    foreach ($covered as $k) {
+      if ($reserve === null || (int) vg_card($k)['profit'] > (int) vg_card($reserve)['profit']) $reserve = $k;
     }
   }
   return ['plays' => $out, 'reserve' => $reserve];
@@ -408,59 +435,92 @@ function engine_run_bots(&$game, &$players, $mysqli) {
 }
 
 /**
- * The bot. Kept in step with strat_bot in tools/simulate.py — the tuning
- * was validated against it, so change them together.
+ * The bot. Kept in step with make_bot in tools/simulate.py (weight 1,
+ * margin 4) -- the tuning was validated against it, so change them together.
  *
  *   1. Keep four cards in hand; commit the rest (at least one).
- *   2. Patron? Cash them all: the bonus pays on every card cashed.
- *   3. Otherwise print the cards that push the way the hand leans (history
- *      breaks a tie) and cash the ones that push nobody. Cards pushing the
- *      other way stay in hand.
- *   4. Reserve the most valuable card printed.
+ *   2. Patron? Play them all for profit: each pays double.
+ *   3. Otherwise pick the side the hand can push hardest. Cheapest card
+ *      first, cover a card for that side when its push is at least its
+ *      profit: positively if that pushes the right way; negatively (one card
+ *      at most) only if it does and stability stays above 4 after the cost.
+ *      Name that side's candidate.
+ *   4. Play the rest of the commitment for profit, best first.
+ *   5. Reserve the most profitable card it covered.
  */
 function engine_bot_commit($game, $player) {
   $hand = $player['private_state']['hand'] ?? [];
-  $byValue = $hand;
-  usort($byValue, function ($a, $b) { return (int) vg_card($b)['value'] - (int) vg_card($a)['value']; });
   $n = max(1, count($hand) - 4 + (int) ($game['config']['draw_per_round'] ?? 2));
+  $byProfit = $hand;
+  usort($byProfit, function ($a, $b) { return (int) vg_card($b)['profit'] - (int) vg_card($a)['profit']; });
 
   if (!empty($player['public_state']['is_patron'])) {
     $plays = [];
-    foreach (array_slice($byValue, 0, $n) as $k) $plays[] = ['card' => $k, 'action' => 'cash', 'side' => null];
-    return ['plays' => $plays, 'reserve' => $plays[0]['card']];
+    foreach (array_slice($byProfit, 0, $n) as $k) $plays[] = ['card' => $k, 'action' => 'profit', 'side' => null];
+    return ['plays' => $plays, 'reserve' => null];
   }
 
-  $net = 0;
-  foreach ($hand as $k) $net += (int) vg_card($k)['push'];
-  if ($net > 0) $side = 'nation';
-  elseif ($net < 0) $side = 'states';
-  else {
+  $stability = (int) ($game['state']['stability'] ?? 0);
+  $margin = 4;
+  $maxNeg = (int) ($game['config']['max_negative'] ?? 1);
+
+  // The side this hand can push hardest (negative options included).
+  $reach = ['nation' => 0, 'states' => 0];
+  foreach ($hand as $k) {
+    $c = vg_card($k);
+    foreach (['nation' => 1, 'states' => -1] as $side => $want) {
+      $best = 0;
+      if ((int) $c['positive'] * $want > 0) $best = max($best, abs((int) $c['positive']));
+      if ((int) $c['negative'] * $want > 0) $best = max($best, abs((int) $c['negative']));
+      $reach[$side] += $best;
+    }
+  }
+  if ($reach['nation'] !== $reach['states']) {
+    $side = ($reach['nation'] > $reach['states']) ? 'nation' : 'states';
+  } else {
     $e = vg_election_at((int) $game['state']['space']);
     $side = $e ? $e['historical_winner'] : 'nation';
   }
   $want = ($side === 'nation') ? 1 : -1;
 
+  $cheapest = array_reverse($byProfit);
   $plays = [];
-  foreach ($byValue as $k) {
+  $used = [];
+  $budget = $stability;
+  $negs = 0;
+  foreach ($cheapest as $k) {
     if (count($plays) >= $n) break;
-    $push = (int) vg_card($k)['push'];
-    if ($push * $want > 0) $plays[] = ['card' => $k, 'action' => 'print', 'side' => $side];
+    $c = vg_card($k);
+    $options = [];
+    if ((int) $c['positive'] * $want > 0) $options[] = [abs((int) $c['positive']), 'positive'];
+    if ($negs < $maxNeg && $budget - (int) $c['stability'] > $margin && (int) $c['negative'] * $want > 0) {
+      $options[] = [abs((int) $c['negative']), 'negative'];
+    }
+    if (!$options) continue;
+    usort($options, function ($a, $b) { return $b[0] - $a[0]; });
+    list($push, $mode) = $options[0];
+    if ($push < (int) $c['profit']) continue;
+    $plays[] = ['card' => $k, 'action' => $mode, 'side' => $side];
+    $used[$k] = true;
+    if ($mode === 'negative') { $budget -= (int) $c['stability']; $negs++; }
   }
-  foreach ($byValue as $k) {
+  foreach ($byProfit as $k) {
     if (count($plays) >= $n) break;
-    if ((int) vg_card($k)['push'] === 0) $plays[] = ['card' => $k, 'action' => 'cash', 'side' => null];
+    if (isset($used[$k])) continue;
+    $plays[] = ['card' => $k, 'action' => 'profit', 'side' => null];
   }
-  if (!$plays) $plays[] = ['card' => $byValue[0], 'action' => 'cash', 'side' => null];
 
   $reserve = null;
   foreach ($plays as $pl) {
-    if ($pl['action'] === 'print') { $reserve = $pl['card']; break; }   // byValue order
+    if ($pl['action'] === 'profit') continue;
+    if ($reserve === null || (int) vg_card($pl['card'])['profit'] > (int) vg_card($reserve)['profit']) $reserve = $pl['card'];
   }
-  return ['plays' => $plays, 'reserve' => $reserve ?? $plays[0]['card']];
+  return ['plays' => $plays, 'reserve' => $reserve];
 }
 
 /**
- * Reveal every commitment, hold the election, and open the next round.
+ * Reveal every commitment, charge the Union, hold the election, and open
+ * the next round.
  */
 function engine_resolve_round(&$game, &$players, $mysqli) {
   $space = (int) $game['state']['space'];
@@ -470,76 +530,95 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
     return;
   }
   $config = $game['config'];
-  $bonus = (int) $config['patron_bonus'];
+  $mult = max(1, (int) ($config['patron_multiplier'] ?? 2));
   $commits = $game['state']['commits'];
 
-  // 1. Reveal. Cash pays now; prints push and stake.
+  // 1. Reveal. Profit pays; coverage pushes and counts influence on the
+  //    named candidate; negative coverage costs the Union.
   $track = 0;
-  $stakes = ['nation' => [], 'states' => []];
+  $influence = ['nation' => [], 'states' => []];
+  $spent = 0;
   $reveal = [];
   foreach (engine_seat_list($players) as $seat) {
     if (!isset($commits[$seat])) continue;
     $p = &$players[$seat];
     $hand = $p['private_state']['hand'] ?? [];
     $wasPatron = !empty($p['public_state']['is_patron']);
-    $cashed = 0;
+    $earned = 0;
     $shown = [];
     foreach ($commits[$seat]['plays'] as $pl) {
       $card = vg_card($pl['card']);
       $at = array_search($pl['card'], $hand, true);
       if (!$card || $at === false) continue;          // defensive: never double-spend
       array_splice($hand, $at, 1);
-      $value = (int) $card['value'];
-      if ($pl['action'] === 'cash') {
-        $gain = $value + ($wasPatron ? $bonus : 0);
+      if ($pl['action'] === 'profit') {
+        $gain = (int) $card['profit'] * ($wasPatron ? $mult : 1);
         $p['public_state']['money'] = (int) $p['public_state']['money'] + $gain;
-        $cashed += $gain;
-        $shown[] = ['card' => $pl['card'], 'name' => $card['name'], 'action' => 'cash',
-                    'side' => null, 'value' => $gain, 'push' => 0];
+        $earned += $gain;
+        $shown[] = ['card' => $pl['card'], 'name' => $card['name'], 'action' => 'profit',
+                    'side' => null, 'money' => $gain, 'push' => 0, 'stability' => 0];
       } else {
-        $track += (int) $card['push'];
-        $stakes[$pl['side']][$seat] = (int) ($stakes[$pl['side']][$seat] ?? 0) + $value;
-        $p['public_state']['prints'] = 1 + (int) ($p['public_state']['prints'] ?? 0);
-        $shown[] = ['card' => $pl['card'], 'name' => $card['name'], 'action' => 'print',
-                    'side' => $pl['side'], 'value' => $value, 'push' => (int) $card['push']];
+        $push = (int) $card[$pl['action']];
+        $cost = ($pl['action'] === 'negative') ? (int) $card['stability'] : 0;
+        $track += $push;
+        $influence[$pl['side']][$seat] = (int) ($influence[$pl['side']][$seat] ?? 0) + abs($push);
+        $spent += $cost;
+        $key = ($pl['action'] === 'negative') ? 'negatives' : 'positives';
+        $p['public_state'][$key] = 1 + (int) ($p['public_state'][$key] ?? 0);
+        $shown[] = ['card' => $pl['card'], 'name' => $card['name'], 'action' => $pl['action'],
+                    'side' => $pl['side'], 'money' => 0, 'push' => $push, 'stability' => $cost];
       }
       $p['public_state']['cards_played'] = 1 + (int) $p['public_state']['cards_played'];
     }
     $p['private_state']['hand'] = $hand;
-    $reveal[$seat] = ['seat' => (int) $seat, 'plays' => $shown, 'cashed' => $cashed,
-                      'reserve' => $commits[$seat]['reserve'], 'paid' => 0, 'kept' => null];
+    $reveal[$seat] = ['seat' => (int) $seat, 'plays' => $shown, 'earned' => $earned,
+                      'influence' => ['nation' => (int) ($influence['nation'][$seat] ?? 0),
+                                      'states' => (int) ($influence['states'][$seat] ?? 0)],
+                      'reserve' => $commits[$seat]['reserve'], 'kept' => null];
     unset($p);
   }
   $track = max((int) $config['track_min'], min((int) $config['track_max'], $track));
+  $before = (int) $game['state']['stability'];
+  $game['state']['stability'] = max(0, $before - $spent);
+
+
+  // The Union breaks: the game ends here and nobody wins.
+  if ($game['state']['stability'] <= 0) {
+    foreach ($reveal as $s => $r) {
+      engine_log($mysqli, $game, $s, 'reveal',
+        engine_reveal_text($players[$s]['player_name'], $r, $election), $r, $players[$s]['player_name']);
+    }
+    $game['state']['last_reveal'] = [
+      'space' => $space, 'year' => $election['year'], 'broke' => true,
+      'track' => $track, 'stability_spent' => $spent,
+      'stability_before' => $before, 'stability_after' => 0,
+      'seats' => array_values($reveal),
+    ];
+    $game['state']['commits'] = [];
+    engine_end_game($game, $players, 'the_union_breaks', $mysqli);
+    return;
+  }
 
   // 2. The election.
   if ($track > 0)      { $side = 'nation'; $decidedBy = 'track'; }
   elseif ($track < 0)  { $side = 'states'; $decidedBy = 'track'; }
   else {
-    $n = array_sum($stakes['nation']);
-    $s = array_sum($stakes['states']);
-    if ($n !== $s) { $side = ($n > $s) ? 'nation' : 'states'; $decidedBy = 'stakes'; }
+    $n = array_sum($influence['nation']);
+    $st = array_sum($influence['states']);
+    if ($n !== $st) { $side = ($n > $st) ? 'nation' : 'states'; $decidedBy = 'influence'; }
     else { $side = $election['historical_winner']; $decidedBy = 'history'; }
   }
   $winner = $election[$side];
   $loser = $election[$side === 'nation' ? 'states' : 'nation'];
 
-  $num = max(1, (int) $config['payout_num']);
-  $den = max(1, (int) $config['payout_den']);
-  foreach ($stakes[$side] as $s => $stake) {
-    $paid = intdiv((int) $stake * $num, $den);
-    $players[$s]['public_state']['money'] = (int) $players[$s]['public_state']['money'] + $paid;
-    if (isset($reveal[$s])) $reveal[$s]['paid'] = $paid;
-  }
-
-  // 3. The Patron: the single largest stake on the winner.
+  // 3. The Patron: the single largest influence on the winner.
   $patron = null;
   $best = 0;
   $tied = false;
-  foreach ($stakes[$side] as $s => $stake) {
-    $stake = (int) $stake;
-    if ($stake > $best) { $best = $stake; $patron = (int) $s; $tied = false; }
-    elseif ($stake === $best && $stake > 0) { $tied = true; }
+  foreach ($influence[$side] as $s => $inf) {
+    $inf = (int) $inf;
+    if ($inf > $best) { $best = $inf; $patron = (int) $s; $tied = false; }
+    elseif ($inf === $best && $inf > 0) { $tied = true; }
   }
   if ($tied || $best <= 0) $patron = null;
   foreach ($players as $s => $p) {
@@ -552,11 +631,15 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
   $game['state']['patron_seat'] = $patron;
   $patronName = ($patron !== null) ? $players[$patron]['player_name'] : null;
 
-  // 4. Everyone but the Patron keeps its reserved card; the rest is spent.
+  // 4. Everyone but the Patron keeps its reserved coverage card; the rest is
+  //    spent. (A reserve that could be a profit card let a paper cash its
+  //    best card every round and made avoiding the Patronage the best line.)
   foreach ($commits as $s => $c) {
     if (!isset($reveal[$s])) continue;
     foreach ($c['plays'] as $pl) {
-      if ($pl['card'] === $c['reserve'] && (int) $s !== $patron && empty($players[$s]['conceded'])) {
+      $keep = $pl['card'] === $c['reserve'] && $pl['action'] !== 'profit'
+           && (int) $s !== $patron && empty($players[$s]['conceded']);
+      if ($keep) {
         $players[$s]['private_state']['hand'][] = $pl['card'];
         $reveal[$s]['kept'] = vg_card($pl['card'])['name'];
       } else {
@@ -564,8 +647,6 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
       }
     }
   }
-
-  // 5. Everyone draws.
   foreach ($players as $s => $p) {
     if (!empty($p['conceded'])) continue;
     engine_draw($game, $players[$s], (int) $config['draw_per_round']);
@@ -573,7 +654,6 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
     $players[$s]['public_state']['committed'] = false;
   }
 
-  // The log: one line per paper, then the result.
   foreach ($reveal as $s => $r) {
     engine_log($mysqli, $game, $s, 'reveal',
       engine_reveal_text($players[$s]['player_name'], $r, $election), $r, $players[$s]['player_name']);
@@ -583,15 +663,24 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
   engine_log($mysqli, $game, null, 'election', $msg, [
     'space' => $space, 'year' => $election['year'], 'winner_side' => $side,
     'winner' => $winner['key'], 'decided_by' => $decidedBy, 'track' => $track,
-    'stakes' => $stakes, 'patron_seat' => $patron,
+    'influence' => engine_seat_amounts($influence), 'patron_seat' => $patron,
+    'stability_spent' => $spent, 'stability' => (int) $game['state']['stability'],
     'historical_winner' => $election['historical_winner'],
   ]);
 
+  // 5. The Union settles a little.
+  $recover = intdiv((int) ($config['stability_recovery'] ?? 0) * max(1, count($players)), 2);
+  $max = (int) ($config['stability_max'] ?? $before);
+  $after = (int) $game['state']['stability'];
+  $game['state']['stability'] = min($max, $after + $recover);
+
   $game['state']['last_reveal'] = [
-    'space' => $space, 'year' => $election['year'],
+    'space' => $space, 'year' => $election['year'], 'broke' => false,
     'winner_side' => $side, 'winner_name' => $winner['name'], 'loser_name' => $loser['name'],
     'decided_by' => $decidedBy, 'track' => $track,
-    'stake_totals' => ['nation' => array_sum($stakes['nation']), 'states' => array_sum($stakes['states'])],
+    'influence_totals' => ['nation' => array_sum($influence['nation']), 'states' => array_sum($influence['states'])],
+    'stability_spent' => $spent, 'stability_before' => $before, 'stability_after' => $after,
+    'stability_recovered' => (int) $game['state']['stability'] - $after,
     'patron_seat' => $patron, 'patron_name' => $patronName,
     'seats' => array_values($reveal),
   ];
@@ -600,6 +689,7 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
     'winner_side' => $side, 'winner' => $winner['key'], 'winner_name' => $winner['name'],
     'loser_name' => $loser['name'], 'decided_by' => $decidedBy, 'track' => $track,
     'patron_seat' => $patron, 'patron_name' => $patronName,
+    'stability' => (int) $game['state']['stability'],
     'matched_history' => ($side === $election['historical_winner']),
   ];
   $game['state']['president'] = [
@@ -619,21 +709,35 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
   engine_release_cards($game, (int) $election['year'], $mysqli);
 }
 
-/** "Name cashed X (+5); printed Y and Z for Jefferson; kept Y." */
+/**
+ * {side: {seat: n}} as {side: [{seat, amount}]}: PHP writes a seat-0-only
+ * map as a JSON list, which made exported logs ambiguous.
+ */
+function engine_seat_amounts($bySide) {
+  $out = [];
+  foreach ($bySide as $side => $seats) {
+    $out[$side] = [];
+    foreach ($seats as $s => $n) $out[$side][] = ['seat' => (int) $s, 'amount' => (int) $n];
+  }
+  return $out;
+}
+
+/** "Name played X for profit (+5); covered Y for Jefferson; kept Y." */
 function engine_reveal_text($name, $r, $election) {
-  $cash = [];
-  $print = ['nation' => [], 'states' => []];
+  $profit = [];
+  $cover = [];
+  $neg = [];
   foreach ($r['plays'] as $pl) {
-    if ($pl['action'] === 'cash') $cash[] = $pl['name'];
-    else $print[$pl['side']][] = $pl['name'];
+    if ($pl['action'] === 'profit') { $profit[] = $pl['name']; continue; }
+    $who = $election[$pl['side']]['name'];
+    $txt = $pl['name'] . ' for ' . $who;
+    if ($pl['action'] === 'negative') $neg[] = $txt; else $cover[] = $txt;
   }
   $parts = [];
-  if ($cash) $parts[] = 'cashed ' . implode(', ', $cash) . ' (+' . $r['cashed'] . ')';
-  foreach (['nation', 'states'] as $side) {
-    if ($print[$side]) $parts[] = 'printed ' . implode(', ', $print[$side]) . ' for ' . $election[$side]['name'];
-  }
+  if ($profit) $parts[] = 'played ' . implode(', ', $profit) . ' for profit (+' . $r['earned'] . ')';
+  if ($cover) $parts[] = 'ran favourable coverage of ' . implode(', ', $cover);
+  if ($neg) $parts[] = 'ran hostile coverage of ' . implode(', ', $neg);
   $msg = $name . ' ' . implode('; ', $parts) . '.';
-  if ($r['paid'] > 0) $msg .= ' Collected ' . $r['paid'] . '.';
   if ($r['kept']) $msg .= ' Kept ' . $r['kept'] . '.';
   if (mb_strlen($msg) > 480) $msg = mb_substr($msg, 0, 477) . '...';
   return $msg;
@@ -661,17 +765,21 @@ function engine_end_game(&$game, &$players, $reason, $mysqli) {
   $game['current_seat'] = null;
   $game['ended_reason'] = $reason;
 
+  // A broken Union pays nobody: every paper scores zero and nobody wins.
+  $broke = ($reason === 'the_union_breaks');
   foreach ($players as $seat => $p) {
-    $result = engine_score_player($players, $seat);
+    $result = engine_score_player($players, $seat, $broke);
     $players[$seat]['final_score']     = (int) $result['total'];
     $players[$seat]['score']           = (int) $result['total'];
     $players[$seat]['score_breakdown'] = $result['breakdown'];
   }
   $best = null;
-  foreach ($players as $seat => $p) {
-    if (!empty($p['conceded'])) continue;
-    if ($best === null || (int) $players[$seat]['final_score'] > (int) $players[$best]['final_score']) {
-      $best = (int) $seat;
+  if (!$broke) {
+    foreach ($players as $seat => $p) {
+      if (!empty($p['conceded'])) continue;
+      if ($best === null || (int) $players[$seat]['final_score'] > (int) $players[$best]['final_score']) {
+        $best = (int) $seat;
+      }
     }
   }
   $game['winner_seat'] = $best;
@@ -685,23 +793,26 @@ function engine_end_game(&$game, &$players, $reason, $mysqli) {
 
 function engine_ended_text($reason) {
   $text = [
-    'board_completed' => 'The board is played out. It is 1860.',
-    'all_humans_left' => 'The last editor walked away.',
-    'rules_changed'   => 'This game was started under the old rules.',
+    'board_completed'  => 'The board is played out. It is 1860.',
+    'the_union_breaks' => 'The Union breaks. Every paper loses.',
+    'all_humans_left'  => 'The last editor walked away.',
+    'rules_changed'    => 'This game was started under the old rules.',
   ];
   return $text[$reason] ?? 'The game ended.';
 }
 
-/** Final score. Money IS the score; nothing else is added. */
-function engine_score_player($players, $seat) {
+/** Final score. Money IS the score -- unless the Union broke, when it is zero. */
+function engine_score_player($players, $seat, $broke = false) {
   $p = $players[$seat];
   $money = (int) ($p['public_state']['money'] ?? 0);
   return [
-    'total' => $money,
+    'total' => $broke ? 0 : $money,
     'breakdown' => [
       'money'        => $money,
+      'union_broke'  => $broke,
       'patronages'   => (int) ($p['public_state']['patronages'] ?? 0),
-      'prints'       => (int) ($p['public_state']['prints'] ?? 0),
+      'positives'    => (int) ($p['public_state']['positives'] ?? 0),
+      'negatives'    => (int) ($p['public_state']['negatives'] ?? 0),
       'cards_played' => (int) ($p['public_state']['cards_played'] ?? 0),
     ],
   ];
@@ -741,7 +852,8 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'money'           => (int) ($p['public_state']['money'] ?? 0),
       'is_patron'       => (bool) ($p['public_state']['is_patron'] ?? false),
       'patronages'      => (int) ($p['public_state']['patronages'] ?? 0),
-      'prints'          => (int) ($p['public_state']['prints'] ?? 0),
+      'positives'       => (int) ($p['public_state']['positives'] ?? 0),
+      'negatives'       => (int) ($p['public_state']['negatives'] ?? 0),
       'hand_count'      => (int) ($p['public_state']['hand_count'] ?? 0),
       'committed'       => $current && isset($state['commits'][$seat]),
       'score'           => (int) $p['score'],
@@ -772,7 +884,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
   $you = null;
   if ($viewerSeat !== null && isset($players[$viewerSeat])) {
     $me = $players[$viewerSeat];
-    $bonus = !empty($me['public_state']['is_patron']) ? (int) ($config['patron_bonus'] ?? 0) : 0;
+    $mult = !empty($me['public_state']['is_patron']) ? max(1, (int) ($config['patron_multiplier'] ?? 2)) : 1;
     $hand = [];
     foreach (($current ? ($me['private_state']['hand'] ?? []) : []) as $key) {
       $c = vg_card($key);
@@ -780,9 +892,11 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       $hand[] = [
         'key' => $key, 'name' => $c['name'], 'year' => $c['year'],
         'flavor' => $c['flavor'], 'kind' => $c['kind'],
-        'value' => (int) $c['value'],
-        'cash_value' => (int) $c['value'] + $bonus,
-        'push' => (int) $c['push'],
+        'profit' => (int) $c['profit'],
+        'profit_value' => (int) $c['profit'] * $mult,
+        'positive' => (int) $c['positive'],
+        'negative' => (int) $c['negative'],
+        'stability' => (int) $c['stability'],
       ];
     }
     $you = [
@@ -791,9 +905,6 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'commit' => $current ? ($state['commits'][$viewerSeat] ?? null) : null,
     ];
   }
-
-  $num = max(1, (int) ($config['payout_num'] ?? 3));
-  $den = max(1, (int) ($config['payout_den'] ?? 2));
 
   return [
     'game_id'       => (int) $game['game_id'],
@@ -810,12 +921,15 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     'ended_text'    => $endedReason ? engine_ended_text($endedReason) : null,
     'state_version' => (int) $game['state_version'],
     'rules'         => [
-      'draw_per_round' => (int) ($config['draw_per_round'] ?? 2),
-      'patron_bonus'   => (int) ($config['patron_bonus'] ?? 2),
-      'payout'         => $num / $den,
-      'hand_limit'     => (int) ($config['hand_limit'] ?? 10),
+      'draw_per_round'    => (int) ($config['draw_per_round'] ?? 2),
+      'patron_multiplier' => (int) ($config['patron_multiplier'] ?? 2),
+      'max_negative'      => (int) ($config['max_negative'] ?? 1),
+      'hand_limit'        => (int) ($config['hand_limit'] ?? 10),
+      'stability_recovery'=> intdiv((int) ($config['stability_recovery'] ?? 2) * max(1, count($players)), 2),
     ],
     'track'         => ['min' => (int) ($config['track_min'] ?? -5), 'max' => (int) ($config['track_max'] ?? 5)],
+    'stability'     => (int) ($state['stability'] ?? 0),
+    'stability_max' => (int) ($config['stability_max'] ?? 0),
     'patron_seat'   => $state['patron_seat'] ?? null,
     'president'     => $state['president'] ?? null,
     'race'          => $race,

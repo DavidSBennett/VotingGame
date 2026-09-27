@@ -4,9 +4,9 @@
  * a player makes arrives here and is dispatched by the engine.
  *
  * Body: { player_token, action, params: { … } }
- *   commit      params { plays: [{ card, action: 'cash' | 'print',
+ *   commit      params { plays: [{ card, action: 'profit' | 'positive' | 'negative',
  *                                      side?: 'nation' | 'states' }],
- *                        reserve?: card }
+ *                        reserve?: card played for coverage }
  *               Sealed until every paper has committed; the last one in
  *               resolves the round. Committing again before then replaces it.
  *   concede     params {}
