@@ -196,6 +196,7 @@ export default function GameShell({ seat, onLeave }) {
                 onCommit={(params) => act('commit', params)}
                 rules={state.rules}
                 stability={state.stability}
+                seats={state.players}
               />
             </>
           )}
@@ -246,7 +247,7 @@ export default function GameShell({ seat, onLeave }) {
               </div>
               <p className="mt-2 text-xs text-slate-500">
                 Negative coverage spends it; each election restores {state.rules.stability_recovery}. At zero,
-                every paper loses.
+                the most exposed paper loses {state.rules.exposure_penalty}.
               </p>
             </section>
           )}
@@ -291,6 +292,21 @@ export default function GameShell({ seat, onLeave }) {
                     {p.is_patron && <span className="text-amber-400">Patron · </span>}
                     {p.hand_count} cards · Patron {p.patronages}×
                     {p.conceded && <span className="text-slate-600"> · left</span>}
+                  </div>
+                  <div className="text-xs">
+                    <span
+                      className={
+                        p.exposure > 0 && p.exposure_rank === 1 ? 'text-red-400' : 'text-slate-500'
+                      }
+                      title="Exposure: cards this paper has played negatively. If the Union breaks, the most exposed paper pays."
+                    >
+                      exposure {p.exposure}
+                      {p.exposure > 0 && ` · rank ${p.exposure_rank}`}
+                      {p.exposure > 0 && p.exposure_rank === 1 && ' · most exposed'}
+                    </span>
+                    {p.exposure_penalty > 0 && (
+                      <span className="text-red-400"> · paid {p.exposure_penalty} for the Union</span>
+                    )}
                   </div>
                 </li>
               ))}

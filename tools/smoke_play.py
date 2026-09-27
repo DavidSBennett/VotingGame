@@ -97,6 +97,12 @@ class Checks:
                 if c["positive"] and c["negative"]:
                     self.check((c["positive"] > 0) != (c["negative"] > 0),
                                "%s: positive and negative push opposite ways" % c["key"])
+        # Exposure is public and ranked: 1 = most exposed, equal counts share.
+        counts = sorted({p["exposure"] for p in st["players"]}, reverse=True)
+        for p in st["players"]:
+            self.check(p["exposure"] == p["negatives"], "seat %d exposure counts its negatives" % p["seat"])
+            self.check(p["exposure_rank"] == counts.index(p["exposure"]) + 1,
+                       "seat %d exposure rank" % p["seat"])
         # The hidden-information boundary: no seat's hand or commitment leaks.
         for p in st["players"]:
             self.check(not ({"private_state", "hand", "commit", "plays"} & set(p)),
@@ -131,8 +137,16 @@ class Checks:
         if r["broke"]:
             self.check(st["status"] == "ended" and st["ended_reason"] == "the_union_breaks",
                        "a broken Union ends the game")
-            self.check(st["winner_seat"] is None and all(p["final_score"] == 0 for p in st["players"]),
-                       "a broken Union: nobody wins, everyone scores zero")
+            top = max(p["exposure"] for p in st["players"])
+            want = [p["seat"] for p in st["players"] if p["exposure"] == top and top > 0]
+            self.check(sorted(r["blamed"]) == sorted(want), "the most exposed papers are blamed",
+                       "%s vs %s" % (r["blamed"], want))
+            for p in st["players"]:
+                self.check(p["exposure_penalty"] == (r["penalty"] if p["seat"] in want else 0),
+                           "seat %d paid exactly its exposure penalty" % p["seat"])
+            live = [p for p in st["players"] if not p["conceded"]]
+            best = max(live, key=lambda p: p["final_score"])
+            self.check(st["winner_seat"] == best["seat"], "the richest paper still wins after a break")
             return
         self.check(r["stability_after"] == prev_stability - spent, "stability paid for hostile coverage")
         if r["decided_by"] == "track":

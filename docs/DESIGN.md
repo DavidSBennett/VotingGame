@@ -58,8 +58,13 @@ One track, **States −5 … 0 … +5 Nation** (states' rights against federal
 power). It starts every round at 0.
 
 **Stability of the Union** starts at 14 per two seats. Negative coverage
-spends it; each election restores 1 per two seats. **At zero the Union
-breaks: the game ends and every paper loses** (all score zero).
+spends it; each election restores 1 per two seats.
+
+**Exposure** is public: the number of cards each paper has played
+negatively this game, ranked (1 = most exposed; equal counts share a rank).
+**At zero stability the Union breaks: the game ends where it stands, the
+most exposed paper loses 25** (ties all pay), and the richest paper after
+that wins.
 
 ---
 
@@ -102,7 +107,8 @@ Mark one **coverage** card to reserve.
 
 ## 6. The reveal
 
-1. Negative plays are paid from stability. At zero, everyone loses.
+1. Negative plays are paid from stability. At zero the Union breaks: the
+   game ends, and the most exposed paper loses 25.
 2. Every push is added up. The side the track leans toward wins. Level:
    the greater total influence wins; failing that, history.
 3. The most influence on the winner makes that paper **Patron**: its
@@ -114,7 +120,8 @@ Mark one **coverage** card to reserve.
 ## 7. The end
 
 After 1860 the richest paper wins; conceded seats cannot. If the Union
-breaks, nobody wins.
+breaks, the game ends early, the most exposed paper pays 25, and the
+richest paper after that wins.
 
 **The bot**: keep four cards, commit the rest. Patron? Profit them all.
 Otherwise pick the side the hand can push hardest and, cheapest first,
@@ -129,6 +136,26 @@ once, and only if stability stays above 4. Profit the rest.
 times per setting. It parses the content **out of the PHP**, so the data
 cannot drift; the rules are a hand-port of `engine.php`, kept in step by
 hand. Every number in `engine_default_config()` came from a run.
+
+### Exposure (2026-09-27)
+
+A broken Union no longer makes everyone lose: the most exposed paper
+(most negative plays over the game) loses a penalty, and the richest after
+that wins. 600–800 games per setting:
+
+- **Careful play never breaks the Union** — bots average 1.3 negative plays
+  a game and broke it 0% at every penalty tested — so the penalty cannot
+  make the occasional negative play worthless.
+- **Heavy negative play already loses on its own**: a paper adding its best
+  negative card every round (6.9 a game) wins 18% heads-up, 4–10% at larger
+  tables, penalty or not; the cards are weaker played negatively.
+- **Where breaks happen** — two such papers at a table, 42% of games — the
+  penalty decides who pays. The careful third paper's win rate rose from
+  68% at 0 to 74% at 25 and not at all beyond: **25 is the smallest
+  penalty with the full effect**, about a sixth of a typical final score
+  (median ~150), or two rounds of profit.
+- A paper that is ahead cannot usefully break the Union on a more exposed
+  rival: at 14 stability one negative card never gets there.
 
 ### Three-stat cards and the Union (2026-09-27)
 
@@ -330,3 +357,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-26 | Sealed rounds: one blind commitment per election, any number of cards, cash or print; Patron keeps no reserve; draw 2 | Round robin above; the Patron bonus sets cash against print |
 | 2026-09-27 | Three-stat cards (profit / positive / negative + stability), every release batch push-balanced; stakes removed; stability track (at zero everyone loses); Patron profit x2; one negative a round; reserve limited to coverage cards | See 'Three-stat cards and the Union' |
 | 2026-09-27 | Stability 14 per two seats, recovery 1 | At 10 / 2 the gauge never moved; griefer now breaks it 59% heads-up, 32% at three |
+| 2026-09-27 | Exposure rank; a broken Union costs the most exposed paper 25 instead of everyone losing | Smallest penalty with the full deterrent effect; careful play never breaks the Union |

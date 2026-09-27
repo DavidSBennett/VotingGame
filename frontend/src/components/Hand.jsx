@@ -17,7 +17,7 @@ const MODES = ['keep', 'profit', 'positive', 'negative'];
 const pushText = (push) => (push > 0 ? `Nation +${push}` : push < 0 ? `States +${-push}` : '—');
 const favoured = (push) => (push > 0 ? 'nation' : 'states');
 
-export default function Hand({ hand, race, commit, busy, onCommit, rules, stability }) {
+export default function Hand({ hand, race, commit, busy, onCommit, rules, stability, seats = [] }) {
   const [mode, setMode] = useState({});
   const [side, setSide] = useState({});
   const [reserve, setReserve] = useState(null);
@@ -112,6 +112,11 @@ export default function Hand({ hand, race, commit, busy, onCommit, rules, stabil
 
   const surname = (s) => (race ? race[s].name.split(' ').slice(-1)[0] : s);
   const danger = summary.cost > 0 && stability - summary.cost <= 3;
+  // Exposure after this commitment, against the most any rival has now.
+  const me = seats.find((p) => p.is_you);
+  const myExposure = (me ? me.exposure : 0) + negatives;
+  const rivalTop = Math.max(0, ...seats.filter((p) => !p.is_you).map((p) => p.exposure));
+  const wouldLead = negatives > 0 && myExposure >= rivalTop;
 
   return (
     <section className="rounded-lg border border-slate-700 bg-slate-800 p-4">
@@ -228,10 +233,19 @@ export default function Hand({ hand, race, commit, busy, onCommit, rules, stabil
             </span>
           )}
           {summary.cost > 0 && <span className={danger ? 'text-red-400' : 'text-amber-400'}>union −{summary.cost}</span>}
+          {negatives > 0 && (
+            <span className={wouldLead ? 'text-red-400' : 'text-slate-400'}>exposure → {myExposure}</span>
+          )}
         </div>
+        {wouldLead && (
+          <p className="mt-1 text-xs text-red-400">
+            This makes you {myExposure > rivalTop ? 'the most exposed paper' : 'joint most exposed'}. If the Union
+            breaks, you lose {rules.exposure_penalty}.
+          </p>
+        )}
         {danger && (
           <p className="mt-1 text-xs text-red-400">
-            Stability is {stability}. If the table spends it all, the Union breaks and every paper loses.
+            Stability is {stability}. If the table spends it all, the Union breaks and the game ends.
           </p>
         )}
         {covered.length > 0 && !effectiveReserve && !locked && (

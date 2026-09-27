@@ -40,7 +40,10 @@ export default function Reveal({ reveal, seats, track }) {
       <Track value={reveal.track} min={track.min} max={track.max} />
       <p className="mt-2 text-xs text-slate-500">
         {reveal.broke
-          ? `Hostile coverage cost the Union ${reveal.stability_spent}; it had ${reveal.stability_before} left.`
+          ? `Hostile coverage cost the Union ${reveal.stability_spent}; it had ${reveal.stability_before} left. ` +
+            (reveal.blamed && reveal.blamed.length
+              ? `${reveal.blamed.map(name).join(' and ')} ${reveal.blamed.length === 1 ? 'was' : 'were'} the most exposed and lost ${reveal.penalty}.`
+              : '')
           : `${decided}. ${reveal.patron_name ? `${reveal.patron_name} is Patron.` : 'Nobody is Patron.'}`}
         {!reveal.broke && reveal.stability_spent > 0 && ` Hostile coverage cost the Union ${reveal.stability_spent}.`}
       </p>

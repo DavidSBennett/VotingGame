@@ -8,8 +8,9 @@ also costs the Union stability; each paper may play only one card
 negatively a round. All reveal: the side the track leans toward wins, the
 most influence on the winner is Patron (every card it plays for profit next
 round pays double), everyone else keeps one reserved card, and
-everyone draws two. If stability reaches zero the Union breaks and EVERYONE
-loses. Cards are dated and enter the deck when their events happened.
+everyone draws two. If stability reaches zero the Union breaks, the game
+ends, and the most exposed paper (most negative plays over the game) loses
+exposure_penalty. Cards are dated and enter the deck when their events happened.
 
     py -X utf8 tools/simulate.py                 # the standard report
     py -X utf8 tools/simulate.py --sweep         # patron bonus, stability
@@ -192,6 +193,7 @@ DEFAULTS = dict(
     min_commit=1,
     stability_start=14,      # per two seats, scaled to the table
     stability_recovery=1,    # per two seats, after each election
+    exposure_penalty=25,     # paid by the most exposed paper if the Union breaks
 )
 
 
@@ -309,7 +311,14 @@ class Game:
         self.stability -= spent
         self.min_stability = min(self.min_stability, self.stability)
         if self.stability <= 0:
-            self.ended = "the_union_breaks"      # everyone loses
+            # The Union breaks: the game ends here, and the most exposed
+            # paper (most negative plays over the game; ties all pay) loses
+            # exposure_penalty. Everyone else keeps what they have.
+            self.ended = "the_union_breaks"
+            top = max(p.negatives for p in self.players)
+            self.blamed = [p.seat for p in self.players if p.negatives == top and top > 0]
+            for s in self.blamed:
+                self.players[s].money -= self.cfg["exposure_penalty"]
             self.history.append(dict(space=self.space, broke=True, spent=spent))
             return
 
@@ -506,6 +515,24 @@ def strat_all_cover(game, p):
     return plays, None
 
 
+def strat_breaker(game, p):
+    """Plays like the bot until it is ahead and a rival carries more
+    exposure; then plays its costliest card negatively to end the game on
+    the rival's head. Tests whether the penalty can be weaponised."""
+    rivals = [q for q in game.players if q is not p]
+    lead = p.money - max(q.money for q in rivals)
+    exposed = max(q.negatives for q in rivals)
+    plays, reserve = make_bot()(game, p)
+    if lead > 0 and exposed > p.negatives:
+        worst = sorted([k for k in p.hand if CARDS[k]["negative"]], key=lambda k: -CARDS[k]["stability"])
+        if worst and not any(m == "negative" for _, m, _ in plays):
+            k = worst[0]
+            plays = [pl for pl in plays if pl[0] != k]
+            side = "nation" if CARDS[k]["negative"] > 0 else "states"
+            plays.append((k, "negative", side))
+    return plays, None
+
+
 STRATEGIES = {
     "hoarder": strat_hoarder,
     "casher": strat_casher,
@@ -513,6 +540,7 @@ STRATEGIES = {
     "positive": strat_positive_only,
     "all_cover": strat_all_cover,
     "spoiler": strat_spoiler,
+    "breaker": strat_breaker,
 }
 
 
@@ -536,8 +564,7 @@ def run_matchup(strategies, games, config=None, seed=0):
             plays[p.seat][2] += p.negatives
         history.extend(h for h in g.history if not h["broke"])
         if g.ended == "the_union_breaks":
-            broke += 1                             # everyone loses: nobody scores a win
-            continue
+            broke += 1
         top = max(p.money for p in g.players)
         leaders = [p for p in g.players if p.money == top]
         for p in leaders:
@@ -583,8 +610,7 @@ def report_elections(r):
 def standard(games, seed, config=None):
     field = ["hoarder", "casher", "bot", "positive", "all_cover", "spoiler"]
     print("=" * 76)
-    print("HEADS-UP ROUND ROBIN: row's win rate against column (%d games; a broken" % games)
-    print("Union is a loss for both, so rows can sum below 100%)")
+    print("HEADS-UP ROUND ROBIN: row's win rate against column (%d games)" % games)
     print("=" * 76)
     print("  %-10s" % "" + "".join("%11s" % c for c in field))
     for a in field:

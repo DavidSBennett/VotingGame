@@ -6,6 +6,7 @@ export default function Rules({ rules, open = false }) {
   const mult = rules ? rules.patron_multiplier : 2;
   const draw = rules ? rules.draw_per_round : 2;
   const maxNeg = rules ? rules.max_negative : 1;
+  const penalty = rules ? rules.exposure_penalty : 25;
 
   return (
     <details open={open} className="rounded-lg border border-slate-700 bg-slate-800 p-4">
@@ -41,7 +42,10 @@ export default function Rules({ rules, open = false }) {
         <ul className="list-disc space-y-1 pl-5">
           <li>
             Negative coverage is paid from the Union&rsquo;s stability.{' '}
-            <span className="text-red-400">If it reaches zero, the Union breaks and every paper loses.</span>
+            Every negative card you play adds to your <span className="text-red-300">exposure</span>.{' '}
+            <span className="text-red-400">
+              If stability reaches zero, the Union breaks, the game ends, and the most exposed paper loses {penalty}.
+            </span>
           </li>
           <li>All the pushes are added up. The side the track leans toward wins.</li>
           <li>

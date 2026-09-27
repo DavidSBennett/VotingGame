@@ -34,8 +34,10 @@
  * Mark one card you played for coverage to reserve. When every paper has
  * committed, all reveal:
  *
- *   1. Stability pays for every negative play. At zero the Union breaks,
- *      the game ends, and EVERYONE loses.
+ *   1. Stability pays for every negative play. At zero the Union breaks
+ *      and the game ends; the paper with the most EXPOSURE (negative plays
+ *      over the whole game; ties all pay) loses exposure_penalty, and the
+ *      richest paper after that wins.
  *   2. Every push is added up on a track from States -5 to Nation +5. The
  *      side it leans toward wins. Level: the bigger total influence wins;
  *      failing that, whoever won in history.
@@ -93,6 +95,13 @@ function engine_default_config() {
     // negative play and stability never moved.)
     'stability_start'    => 14,
     'stability_recovery' => 1,
+    // Paid by the most exposed paper when the Union breaks. Careful papers
+    // (~1.3 negative plays a game) essentially never break it; two papers
+    // playing a negative every round broke it 42% of the time, and there the
+    // careful third paper's win rate rose with the penalty up to 25 and not
+    // beyond: 25 is the smallest penalty with the full deterrent effect,
+    // about a sixth of a typical final score.
+    'exposure_penalty'   => 25,
     'track_min'          => -5,
     'track_max'          => 5,
     'min_commit'         => 1,
@@ -115,6 +124,7 @@ function engine_config_knobs() {
     'patron_multiplier'  => [1, 4],
     'stability_start'    => [4, 30],
     'stability_recovery' => [0, 6],
+    'exposure_penalty'   => [0, 100],
   ];
 }
 
@@ -584,16 +594,30 @@ function engine_resolve_round(&$game, &$players, $mysqli) {
   $game['state']['stability'] = max(0, $before - $spent);
 
 
-  // The Union breaks: the game ends here and nobody wins.
+  // The Union breaks: the game ends here, and the most exposed paper pays.
   if ($game['state']['stability'] <= 0) {
     foreach ($reveal as $s => $r) {
       engine_log($mysqli, $game, $s, 'reveal',
         engine_reveal_text($players[$s]['player_name'], $r, $election), $r, $players[$s]['player_name']);
     }
+    $penalty = (int) ($config['exposure_penalty'] ?? 25);
+    $blamed = engine_most_exposed($players);
+    $names = [];
+    foreach ($blamed as $s) {
+      $players[$s]['public_state']['money'] = (int) $players[$s]['public_state']['money'] - $penalty;
+      $players[$s]['public_state']['exposure_penalty'] = $penalty;
+      $names[] = $players[$s]['player_name'];
+    }
+    if ($blamed) {
+      engine_log($mysqli, $game, null, 'exposure_penalty',
+        'The Union breaks. ' . implode(' and ', $names) . (count($names) === 1 ? ', the most exposed paper, loses ' : ', the most exposed papers, each lose ')
+        . $penalty . '.', ['seats' => $blamed, 'penalty' => $penalty]);
+    }
     $game['state']['last_reveal'] = [
       'space' => $space, 'year' => $election['year'], 'broke' => true,
       'track' => $track, 'stability_spent' => $spent,
       'stability_before' => $before, 'stability_after' => 0,
+      'blamed' => $blamed, 'penalty' => $penalty,
       'seats' => array_values($reveal),
     ];
     $game['state']['commits'] = [];
@@ -767,21 +791,19 @@ function engine_end_game(&$game, &$players, $reason, $mysqli) {
   $game['current_seat'] = null;
   $game['ended_reason'] = $reason;
 
-  // A broken Union pays nobody: every paper scores zero and nobody wins.
-  $broke = ($reason === 'the_union_breaks');
+  // Money is the score however the game ends; a broken Union has already
+  // charged the most exposed paper before we get here.
   foreach ($players as $seat => $p) {
-    $result = engine_score_player($players, $seat, $broke);
+    $result = engine_score_player($players, $seat);
     $players[$seat]['final_score']     = (int) $result['total'];
     $players[$seat]['score']           = (int) $result['total'];
     $players[$seat]['score_breakdown'] = $result['breakdown'];
   }
   $best = null;
-  if (!$broke) {
-    foreach ($players as $seat => $p) {
-      if (!empty($p['conceded'])) continue;
-      if ($best === null || (int) $players[$seat]['final_score'] > (int) $players[$best]['final_score']) {
-        $best = (int) $seat;
-      }
+  foreach ($players as $seat => $p) {
+    if (!empty($p['conceded'])) continue;
+    if ($best === null || (int) $players[$seat]['final_score'] > (int) $players[$best]['final_score']) {
+      $best = (int) $seat;
     }
   }
   $game['winner_seat'] = $best;
@@ -796,22 +818,53 @@ function engine_end_game(&$game, &$players, $reason, $mysqli) {
 function engine_ended_text($reason) {
   $text = [
     'board_completed'  => 'The board is played out. It is 1860.',
-    'the_union_breaks' => 'The Union breaks. Every paper loses.',
+    'the_union_breaks' => 'The Union breaks. The most exposed paper pays for it.',
     'all_humans_left'  => 'The last editor walked away.',
     'rules_changed'    => 'This game was started under the old rules.',
   ];
   return $text[$reason] ?? 'The game ended.';
 }
 
-/** Final score. Money IS the score -- unless the Union broke, when it is zero. */
-function engine_score_player($players, $seat, $broke = false) {
+/**
+ * Seats with the most exposure (negative plays over the game), ties
+ * included, or none if nobody has any. Conceded seats count: leaving does
+ * not wash your hands of what you printed.
+ */
+function engine_most_exposed($players) {
+  $top = 0;
+  foreach ($players as $p) $top = max($top, (int) ($p['public_state']['negatives'] ?? 0));
+  if ($top === 0) return [];
+  $out = [];
+  foreach (engine_seat_list($players) as $s) {
+    if ((int) ($players[$s]['public_state']['negatives'] ?? 0) === $top) $out[] = $s;
+  }
+  return $out;
+}
+
+/**
+ * Exposure rank per seat: 1 = most exposed. Seats with equal exposure share
+ * a rank; the next distinct count takes the next rank.
+ */
+function engine_exposure_ranks($players) {
+  $counts = [];
+  foreach ($players as $s => $p) $counts[(int) $s] = (int) ($p['public_state']['negatives'] ?? 0);
+  $distinct = array_values(array_unique($counts));
+  rsort($distinct);
+  $ranks = [];
+  foreach ($counts as $s => $n) $ranks[$s] = array_search($n, $distinct, true) + 1;
+  return $ranks;
+}
+
+/** Final score. Money IS the score, after any exposure penalty. */
+function engine_score_player($players, $seat) {
   $p = $players[$seat];
   $money = (int) ($p['public_state']['money'] ?? 0);
   return [
-    'total' => $broke ? 0 : $money,
+    'total' => $money,
     'breakdown' => [
-      'money'        => $money,
-      'union_broke'  => $broke,
+      'money'            => $money,
+      'exposure'         => (int) ($p['public_state']['negatives'] ?? 0),
+      'exposure_penalty' => (int) ($p['public_state']['exposure_penalty'] ?? 0),
       'patronages'   => (int) ($p['public_state']['patronages'] ?? 0),
       'positives'    => (int) ($p['public_state']['positives'] ?? 0),
       'negatives'    => (int) ($p['public_state']['negatives'] ?? 0),
@@ -844,6 +897,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
   $state = $current ? $game['state'] : [];
   $config = $game['config'];
 
+  $ranks = engine_exposure_ranks($players);
   $seats = [];
   foreach ($players as $seat => $p) {
     $seats[] = [
@@ -856,6 +910,9 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'patronages'      => (int) ($p['public_state']['patronages'] ?? 0),
       'positives'       => (int) ($p['public_state']['positives'] ?? 0),
       'negatives'       => (int) ($p['public_state']['negatives'] ?? 0),
+      'exposure'        => (int) ($p['public_state']['negatives'] ?? 0),
+      'exposure_rank'   => $ranks[(int) $seat] ?? null,
+      'exposure_penalty'=> (int) ($p['public_state']['exposure_penalty'] ?? 0),
       'hand_count'      => (int) ($p['public_state']['hand_count'] ?? 0),
       'committed'       => $current && isset($state['commits'][$seat]),
       'score'           => (int) $p['score'],
@@ -928,6 +985,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'max_negative'      => (int) ($config['max_negative'] ?? 1),
       'hand_limit'        => (int) ($config['hand_limit'] ?? 10),
       'stability_recovery'=> intdiv((int) ($config['stability_recovery'] ?? 2) * max(1, count($players)), 2),
+      'exposure_penalty'  => (int) ($config['exposure_penalty'] ?? 25),
     ],
     'track'         => ['min' => (int) ($config['track_min'] ?? -5), 'max' => (int) ($config['track_max'] ?? 5)],
     'stability'     => (int) ($state['stability'] ?? 0),
