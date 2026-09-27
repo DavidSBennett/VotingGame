@@ -280,8 +280,11 @@ def main():
         prev_money = [p for p in st["players"] if p["is_you"]][0]["money"]
         prev_stability = st["stability"]
         space = st["space"]
+        passing = (space == 3)          # exercise the pass once a game
+        prev_hand = len(st["you"]["hand"])
+        params = {"plays": []} if passing else choose(st)
         res = call(args.base, "/playAction.php",
-                   {"player_token": token, "action": "commit", "params": choose(st)})
+                   {"player_token": token, "action": "commit", "params": params})
         checks.check(res.get("ok") is True, "commitment accepted", str(res)[:120])
         turns += 1
 
@@ -290,6 +293,12 @@ def main():
         checks.check(broke or len(after["history"]) == space, "the round resolved on our commitment",
                      "%d elections after round %d" % (len(after["history"]), space))
         checks.reveal(after, prev_money, prev_stability)
+        if passing and after["status"] == "active":
+            mine = [sd for sd in after["last_reveal"]["seats"] if sd["seat"] == st["you"]["seat"]][0]
+            checks.check(mine["plays"] == [] and mine["earned"] == 0, "a pass plays nothing and earns nothing")
+            checks.check(len(after["you"]["hand"]) == min(prev_hand + after["rules"]["draw_per_round"],
+                                                          after["rules"]["hand_limit"]),
+                         "a pass still draws", "%d -> %d" % (prev_hand, len(after["you"]["hand"])))
 
     final = call(args.base, "/getState.php", params={"player_token": token})["state"]
     elections_seen = len(final.get("history", []))

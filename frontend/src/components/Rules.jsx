@@ -23,7 +23,7 @@ export default function Rules({ rules, open = false }) {
         </p>
         <p>
           Each election is one round, played by every paper <span className="text-slate-100">in secret</span>.
-          Commit as many cards as you like (at least one). Each card can be played one way:
+          Commit as many cards as you like — or none, and pass. Each card can be played one way:
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>

@@ -22,8 +22,8 @@
  *
  * Each card has up to three stats: profit, positive coverage, negative
  * coverage (plus the stability its negative coverage costs). Each round,
- * every paper commits BLIND, all at once: any number of cards (at least
- * one), each played for
+ * every paper commits BLIND, all at once: any number of cards (or none,
+ * to pass), each played for
  *
  *   PROFIT     its profit in money -- doubled if you are the Patron;
  *   POSITIVE   its positive push on the track, counted as that much
@@ -104,7 +104,10 @@ function engine_default_config() {
     'exposure_penalty'   => 25,
     'track_min'          => -5,
     'track_max'          => 5,
-    'min_commit'         => 1,
+    // 0: a paper may pass a round. Passing only grows the hand (draw 2, up
+    // to hand_limit); no passing line tested beat a fair share -- passing
+    // until holding 6 won 19% heads-up, until a full hand then dumping 0%.
+    'min_commit'         => 0,
     'min_players'        => 1,
     'max_players'        => 5,
     'bots'               => 1,
@@ -337,8 +340,8 @@ function engine_validate_commit($game, $player, $params) {
   $plays = $params['plays'] ?? null;
   if (!is_array($plays)) throw new Exception('Choose the cards you are committing.');
 
-  $min = min((int) ($game['config']['min_commit'] ?? 1), count($hand));
-  if (count($plays) < $min) throw new Exception('Commit at least one card.');
+  $min = min((int) ($game['config']['min_commit'] ?? 0), count($hand));
+  if (count($plays) < $min) throw new Exception('Commit at least ' . $min . ' card' . ($min === 1 ? '' : 's') . '.');
 
   $out = [];
   $seen = [];

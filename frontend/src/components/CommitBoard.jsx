@@ -361,7 +361,11 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-xs uppercase tracking-widest text-slate-400">Your commitment</h2>
         <span className="text-xs text-slate-500">
-          {locked ? 'Committed — sealed until everyone is in' : 'Drag cards (or tap a card, then a zone). Sealed until everyone is in.'}
+          {locked
+            ? commit.plays.length === 0
+              ? 'You passed — waiting for the others'
+              : 'Committed — sealed until everyone is in'
+            : 'Drag cards (or tap a card, then a zone), or pass. Sealed until everyone is in.'}
         </span>
       </div>
 
@@ -434,6 +438,11 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
             Stability is {stability}. If the table spends it all, the Union breaks and the game ends.
           </p>
         )}
+        {committed.length === 0 && !locked && (
+          <p className="mt-1 text-xs text-slate-500">
+            Nothing on the board: you can pass. You still draw {rules.draw_per_round} at the end of the round.
+          </p>
+        )}
         {covered.length > 0 && !effectiveReserve && !locked && (
           <p className="mt-1 text-xs text-slate-500">
             No reserve starred: your most profitable coverage card will be kept.
@@ -450,14 +459,26 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
             </button>
           ) : (
             <>
-              <button
-                type="button"
-                disabled={busy || committed.length === 0}
-                onClick={submit}
-                className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-500 disabled:opacity-40"
-              >
-                Commit {committed.length} {committed.length === 1 ? 'card' : 'cards'}
-              </button>
+              {committed.length > 0 ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={submit}
+                  className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-500 disabled:opacity-40"
+                >
+                  Commit {committed.length} {committed.length === 1 ? 'card' : 'cards'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={submit}
+                  className="rounded border border-slate-500 px-4 py-2 text-sm font-medium text-slate-200 hover:border-amber-500 disabled:opacity-40"
+                  title="Commit nothing this round. You still draw at the end of it."
+                >
+                  Pass this round
+                </button>
+              )}
               {committed.length > 0 && (
                 <button
                   type="button"

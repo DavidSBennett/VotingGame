@@ -95,7 +95,8 @@ held in or after their year; the opening deck is the 30 cards to 1796.
 ## 5. A round
 
 Each election is **one round**, played by every paper **at once, blind**.
-Commit any number of cards (at least one), each played for:
+Commit any number of cards — or none, to pass (you still draw 2) — each
+played for:
 
 - **Profit** — its profit in money. **Doubled if you are the Patron.**
 - **Positive** — its positive push, counted as that much **influence** on
@@ -358,3 +359,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-27 | Three-stat cards (profit / positive / negative + stability), every release batch push-balanced; stakes removed; stability track (at zero everyone loses); Patron profit x2; one negative a round; reserve limited to coverage cards | See 'Three-stat cards and the Union' |
 | 2026-09-27 | Stability 14 per two seats, recovery 1 | At 10 / 2 the gauge never moved; griefer now breaks it 59% heads-up, 32% at three |
 | 2026-09-27 | Exposure rank; a broken Union costs the most exposed paper 25 instead of everyone losing | Smallest penalty with the full deterrent effect; careful play never breaks the Union |
+| 2026-09-27 | A paper may pass a round (commit no cards) | No passing line beat a fair share: pass-to-6 won 19% heads-up, pass-to-full-then-dump 0% |
