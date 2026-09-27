@@ -203,8 +203,11 @@ export default function GameShell({ seat, onLeave }) {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <div className="space-y-5">
+        {/* minmax(0,1fr) and min-w-0: without them the column grows to its
+            widest content -- the desk's row of clippings -- and the whole
+            page scrolls sideways on a phone. */}
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="min-w-0 space-y-5">
             {active && state.race && (
               <>
                 <section className="text-center animate-fade">
@@ -322,7 +325,7 @@ export default function GameShell({ seat, onLeave }) {
           </div>
 
           {/* The side: the presses, and the wire */}
-          <aside className="space-y-5">
+          <aside className="min-w-0 space-y-5">
             <section className="panel p-4">
               <div className="section-title mb-3">The presses</div>
               <ul className="space-y-3">
