@@ -190,8 +190,8 @@ DEFAULTS = dict(
     track_min=-5,
     track_max=5,
     min_commit=1,
-    stability_start=10,      # per two seats, scaled to the table
-    stability_recovery=2,    # per two seats, after each election
+    stability_start=14,      # per two seats, scaled to the table
+    stability_recovery=1,    # per two seats, after each election
 )
 
 

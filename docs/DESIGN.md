@@ -57,8 +57,8 @@ The historical result breaks a dead tie and nothing else.
 One track, **States −5 … 0 … +5 Nation** (states' rights against federal
 power). It starts every round at 0.
 
-**Stability of the Union** starts at 10 per two seats. Negative coverage
-spends it; each election restores 2 per two seats. **At zero the Union
+**Stability of the Union** starts at 14 per two seats. Negative coverage
+spends it; each election restores 1 per two seats. **At zero the Union
 breaks: the game ends and every paper loses** (all score zero).
 
 ---
@@ -151,9 +151,13 @@ setting:
   coverage is a situational tool, not a requirement.
 - Nation wins ~45% of races before 1848 and ~52% after (history: 3 of 10,
   2 of 4). The Patron still never repeats.
+- **Stability retuned to 14 / 1** (from 10 / 2, where recovery refunded
+  nearly every negative play and the gauge never moved). Careful papers
+  still never break the Union; a paper playing its costliest card
+  negatively every round breaks it ~59% heads-up, ~32% at three seats, 0%
+  at four or more.
 - **Open:** heads-up, 33% of races end level on the track with equal
-  influence, so history decides them; the Union almost never breaks among
-  careful players, so stability is a safety net more than a pressure.
+  influence, so history decides them.
 
 ### Sealed rounds (2026-09-26)
 
@@ -325,3 +329,4 @@ gate is the only PHP syntax check in the project. rsync runs with no
 | 2026-09-26 | Cards released by date; 40 new cards (the founding, the gap years, profit cards); the crisis rule removed | Opening deck of 30 deals five hands; pinned races stay under 10% |
 | 2026-09-26 | Sealed rounds: one blind commitment per election, any number of cards, cash or print; Patron keeps no reserve; draw 2 | Round robin above; the Patron bonus sets cash against print |
 | 2026-09-27 | Three-stat cards (profit / positive / negative + stability), every release batch push-balanced; stakes removed; stability track (at zero everyone loses); Patron profit x2; one negative a round; reserve limited to coverage cards | See 'Three-stat cards and the Union' |
+| 2026-09-27 | Stability 14 per two seats, recovery 1 | At 10 / 2 the gauge never moved; griefer now breaks it 59% heads-up, 32% at three |

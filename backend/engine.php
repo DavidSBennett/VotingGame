@@ -86,11 +86,13 @@ function engine_default_config() {
     // One negative card per paper per round. Uncapped, a single paper
     // flooding negative coverage broke the Union in 80-100% of games.
     'max_negative'       => 1,
-    // Per two seats, scaled to the table. With recovery 2 even a paper that
-    // plays negatively every round breaks the Union ~0% of the time; with
-    // recovery 0-1 it broke it 90-100%.
-    'stability_start'    => 10,
-    'stability_recovery' => 2,
+    // Per two seats, scaled to the table. At 14 / 1 careful papers never
+    // break the Union, but one that plays its costliest card negatively
+    // every round breaks it ~59% of the time heads-up, ~32% at three seats,
+    // 0% at four or more. (At 10 / 2 recovery refunded nearly every
+    // negative play and stability never moved.)
+    'stability_start'    => 14,
+    'stability_recovery' => 1,
     'track_min'          => -5,
     'track_max'          => 5,
     'min_commit'         => 1,
