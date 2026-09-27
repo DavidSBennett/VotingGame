@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
  */
 const SIDES = ['states', 'nation'];
 const pushText = (p) => (p > 0 ? `Nation +${p}` : p < 0 ? `States +${-p}` : '—');
+const pushShort = (p) => (p > 0 ? `N+${p}` : `S+${-p}`);
 const want = (side) => (side === 'nation' ? 1 : -1);
 
 /** The coverage mode a card uses for a side, or null if it has none. */
@@ -77,9 +78,15 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
     const why = refusal(byKey[key], zone);
     if (why) {
       setNotice(why);
+      setDragging(null);
+      setOver(null);
       return;
     }
     setNotice(null);
+    // The dropped card is remounted in its new zone, so its dragend never
+    // fires; clear the drag state here as well.
+    setDragging(null);
+    setOver(null);
     setPlace((prev) => {
       const next = { ...prev };
       if (zone === 'hand') delete next[key];
@@ -197,18 +204,42 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
             {mode === 'negative' && ` · union −${c.stability}`}
           </div>
         ) : (
-          <div className="mt-1 grid grid-cols-3 gap-1 font-mono text-xs">
-            <span className="text-emerald-400">
-              P {c.profit}
+          <div className="mt-1 flex flex-wrap gap-1 font-mono text-xs">
+            <span className="whitespace-nowrap rounded bg-emerald-950 px-1 text-emerald-300" title="Profit">
+              ${c.profit}
               {c.profit_value !== c.profit && `→${c.profit_value}`}
             </span>
-            <span className={c.positive > 0 ? 'text-sky-300' : c.positive < 0 ? 'text-rose-300' : 'text-slate-600'}>
-              + {pushText(c.positive)}
-            </span>
-            <span className={c.negative > 0 ? 'text-sky-300' : c.negative < 0 ? 'text-rose-300' : 'text-slate-600'}>
-              − {pushText(c.negative)}
-              {c.stability > 0 && <span className="text-red-400"> ·{c.stability}</span>}
-            </span>
+            {c.kind === 'profit' ? (
+              <span className="whitespace-nowrap px-1 text-slate-500">profit card</span>
+            ) : (
+              <>
+                {c.positive !== 0 && (
+                  <span
+                    className={
+                      c.positive > 0
+                        ? 'whitespace-nowrap rounded bg-sky-950 px-1 text-sky-300'
+                        : 'whitespace-nowrap rounded bg-rose-950 px-1 text-rose-300'
+                    }
+                    title="Positive coverage"
+                  >
+                    + {pushShort(c.positive)}
+                  </span>
+                )}
+                {c.negative !== 0 && (
+                  <span
+                    className={
+                      c.negative > 0
+                        ? 'whitespace-nowrap rounded bg-sky-950 px-1 text-sky-300'
+                        : 'whitespace-nowrap rounded bg-rose-950 px-1 text-rose-300'
+                    }
+                    title={`Negative coverage: costs the Union ${c.stability}`}
+                  >
+                    − {pushShort(c.negative)}
+                    <span className="text-red-400"> ☠{c.stability}</span>
+                  </span>
+                )}
+              </>
+            )}
           </div>
         )}
 
