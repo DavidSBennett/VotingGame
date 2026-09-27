@@ -383,7 +383,7 @@ export default function CommitBoard({ hand, race, commit, busy, onCommit, rules,
           </div>
         )}
         {!locked && cards.length > 0 && (
-          <p className="text-center font-mono text-[9px] uppercase tracking-[0.2em] text-cream-200/40">
+          <p className="text-center font-mono text-[9px] uppercase tracking-[0.2em] text-cream-200/40 [@media(max-height:820px)]:hidden">
             Drag a clipping to a candidate or the counting house — or tap it, then tap where it goes
           </p>
         )}

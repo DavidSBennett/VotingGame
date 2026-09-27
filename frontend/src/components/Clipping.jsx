@@ -52,7 +52,13 @@ export default function Clipping({ card, effect = null, size = 'md', lifted = fa
       : 'parchment relative flex flex-col shadow-card transition hover:-translate-y-0.5 hover:shadow-lift';
 
   return (
-    <div {...rest} className={md ? `${shell} h-40 w-36 shrink-0` : `${shell} w-full`} title={card.flavor}>
+    // On short screens (laptops at 768px) the desk card drops its flavour
+    // line and shrinks, so the table above it keeps room for placed cards.
+    <div
+      {...rest}
+      className={md ? `${shell} h-40 w-36 shrink-0 [@media(max-height:820px)]:h-[6.5rem]` : `${shell} w-full`}
+      title={card.flavor}
+    >
       <div className="flex items-baseline justify-between border-b border-ink-950/20 px-2 pb-0.5 pt-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-ink-950/60">
         <span>{card.year}</span>
         <span>{card.kind === 'profit' ? 'The press' : 'Event'}</span>
@@ -69,7 +75,9 @@ export default function Clipping({ card, effect = null, size = 'md', lifted = fa
           {card.name}
         </div>
         {md && (
-          <p className="mt-1 line-clamp-3 font-serif text-[10px] italic leading-snug text-ink-950/70">{card.flavor}</p>
+          <p className="mt-1 line-clamp-3 font-serif text-[10px] italic leading-snug text-ink-950/70 [@media(max-height:820px)]:hidden">
+            {card.flavor}
+          </p>
         )}
       </div>
 
