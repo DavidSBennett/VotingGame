@@ -436,3 +436,32 @@ North Star 29, Aurora 35); seats 3p 36/32/33, 4p 22/22/28/28; ~23
 rounds. Still: never buying negative stories 17%, attacker 22%,
 bigmoney 1%.
 
+### 2026-09-28: negative stories
+
+Before: the middle line won; both extremes lost. Never buying negative
+stories 14-17%, leaning on them 22-26% (fair 33% among two balanced).
+Negative stories carried the same influence and prestige as any story
+plus an attack, so skipping them skipped a quarter of the exchange and
+its points; and an attack hurts every rival equally, so the attacker
+gained nothing over the rest of the table.
+
+| change | attacker / never-negative, among 2 balanced (fair 33) | at 4 seats: attacker / never / balanced (fair 25) |
+| --- | --- | --- |
+| as was | 26 / 14 | 12 / 24 / 32 |
+| -1 influence on negative stories | 11 / 32 | 6 / 30 / 32 |
+| +1 influence per rival hit | 42 / 6 | 48 / 9 / 22 |
+| both | 34 / 12 | 36 / 15 / 25 |
+| -2 influence, +1 per rival hit | 18 / 20 | 17 / 22 / 31 |
+| negative stories worth 0 prestige | 20 / 31 | 7 / 42 / 26 |
+| 0 prestige, +1 per rival hit | 40 / 23 | 46 / 14 / 20 |
+| 0 prestige, +1 prestige per rival hit | (attacks rewarded in prestige: attacker 64-74%) | |
+| **0 prestige, +1 influence if the attack hits anyone** | **31 / 24** (600 games) | **23 / 27 / 25** |
+
+Adopted the last: **negative stories are worth no prestige** (nobody is
+honoured for a smear), and **an attack that hits any rival gives its
+paper +1 influence** that turn. All 27 negative stories updated in
+`docs/deck-dc.csv`. Rechecked: themes head to head 29 / 37 / 34
+(Economic a little high); papers 30-43% (Herald 43%); seats 2p 51/49, 3p
+32/33/35, 4p 25/25/27/23; games ~20 rounds (were ~23); a paper now makes
+~8 attacks and takes ~4 Scandals a game (were ~12 and ~5).
+

@@ -98,7 +98,12 @@ DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=60, unhistorical_extra=None,
                 retract_draw="always",      # Retraction draws a card ('always'); True = only if it destroys one
                 draw_cap=None,              # cap every story's draw
                 political_any=False,        # Political influence counts toward ANY candidate
-                catchup=1)                  # later seats: +1 influence per seat on their first turn (turn order)
+                catchup=1,
+                attack_reward=1,            # influence to the attacker when its negative story hits
+                attack_reward_per_hit=False, # ... for each rival hit (else once, if any rival is hit)
+                attack_vp=0,                # prestige to the attacker for each rival hit
+                neg_gen_add=0,
+                neg_vp=None)                # test: prestige of every negative story (None = the card's)              # test: add to every negative story's plain influence                  # later seats: +1 influence per seat on their first turn (turn order)
 
 
 class Player:
@@ -110,6 +115,8 @@ class Player:
         self.hand, self.discard, self.locations = [], [], []
         self.shielded = False       # the Intelligencer's shield, used this round
         self.argus_vp = 2
+        self.bonus_vp = 0
+        self.neg_vp = None
         self.guarded = False        # the Intelligencer's discard guard, used this round
         self.stats = dict(turns=0, elected=0, bought=0, attacks=0, scandals=0, trashed=0, retracted=0,
                           gen=0, themed=0, draws=0, unhistorical=0)
@@ -122,7 +129,10 @@ class Player:
 
     def prestige(self):
         bonus = self.argus_vp * self.offices() if self.paper == "argus" else 0     # the machine rewards offices
-        return sum(card(c)["vp"] for c in self.owned()) + bonus
+        vp = sum(card(c)["vp"] for c in self.owned() if card(c)["type"] != "Negative story")
+        vp += sum(self.neg_vp if self.neg_vp is not None else card(c)["vp"]
+                  for c in self.owned() if card(c)["type"] == "Negative story")
+        return vp + bonus + self.bonus_vp
 
 
 class Game:
@@ -134,6 +144,7 @@ class Game:
         self.players = [Player(i, s) for i, s in enumerate(strategies)]
         for p in self.players:
             p.argus_vp = self.cfg["argus_vp"]
+            p.neg_vp = self.cfg["neg_vp"]
         if self.cfg["papers"]:
             # Unnamed seats are dealt a paper at random from those not taken.
             free = [k for k in PAPERS if k not in {p.paper for p in self.players}]
@@ -227,6 +238,8 @@ class Game:
             cid = p.hand.pop(0)
             c = card(cid)
             played.append(cid)
+            if c["type"] == "Negative story":
+                gen += self.cfg["neg_gen_add"]
             if c["theme"] and c["type"] != "Election":
                 count[c["theme"]] += 1
                 if p.paper == "journal" and c["theme"] == "Economic":
@@ -262,9 +275,10 @@ class Game:
                     self.refill()
             if c["attack"]:
                 p.stats["attacks"] += 1
-                for q in self.players:
-                    if q is not p:
-                        self.attack(q, c["attack"])
+                hits = sum(self.attack(q, c["attack"]) for q in self.players if q is not p)
+                paid = hits if self.cfg["attack_reward_per_hit"] else min(1, hits)
+                gen += self.cfg["attack_reward"] * paid      # the attacker profits from the hit
+                p.bonus_vp += self.cfg["attack_vp"] * hits
         by_theme = {t: sum(1 for x in played if card(x)["theme"] == t and card(x)["type"] != "Election") for t in THEMES}
         for cid in played:
             c = card(cid)
@@ -388,14 +402,15 @@ class Game:
             q.hand.remove(shield)
             q.discard.append(shield)
             self.draw(q, 1)
-            return
+            return False
         if kind == "discard" and q.paper == "intelligencer" and self.cfg["intelligencer_discard"] and not q.guarded:
             q.guarded = True            # the first discard attack each round misses
-            return
+            return False
         if kind == "discard" and q.hand:
             c = self.rng.choice(q.hand)
             q.hand.remove(c)
             q.discard.append(c)
+            return True
         elif kind == "scandal" and q.paper == "intelligencer" and (
                 self.cfg["intelligencer"] in ("all", "all_draw_first") or not q.shielded):
             # 'all_draw_first': every Scandal ignored; the first each round draws a card.
@@ -403,11 +418,13 @@ class Game:
             q.shielded = True
             if draw:
                 self.draw(q, 1)
-            return
+            return False
         elif kind == "scandal" and self.scandals:
             self.scandals -= 1
             q.discard.append("scandal#%d" % self.scandals)
             q.stats["scandals"] += 1
+            return True
+        return False
 
     def run(self):
         while not self.ended and self.rounds < self.cfg["max_rounds"]:
@@ -425,8 +442,13 @@ class Game:
 # Bots
 # =====================================================================
 
+NEG_VP = None     # set by experiments: the bots' view of negative stories' prestige
+
+
 def value(c):
     t = c["type"]
+    if t == "Negative story" and NEG_VP is not None:
+        c = dict(c, vp=NEG_VP)
     if t == "Media event":
         return 1.2 * c["vp"] + 3 * (c["ongoing_gen"] + 1.3 * c["ongoing_draw"]) - 0.5 * c["others_bonus"]
     v = (1.2 * c["vp"] + c["gen"] + 0.8 * c["themed"] + 0.6 * c["campaign"] + 1.3 * c["draw"]

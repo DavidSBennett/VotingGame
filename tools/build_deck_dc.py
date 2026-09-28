@@ -124,11 +124,13 @@ def text_of(r):
     if r["gain_upto"]:
         s += " Gain a story costing %d or less from the exchange." % r["gain_upto"]
     if r["attack"] == "discard":
-        s += " Attack: each rival paper discards a card at random."
+        s += " Attack: each rival paper discards a card at random; +1 influence if it hits any of them."
     if r["attack"] == "scandal":
-        s += " Attack: each rival paper gains a Scandal."
+        s += " Attack: each rival paper gains a Scandal; +1 influence if it hits any of them."
     if r["retract"]:
         s += " Retraction: draw a card, and you may destroy a Scandal in your hand or discard pile."
+    if r["type"] == "Negative story":
+        s += " Worth no prestige."
     if r["defense"]:
         s += " Defense: discard this from your hand to ignore a negative story, and draw a card."
     return s.strip()
@@ -159,7 +161,8 @@ for s in src:
         else:
             tmpl = {"Political": POLITICAL, "Economic": ECONOMIC, "Social": SOCIAL}[s["theme"]]
             typ = TYPE_OF_THEME[s["theme"]]
-        r = blank(key=key, name=s["name"], type=typ, theme=s["theme"], cost=cost, vp=vp_of(cost), **tmpl[cost])
+        vp = 0 if typ == "Negative story" else vp_of(cost)      # nobody is honoured for a smear
+        r = blank(key=key, name=s["name"], type=typ, theme=s["theme"], cost=cost, vp=vp, **tmpl[cost])
     r.update(released=s["released"], year=s["year"], flavor=s["flavor"])
     rows.append(r)
 for r in rows:
