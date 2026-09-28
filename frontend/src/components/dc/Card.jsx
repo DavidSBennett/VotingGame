@@ -8,7 +8,8 @@
  *
  * Clicking a card opens it in the CardModal (with Play / Buy / Choose when
  * the server allows them); `onOpen` does that. With `dragKey` the card can
- * also be dragged (native drag and drop) onto the play area. Every number comes from the
+ * also be dragged (native drag and drop) onto the play area, and with
+ * `onMiddle` a middle-button click sends it there too. Every number comes from the
  * server's card view. Literal class strings only (Tailwind cannot see
  * interpolated names).
  */
@@ -98,7 +99,7 @@ export function Abilities({ card, size = 'sm' }) {
  * The card thumbnail. size 'sm' (w-28, the Historians' hand size) or 'xs'
  * (w-20, for cards already played this turn).
  */
-export default function Card({ card, onOpen, footer = null, dim = false, tag = null, size = 'sm', lifted = false, dragKey = null }) {
+export default function Card({ card, onOpen, footer = null, dim = false, tag = null, size = 'sm', lifted = false, dragKey = null, onMiddle = null }) {
   const t = typeStyle(card);
   const xs = size === 'xs';
   const tip = [card.name, card.card_text].filter(Boolean).join('\n\n');
@@ -109,6 +110,26 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
         onClick={onOpen}
         title={tip}
         draggable={Boolean(dragKey)}
+        // Middle button: `onMiddle` (a hand card: play it). The mousedown is
+        // swallowed so Windows does not start its auto-scroll; the action
+        // fires on auxclick, when the middle button comes back up.
+        onMouseDown={
+          onMiddle
+            ? (e) => {
+                if (e.button === 1) e.preventDefault();
+              }
+            : undefined
+        }
+        onAuxClick={
+          onMiddle
+            ? (e) => {
+                if (e.button === 1) {
+                  e.preventDefault();
+                  onMiddle();
+                }
+              }
+            : undefined
+        }
         onDragStart={
           dragKey
             ? (e) => {

@@ -631,3 +631,13 @@ re-checks); click still opens it. Checked by firing the drag events on a
 live test game: the card carried its key, the play reached the server,
 the hand went 4 -> 3. On a phone the columns stack.
 
+### 2026-09-28: first playtest; middle-click to play
+
+- **Playtest, game 38** (the user, the Washington Globe, vs one easy bot,
+  the New York Herald): 67 to 70, the bot won; 21 rounds; the user
+  elected 9 of 17, the bot 8; history rewritten 3 times (1808, 1824,
+  1848). The user: "the game feels ok."
+- Middle-click a hand card to play it (the user's request): the mousedown
+  is swallowed so Windows does not start its auto-scroll, and the play
+  fires on auxclick. Drag and click-to-open still work.
+

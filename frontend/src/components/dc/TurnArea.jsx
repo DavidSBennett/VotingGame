@@ -29,7 +29,7 @@ export function Pools({ pools }) {
  * turn's buttons.
  *
  * Drag a story from your hand into the play area to play it (native drag
- * and drop; the server re-checks). Click a card to open it instead -- Play
+ * and drop), or middle-click it; the server re-checks. Click a card to open it instead -- Play
  * is in the card too. The play area holds what has been played this turn;
  * on a rival's turn it shows what they have played.
  *
@@ -107,7 +107,7 @@ export default function TurnArea({ state, me, act, busy, open }) {
         <div className="mt-2">
           <div className="label text-center text-cream-200/50">
             Your hand · {you.hand.length}
-            {you.hand.length > 0 && (myTurn ? ' · drag to the press, or click to open' : ' · click to open')}
+            {you.hand.length > 0 && (myTurn ? ' · drag or middle-click to the press · click to open' : ' · click to open')}
           </div>
           {you.hand.length === 0 ? (
             <p className="mt-2 text-center font-serif text-sm italic text-cream-200/50">{myTurn ? 'Every card is played.' : 'Empty.'}</p>
@@ -120,6 +120,7 @@ export default function TurnArea({ state, me, act, busy, open }) {
                   dim={!myTurn}
                   onOpen={() => open(you.hand, i, 'hand')}
                   dragKey={canPlay && playable.includes(c.key) ? c.key : null}
+                  onMiddle={canPlay && playable.includes(c.key) ? () => act('play', { card: c.key }) : null}
                 />
               ))}
             </HandFan>
