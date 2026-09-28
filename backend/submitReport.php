@@ -9,7 +9,7 @@
  * The snapshot is the point: a complaint about the endgame is unreadable
  * six games later without the position that produced it.
  */
-require_once __DIR__ . '/engine.php';
+require_once __DIR__ . '/lib.php';
 
 require_method('POST');
 $me = authenticate($mysqli);

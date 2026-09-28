@@ -583,3 +583,19 @@ render; fixed on sight: "new" tags covering costs (and marking every
 1796 story), truncated negative labels, empty card middles (now the
 flavour line).
 
+### 2026-09-28: milestone 6 -- polish
+
+- High scores: `highScores.php?engine=dc` keeps only the DC game's rows
+  (their breakdown carries `prestige`; the older game's scored money) and
+  returns each row's newspaper and elections won. The lobby board is now
+  "Most honoured papers on record": prestige, newspaper, offices.
+- The Herald's text matches its timing: the scooped story joins your next
+  hand.
+- Playtest notes: the snapshot already stored the whole state;
+  `submitReport.php` no longer loads the old engine.
+- The old game's screen is retired: BoardStrip, Clipping, CommitBoard,
+  Exchange, NationGauge, News, Reveal, Rules and Track removed (bundle
+  282 -> 238 kB). A table still on the older rules gets a notice (export,
+  or back to the lobby); its engine stays on the server for the API.
+- CLAUDE.md describes the DC game, its content pipeline and its tests.
+

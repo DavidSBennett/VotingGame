@@ -68,5 +68,5 @@ Roughly 1,000 lines of PHP and 1,500 of React.
 - Milestone 4 (live, opt-in `"engine": "dc"`; `tools/smoke_dc.py`): done.
 - Milestone 5 (UI): done. `createGame` defaults to `dc`; the lobby lists
   DC tables with their papers.
-- Milestone 6 (polish): next.
+- Milestone 6 (polish): done. The build is complete.
 

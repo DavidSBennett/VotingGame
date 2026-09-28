@@ -351,7 +351,7 @@ export default function Lobby({ onSeated }) {
       )}
 
       <div className="mt-12">
-        <HighScores />
+        <HighScores papers={papers} />
       </div>
     </div>
   );
