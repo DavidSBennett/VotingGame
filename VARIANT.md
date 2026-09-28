@@ -413,3 +413,26 @@ all three focused decks meet; the Journal's card draw did not fix it
 (23%). Negative stories still near-essential: attacker 22%, never buying
 them 21%. Games ~24 rounds.
 
+### 2026-09-28: Economic compounds
+
+Economic lagged when all three focused decks met (22-23%). Tried in
+memory (Political / Economic / Social; head to head, and one theme deck
+among two balanced; fair 33%):
+
+| change | head to head | among balanced |
+| --- | --- | --- |
+| as was | 38 / 22 / 40 | 27 / 30 / 32 |
+| +1 influence on every Economic story | 41 / 31 / 28 | 22 / 34 / 24 |
+| +1 Economic on every Economic story | 32 / 36 / 32 | 26 / 38 / 25 |
+| +1 influence on Economic stories cost 4+ | 38 / 30 / 32 | 22 / 32 / 28 |
+| **every Economic story: +1 influence per other Economic story this turn** | **34 / 31 / 36** | **28 / 37 / 30** |
+
+Adopted the last (600 games): it is Economic's identity -- the
+engine-builder that compounds -- and the only change that evened the
+head-to-head without sinking Political or Social. Now on all 26 Economic
+stories (19 gained it). Rechecked: papers on a balanced deck 29-41%
+(Globe 34, Argus 35, Intelligencer 33, Journal 39, Herald 41, Sun 31,
+North Star 29, Aurora 35); seats 3p 36/32/33, 4p 22/22/28/28; ~23
+rounds. Still: never buying negative stories 17%, attacker 22%,
+bigmoney 1%.
+

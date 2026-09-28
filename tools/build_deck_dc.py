@@ -49,14 +49,14 @@ POLITICAL = {
     7: dict(gen=2, themed=3, campaign=3, retract=1),
     8: dict(gen=3, themed=4, per_office=1, retract=1),
 }
-ECONOMIC = {
-    2: dict(gen=2),
-    3: dict(gen=1, themed=1, trash=1),
+ECONOMIC = {        # every Economic story compounds: +1 per other Economic story this turn
+    2: dict(gen=2, per_same=1),
+    3: dict(gen=1, themed=1, trash=1, per_same=1),
     4: dict(gen=2, themed=1, per_same=1),
-    5: dict(gen=2, themed=1, trash=1),
-    6: dict(gen=2, themed=2, gain_upto=4),
+    5: dict(gen=2, themed=1, trash=1, per_same=1),
+    6: dict(gen=2, themed=2, gain_upto=4, per_same=1),
     7: dict(gen=3, themed=2, per_same=1),
-    8: dict(gen=4, themed=2, gain_upto=5),
+    8: dict(gen=4, themed=2, gain_upto=5, per_same=1),
 }
 SOCIAL = {
     2: dict(gen=1, draw=1, defense=1),
