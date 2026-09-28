@@ -530,3 +530,28 @@ simulator; each varies as much against itself.
 Local PHP now has a php.ini with mbstring enabled (the server has it;
 the engine uses mb_strlen for log lines).
 
+### 2026-09-28: milestone 4 -- the new engine live, behind an opt-in
+
+A game created with `"engine": "dc"` plays `engine_dc.php`; every other
+game (the whole current UI) still plays the newsroom game. `lib.php`
+gains `vg_engine_of_config` / `vg_require_engine` /
+`vg_require_engine_for_game`; `createGame` stores the choice in the
+game's config; start, play, state and export load that game's engine.
+DC games are kept off the lobby list and exported raw by the bulk export
+until the UI lands.
+
+`tools/smoke_dc.py` plays DC games through the live endpoints: solo
+against 1-3 bots (easy and hard) and two people + a bot (join, start,
+turns alternate, "not your turn" enforced, the second person never sees
+the first's hand), with refusals (card not in hand, unaffordable
+election and story, unknown action) and checks after every action (one
+paper on turn = current_seat; my hand / deck / discard match the public
+counts; my prestige adds up; nothing private in any seat's public block;
+pools never negative; exchange at most five; the ending, scores, winner
+and export). Two runs: 8 games at 2-4 seats, 14,353 checks, all clear;
+17-25 rounds, history rewritten in 2-9 of 17 elections -- the
+simulator's shape. The current game's smoke test still passes (1,993
+checks). One run lost a request to a dropped connection from the host
+(WinError 10054); actions are not retried, since a retry could apply
+twice.
+

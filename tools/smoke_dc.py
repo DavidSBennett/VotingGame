@@ -81,10 +81,13 @@ def take_turn(base, token, st, ck, say, stats):
     """One whole turn for a person, through the API: play, prompts, elect, buy, paper, end."""
     before = len(st["history"])
     guard = 0
+    trail = []
     while st["status"] == "active" and st["turn"]["seat"] == st["you"]["seat"] and guard < 80:
         guard += 1
         av = st["available_actions"]
         you = st["you"]
+        trail.append("pending=%s play_all=%s elect=%s paper=%s buy=%s hand=%d" % (
+            bool(you["pending"]), av.get("play_all"), av.get("elect"), av.get("paper"), av.get("buy"), len(you["hand"])))
         if you["pending"]:
             opts = [c["key"] for c in you["pending"]["options"]]
             pick = None
@@ -113,9 +116,12 @@ def take_turn(base, token, st, ck, say, stats):
             act(base, token, "end_turn")
             stats["turns"] += 1
             stats["paper_used_turn"] = False
+            st = state_of(base, token)
+            check_state(ck, st, "after turn %d" % stats["turns"])
+            break               # in a solo game the bots have already played: my next turn is a new call
         st = state_of(base, token)
         check_state(ck, st, "turn %d action %d" % (stats["turns"], guard))
-    ck.check(guard < 80, "a turn finishes")
+    ck.check(guard < 80, "a turn finishes", " | ".join(trail[-6:]))
     return st
 
 

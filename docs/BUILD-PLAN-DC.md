@@ -59,3 +59,13 @@ contracts (`createGame`, `joinGame`, `startGame`, `playAction`,
 6. **Polish.** Export, high scores in prestige, playtest report.
 
 Roughly 1,000 lines of PHP and 1,500 of React.
+
+## Progress
+
+- Milestone 1 (content pipeline): done 2026-09-28.
+- Milestone 2 (engine core, `backend/engine_dc.php`, `tools/engine_test.php`): done.
+- Milestone 3 (bots, `tools/parity_dc.py`): done; engine and simulator agree.
+- Milestone 4 (live, opt-in `"engine": "dc"`; `tools/smoke_dc.py`): done.
+- Milestone 5 (UI): next. When it lands, `createGame` should default to
+  `dc` and the lobby list should stop hiding DC games.
+
