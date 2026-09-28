@@ -50,8 +50,8 @@ def load():
     with open(os.path.join(DOCS, "elections-dc.csv"), encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             e = dict(r)
-            for f in ("space", "year", "vp", "nation_threshold", "states_threshold", "patron_gen", "patron_themed"):
-                e[f] = int(r[f])
+            for f in ("space", "year", "vp", "nation_threshold", "states_threshold", "patron_themed") + ("p_gen", "p_draw", "p_trash", "p_trash_draw", "p_gain_upto", "p_recover", "p_per_kind", "p_scry", "p_stay_gen", "fa_n"):
+                e[f] = int(r[f] or 0)
             elections.append(e)
     return cards, elections
 
@@ -70,16 +70,21 @@ def card(cid):
     if cid.startswith("elec#"):
         i, side = cid[5:].split(":")
         e = ELECTIONS[int(i)]
-        return dict(key=cid, name="%s %s" % (e["year"], e[side]), type="Election", theme=e[side + "_theme"],
-                    vp=e["vp"], gen=e["patron_gen"], themed=e["patron_themed"], cost=0,
-                    attack="", others_theme="", released=None,
-                    **{f: 0 for f in INT if f not in ("vp", "gen", "themed", "cost")})
+        # The election card's power (docs/elections-dc.csv, p_*): DC's Super-Villains.
+        c = dict(key=cid, name="%s %s" % (e["year"], e[side]), type="Election", theme=e[side + "_theme"],
+                 vp=e["vp"], themed=e["patron_themed"], cost=0, others_theme="", released=None,
+                 **{f: 0 for f in INT if f not in ("vp", "themed", "cost")})
+        c.update(gen=e["p_gen"], draw=e["p_draw"], trash=e["p_trash"], gain_upto=e["p_gain_upto"],
+                 trash_draw=e["p_trash_draw"], recover=e["p_recover"], per_kind=e["p_per_kind"],
+                 scry=e["p_scry"], ongoing_gen=e["p_stay_gen"], attack=e["p_attack"] or "")
+        return c
     return CARDS[cid.split("#")[0]]
 
 
 DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=60, unhistorical_extra=None,
                 threshold_add=0,
                 papers=True,                # each paper plays a newspaper character (DC's Super Heroes)
+                election_powers=True,       # election cards' powers and First Appearance (else the old +1 / themed)
                 retract_min_cost=None,      # test: every Political story costing this or more has Retraction 1
                 intelligencer="all",      # 'all': never gains Scandals; 'first': ignores the first each round
                 intelligencer_draw=False,    # ... and draws a card when it does
@@ -238,6 +243,7 @@ class Game:
             cid = p.hand.pop(0)
             c = card(cid)
             played.append(cid)
+            powers = self.cfg["election_powers"] or c["type"] != "Election"
             if c["type"] == "Negative story":
                 gen += self.cfg["neg_gen_add"]
             if c["theme"] and c["type"] != "Election":
@@ -253,27 +259,46 @@ class Game:
                         and count["Social"] == self.cfg["north_star_at"] and not star_done):
                     star_done = True
                     p.stats["draws"] += len(self.draw(p, self.cfg["north_star_draw"]))
-            gen += c["gen"]
+            if c["type"] == "Election" and not self.cfg["election_powers"]:
+                gen += 1
+            elif c["type"] != "Election" or powers:
+                gen += c["gen"]
             if c["theme"]:
                 themed[c["theme"]] += c["themed"]
             campaign += c["campaign"]
             n_draw = c["draw"] if self.cfg["draw_cap"] is None else min(c["draw"], self.cfg["draw_cap"])
+            if c["type"] == "Election" and not powers:
+                n_draw = 0
             if n_draw:
                 p.stats["draws"] += len(self.draw(p, n_draw))
-            if c["trash"]:
-                self.trash(p, bot)
+            for _ in range(c["trash"] if powers else 0):
+                if self.trash(p, bot) and c.get("trash_draw"):
+                    p.stats["draws"] += len(self.draw(p, 1))
+            if powers and c.get("recover"):
+                for _ in range(c["recover"]):
+                    if not p.discard:
+                        break
+                    best = max(p.discard, key=lambda x: value(card(x)))
+                    p.discard.remove(best)
+                    p.hand.append(best)
+            if powers and c.get("scry") and self.main:
+                look = [self.main.pop() for _ in range(min(c["scry"], len(self.main)))]
+                keep = bot.choose(self, p, look)
+                look.remove(keep)
+                p.hand.append(keep)
+                self.main[0:0] = look            # the rest to the bottom
             retract = c["retract"]
             if self.cfg["retract_min_cost"] is not None and c["type"] == "Political story":
                 retract = 1 if c["cost"] >= self.cfg["retract_min_cost"] else 0
             for _ in range(retract):
                 self.retract(p)
-            if c["gain_upto"]:
+            if c["gain_upto"] and powers:
                 pick = bot.choose(self, p, [x for x in self.exchange if card(x)["cost"] <= c["gain_upto"]])
                 if pick:
                     self.exchange.remove(pick)
                     p.discard.append(pick)
                     self.refill()
-            if c["attack"]:
+            if c["attack"] and powers:
                 p.stats["attacks"] += 1
                 hits = sum(self.attack(q, c["attack"]) for q in self.players if q is not p)
                 paid = hits if self.cfg["attack_reward_per_hit"] else min(1, hits)
@@ -290,6 +315,10 @@ class Game:
                 themed[c["theme"]] += c["per_office"] * p.offices()
         if p.paper == "globe":
             themed["Political"] += self.cfg["globe_per"] * by_theme["Political"]
+        if self.cfg["election_powers"]:
+            kinds = len({card(x)["type"] for x in played})
+            for cid in played:
+                gen += card(cid).get("per_kind", 0) * kinds
         if p.paper == "aurora":
             gen += self.cfg["aurora_per"] * len({card(x)["key"] for x in played if card(x)["type"] == "Negative story"})
         p.stats["gen"] += gen
@@ -330,6 +359,8 @@ class Game:
             else:
                 self.release(ELECTIONS[self.e]["year"])
                 self.refill()
+                if self.cfg["election_powers"]:
+                    self.first_appearance(ELECTIONS[self.e])
 
         # Buy.
         while True:
@@ -365,7 +396,8 @@ class Game:
         self.refill()
 
         for cid in played:
-            if card(cid)["type"] == "Media event":
+            if card(cid)["type"] == "Media event" or (card(cid)["type"] == "Election" and card(cid)["ongoing_gen"]
+                                                        and self.cfg["election_powers"]):
                 p.locations.append(cid)
             else:
                 p.discard.append(cid)
@@ -395,6 +427,55 @@ class Game:
             c = order[0]
             (p.hand if c in p.hand else p.discard).remove(c)
             p.stats["trashed"] += 1
+            return True
+        return False
+
+    def first_appearance(self, e):
+        """An election's First Appearance: it hits every paper as its campaign opens."""
+        kind, n = e["fa_kind"], e["fa_n"]
+        cost = lambda x: card(x)["cost"]
+        if kind == "sweep":
+            self.main[0:0] = self.exchange
+            self.exchange = []
+            self.refill()
+            return
+        if kind == "scandal_leader":
+            top = max(q.prestige() for q in self.players)
+            targets = [q for q in self.players if q.prestige() == top]
+        elif kind == "discard_leader":
+            high = max(q.offices() for q in self.players)
+            targets = [q for q in self.players if q.offices() == high]
+            kind = "discard"
+        elif kind == "draw_fewest":
+            low = min(q.offices() for q in self.players)
+            targets = [q for q in self.players if q.offices() == low]
+        else:
+            targets = list(self.players)
+        for q in targets:
+            for _ in range(n):
+                if kind in ("draw", "draw_fewest"):
+                    self.draw(q, 1)
+                elif kind == "discard" and q.hand:
+                    c = self.rng.choice(q.hand)
+                    q.hand.remove(c)
+                    q.discard.append(c)
+                elif kind == "discard_dearest" and q.hand:
+                    c = max(q.hand, key=cost)
+                    q.hand.remove(c)
+                    q.discard.append(c)
+                elif kind == "destroy_cheapest" and q.hand:
+                    c = min(q.hand, key=cost)
+                    q.hand.remove(c)
+                elif kind in ("scandal", "scandal_leader") and self.scandals and q.paper != "intelligencer":
+                    self.scandals -= 1
+                    q.discard.append("scandal#%d" % self.scandals)
+                    q.stats["scandals"] += 1
+                elif kind == "unscandal":
+                    for pile in (q.hand, q.discard):
+                        sc = next((c for c in pile if c.startswith("scandal#")), None)
+                        if sc:
+                            pile.remove(sc)
+                            break
 
     def attack(self, q, kind):
         shield = next((c for c in q.hand if card(c)["defense"]), None)

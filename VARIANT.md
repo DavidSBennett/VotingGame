@@ -641,3 +641,54 @@ the hand went 4 -> 3. On a phone the columns stack.
   is swallowed so Windows does not start its auto-scroll, and the play
   fires on auxclick. Drag and click-to-open still work.
 
+### 2026-09-28: election cards as DC's Super-Villains (the user)
+
+"The election cards should do more powerful things" -- modelled on the
+Heroes Unite Super-Villains (a strong power when played, and a "First
+Appearance" attack when revealed). One power per election (the user's
+choice), plus the elected candidate's themed bonus as before; a First
+Appearance event for each election after 1796 (no choices, so nobody
+waits; Defense does not stop it; the Intelligencer never gains Scandals).
+Prestige is shown as a gilt seal on every card (the user: "cards need to
+have prestige on them" = show it prominently).
+
+| year | card | power (when played) | First Appearance |
+| --- | --- | --- | --- |
+| 1796 | The Farewell Address | +2, draw 1 | -- |
+| 1800 | The Revolution of 1800 | +2, draw 2, destroy 1 | Sedition Act: office leaders discard 1 at random |
+| 1804 | The Louisiana Purchase | +2, gain a story <=4 | 12th Amendment: each draws 1 |
+| 1808 | The Embargo | +4 | Embargo: each discards its dearest card in hand |
+| 1812 | Mr. Madison's War | +1 per different kind of card played | Impressment: prestige leaders gain a Scandal |
+| 1816 | Good Feelings | draw 3 | Good Feelings: each destroys a Scandal |
+| 1820 | The Missouri Compromise | destroy up to 2, draw 1 each | Fire Bell: office leaders discard 1 at random |
+| 1824 | The Corrupt Bargain | recover 2 from discard to hand | Corrupt Bargain: prestige leaders gain a Scandal |
+| 1828 | The Tariff of Abominations | +3, draw 1 | Mudslinging: prestige leaders gain a Scandal |
+| 1832 | The Bank War | gain a story <=6, draw 1 | The Veto: the exchange is swept and dealt afresh |
+| 1836 | The Specie Circular | +3, draw 2 | Panic of 1837: office leaders discard 2 |
+| 1840 | Log Cabin and Hard Cider | +4 | Tippecanoe: each draws 1 |
+| 1844 | Manifest Destiny | +2; look at the top 3, keep 1 | Fifty-four Forty: fewest offices draw 2 |
+| 1848 | The Free Soil Revolt | +1 per kind played, draw 1 | Wilmot Proviso: each destroys its cheapest card in hand |
+| 1852 | The Compromise of 1850 | destroy up to 3, draw 1 each | Fugitive Slave Act: prestige leaders gain a Scandal |
+| 1856 | Bleeding Kansas | +5; attack: each rival gains a Scandal | Bleeding Kansas: office leaders discard 2 |
+| 1860 | Secession Winter | +6 | Secession: each destroys its cheapest card in hand |
+
+Simulator (`election_powers`, 450-600 games):
+- As first drafted (with two "stays in play" cards, 1796 +1 and 1840 +2
+  every turn, and most events hitting everyone), the paper that won most
+  of the first six elections won the game 56% (36% with the old cards;
+  fair 33%): a snowball. Dampers, each tested: no stays-in-play 52%; three
+  Scandal events aimed at the prestige leader 49%; four discard events
+  aimed at the office leader 45%. Adopted all three.
+- Final: early election leader wins 45%; themes head to head 29/32/39,
+  among balanced 31/39/34; papers 29-39% (spread 9); seats 3p 32.9/33.2/
+  33.9 and 4p 23.8/24.9/27.2/24.1 (1,500 games); games 16-19 rounds (were
+  18-23).
+
+Engine: the powers and First Appearance in `engine_dc.php` (a prompt
+queue for destroy-up-to-N-and-draw, recover, and look-at-the-top-3; the
+cards being looked at are a zone of their own and go to the bottom of the
+main deck if the turn ends). `tools/engine_test.php`: 3,092 rule checks
+and 300 random games (133,130 actions, 22.7M invariant checks), 0
+failures; it caught stories being lost when a turn ended mid-choice.
+Parity with the simulator within ~2% on every aggregate.
+

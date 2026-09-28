@@ -29,11 +29,14 @@ CARD_FIELDS = ["key", "name", "type", "theme", "cost", "vp", "gen", "themed", "c
                "ongoing_gen", "ongoing_draw", "others_bonus", "others_theme", "released", "year",
                "copies", "card_text", "flavor"]
 ELECTION_FIELDS = ["space", "year", "era", "vp", "nation", "nation_theme", "nation_threshold",
-                   "states", "states_theme", "states_threshold", "historical_winner",
-                   "patron_gen", "patron_themed", "card_text"]
+                   "states", "states_theme", "states_threshold", "historical_winner", "patron_themed",
+                   "card_name", "p_gen", "p_draw", "p_trash", "p_trash_draw", "p_gain_upto", "p_recover",
+                   "p_per_kind", "p_scry", "p_stay_gen", "p_attack", "power_text",
+                   "fa_kind", "fa_n", "fa_name", "fa_text", "card_text"]
 PAPER_FIELDS = ["key", "name", "dc_super_hero", "leans", "ability", "flavor"]
-INTS = set(sim.INT) | {"space", "year", "vp", "nation_threshold", "states_threshold",
-                       "patron_gen", "patron_themed", "released"}
+INTS = set(sim.INT) | {"space", "year", "vp", "nation_threshold", "states_threshold", "patron_themed",
+                       "released", "p_gen", "p_draw", "p_trash", "p_trash_draw", "p_gain_upto", "p_recover",
+                       "p_per_kind", "p_scry", "p_stay_gen", "fa_n"}
 
 
 def typed(record, fields):
