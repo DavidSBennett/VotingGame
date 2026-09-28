@@ -1,18 +1,22 @@
-"""Playout harness for the VARIANT's era redesign (VARIANT.md, revision 2).
+"""Playout harness for the VARIANT's era redesign (VARIANT.md, revision 3).
 
 The game in one paragraph: seventeen elections in three eras (I 1796-1816,
 II 1820-1840, III 1844-1860). Each paper draws from its own deck, which
 starts with generic Era I starter stories. Every round each paper commits
-blind: each story is RUN on either candidate (its influence, plus its theme
-bonus if its theme matches that candidate's) or BURIED (its purchasing
-power -- doubled for the Patron -- and its prestige, the score). With the
-commitment it names stories to BUY off the exchange at their cost. The
-candidate with the most total influence wins; the most influence on him
-makes a paper Patron for the next round. Run stories go to the paper's own
-discard pile; buried stories leave the game. Entering a new era, every
-card of the old era is lost. A story's era is set by the election that
-releases it, so next-era stories arrive three elections early. Most
-prestige buried by 1860 wins.
+blind. Each story is either
+  PLAYED on a candidate, in his POSITIVE space (adds its influence, plus
+    its theme bonus if its theme matches his) or his NEGATIVE space
+    (subtracts the same). A played story is spent: it leaves the paper's
+    deck, and the paper banks its PRESTIGE -- the score;
+  or BURIED: its purchasing power (doubled for the Patron), and it goes
+    back to the paper's discard pile to be buried again another day.
+With the commitment it names stories to BUY off the exchange at their
+cost. The candidate with the higher net influence wins; the most influence
+on him (positive on him, and -- by default -- negative on his rival) makes
+a paper Patron for the next round. Entering a new era, every card of the
+old era is lost. A story's era is set by the election that releases it,
+so next-era stories arrive three elections early. Most prestige by 1860
+wins.
 
 Content is read from docs/deck-v2.csv and docs/candidates.csv, so an edit
 to either spreadsheet is picked up on the next run.
@@ -113,6 +117,10 @@ DEFAULTS = dict(
     exchange_size=6,
     max_buys=1,
     era_topup=True,         # after an era change, draw back up to start_hand
+    neg_patron=True,        # a negative play counts toward the Patronage of his rival
+    floor_zero=True,        # a candidate's net influence never drops below 0
+    income=0,               # purchasing power every paper gets each round (subscriptions)
+    starter_copies=1,       # multiply every starter's copies
     # stat overrides for sweeps (None = the spreadsheet's value)
     bonus=None,
     prestige_by_era=None,   # e.g. {"I": 1, "II": 2, "III": 3}
@@ -131,7 +139,8 @@ class Player:
         self.patronages = 0
         self.bought = {"I": 0, "II": 0, "III": 0}
         self.buried = 0
-        self.ran = 0
+        self.ran = 0             # played positive
+        self.negs = 0            # played negative
         self.lost = 0            # cards lost at era changes
         self.empty_rounds = 0
 
@@ -148,7 +157,8 @@ class Game:
         self.players = [Player(i, s) for i, s in enumerate(strategies)]
         for p in self.players:
             p.money = self.cfg["start_money"]
-            p.deck = ["%s#%d.%d" % (k, p.seat, i) for k, n in STARTERS for i in range(n)]
+            p.deck = ["%s#%d.%d" % (k, p.seat, i) for k, n in STARTERS
+                      for i in range(n * self.cfg["starter_copies"])]
             self.rng.shuffle(p.deck)
         self.space = 0
         self.supply, self.exchange = [], []
@@ -239,23 +249,37 @@ class Game:
             if not p.hand:
                 p.empty_rounds += 1
 
-        influence = {"nation": {}, "states": {}}
+        pos = {"nation": {}, "states": {}}     # side -> seat -> influence played for him
+        neg = {"nation": {}, "states": {}}     # side -> seat -> influence played against him
         for p in self.players:
             for cid, act, side in commits[p.seat]:
                 p.hand.remove(cid)
                 if act == "bury":
                     p.money += base(cid)["profit"] * (self.cfg["patron_multiplier"] if p.patron else 1)
-                    p.prestige += self.prestige(cid)
                     p.buried += 1
-                else:
-                    influence[side][p.seat] = influence[side].get(p.seat, 0) + self.influence(cid, side, e)
+                    continue
+                # Played: spent, and known for it.
+                p.prestige += self.prestige(cid)
+                book = pos if act == "pos" else neg
+                book[side][p.seat] = book[side].get(p.seat, 0) + self.influence(cid, side, e)
+                if act == "pos":
                     p.ran += 1
+                else:
+                    p.negs += 1
 
-        totals = {s: sum(influence[s].values()) for s in SIDES}
+        totals = {}
+        for s in SIDES:
+            net = sum(pos[s].values()) - sum(neg[s].values())
+            totals[s] = max(0, net) if self.cfg["floor_zero"] else net
         if totals["nation"] != totals["states"]:
             winner, decided = ("nation" if totals["nation"] > totals["states"] else "states"), "influence"
         else:
             winner, decided = e["historical_winner"], "history"
+        loser = "states" if winner == "nation" else "nation"
+        influence = {winner: dict(pos[winner])}
+        if self.cfg["neg_patron"]:
+            for seat, v in neg[loser].items():
+                influence[winner][seat] = influence[winner].get(seat, 0) + v
         best = max(influence[winner].values(), default=0)
         top = [s for s, v in influence[winner].items() if v == best and best > 0]
         patron = top[0] if len(top) == 1 else None
@@ -264,11 +288,13 @@ class Game:
             p.patron = (p.seat == patron)
             p.patronages += p.patron
 
-        # Stories run go home; stories buried are gone.
+        # Stories buried go home to be buried again; stories played are spent.
         for p in self.players:
             for cid, act, _ in commits[p.seat]:
-                if act == "run":
+                if act == "bury":
                     p.discard.append(cid)
+        for p in self.players:
+            p.money += self.cfg["income"]
         self.buy(wishes)
         self.history.append(dict(space=self.space, year=e["year"], era=e["era"], winner=winner,
                                  decided=decided, patron=patron, repeat=(patron is not None and patron == prev),
@@ -304,8 +330,8 @@ class Game:
         ids = [c for c, _, _ in plays]
         assert len(set(ids)) == len(ids) and all(c in p.hand for c in ids), (p.strategy, ids)
         for cid, act, side in plays:
-            assert act in ("run", "bury"), act
-            if act == "run":
+            assert act in ("pos", "neg", "bury"), act
+            if act != "bury":
                 assert side in SIDES and base(cid)["kind"] == "news", (p.strategy, cid)
 
     def buy(self, wishes):
@@ -331,91 +357,123 @@ class Game:
 
 
 # =====================================================================
-# Strategies: f(game, player) -> [(card, 'run'|'bury', side|None)]
+# Strategies: f(game, player) -> [(card, 'pos'|'neg'|'bury', side|None)]
+#   side is the candidate the story is PLAYED ON: 'pos' adds to him,
+#   'neg' subtracts from him.
 # =====================================================================
 
-def choose_side(game, hand):
-    """The candidate this hand gives the most influence (history breaks a tie)."""
+def best_play(game, cid, side, allow_neg=True):
+    """How this story helps `side` win most: positive on him, or negative on
+    his rival. Returns (influence, act, played_on)."""
+    rival = "states" if side == "nation" else "nation"
+    options = [(game.influence(cid, side), "pos", side)]
+    if allow_neg:
+        options.append((game.influence(cid, rival), "neg", rival))
+    return max(options, key=lambda o: (o[0], o[1] == "pos"))
+
+
+def choose_side(game, hand, allow_neg=True):
+    """The candidate whose theme this hand fits best, played positive (a coin
+    breaks a tie). With negative plays every story helps either man about
+    equally, so following history -- or the most reach -- herds every paper
+    onto the same candidate."""
     reach = {s: sum(game.influence(c, s) for c in hand) for s in SIDES}
     if reach["nation"] != reach["states"]:
         return max(SIDES, key=lambda s: reach[s])
-    return game.election()["historical_winner"]
+    return game.rng.choice(SIDES)
 
 
-def make_bot(target=4, keep_hand=10, patron_keep=1, bury_by="prestige"):
+def news(hand):
+    return [c for c in hand if base(c)["kind"] == "news"]
+
+
+def make_bot(target=4, keep_hand=3, patron_keep=1, allow_neg=True, only_neg=False):
     """
-      1. The last election a card can be used in (end of its era, or 1860):
-         bury it.
-      2. Patron? Bury everything but the `patron_keep` best runners: it pays
-         double.
-      3. Otherwise back the candidate the hand favours: run the stories that
-         give the most influence for the least prestige until influence
-         reaches `target`.
-      4. Bury the rest down to `keep_hand` cards in hand, by `bury_by`.
+      1. 1860, or the last election a story's era allows: play it (its
+         prestige is lost otherwise). Money is worth nothing by then.
+      2. Patron? Bury everything else (double purchasing power), keeping
+         `patron_keep` stories to bid with next round.
+      3. Otherwise back the candidate the hand helps most: play the stories
+         worth more played than buried (prestige high, profit low) until the
+         influence reaches `target` -- positive on him, or negative on his
+         rival, whichever helps more.
+      4. Bury the rest (they come back), keeping `keep_hand` stories in hand
+         for next round's bid.
     """
     def strat(game, p):
         hand = list(p.hand)
         plays, used = [], set()
-        for c in hand:
+        side = choose_side(game, news(hand), allow_neg)
+        for c in news(hand):
             if game.expires_now(c):
-                plays.append((c, "bury", None))
+                inf, act, on = best_play(game, c, side, allow_neg)
+                if only_neg and allow_neg:
+                    act, on = "neg", ("states" if side == "nation" else "nation")
+                plays.append((c, act, on))
                 used.add(c)
+        if game.last_round():
+            return plays
         rest = [c for c in hand if c not in used]
         if p.patron:
-            runners = sorted([c for c in rest if base(c)["kind"] == "news"],
-                             key=lambda c: (-base(c)["influence"], game.prestige(c)))[:patron_keep]
-            return plays + [(c, "bury", None) for c in rest if c not in runners]
-        side = choose_side(game, rest)
-        options = sorted([c for c in rest if game.influence(c, side) > 0],
-                         key=lambda c: (game.prestige(c) / game.influence(c, side), -game.influence(c, side)))
+            keep = sorted(news(rest), key=lambda c: (-game.prestige(c), base(c)["profit"]))[:patron_keep]
+            return plays + [(c, "bury", None) for c in rest if c not in keep]
+        options = sorted(news(rest), key=lambda c: (base(c)["profit"] - game.prestige(c),
+                                                    -best_play(game, c, side, allow_neg)[0]))
         inf = 0
         for c in options:
             if inf >= target:
                 break
-            plays.append((c, "run", side))
+            got, act, on = best_play(game, c, side, allow_neg)
+            if only_neg and allow_neg:
+                rival = "states" if side == "nation" else "nation"
+                got, act, on = game.influence(c, rival), "neg", rival
+            plays.append((c, act, on))
             used.add(c)
-            inf += game.influence(c, side)
-        left = [c for c in hand if c not in used]
-        key = (lambda c: -game.prestige(c)) if bury_by == "prestige" else (lambda c: -base(c)["profit"])
-        for c in sorted(left, key=key)[:max(0, len(left) - keep_hand + game.cfg["draw_per_round"])]:
-            plays.append((c, "bury", None))
+            inf += got
+        left = sorted([c for c in hand if c not in used], key=lambda c: (-base(c)["profit"], game.prestige(c)))
+        keepers = set(sorted(news(left), key=lambda c: (-game.prestige(c), base(c)["profit"]))[:keep_hand])
+        for c in left:
+            if c not in keepers:
+                plays.append((c, "bury", None))
         return plays
     return strat
 
 
-def strat_burier(game, p):
-    """Buries everything, every round. Never Patron."""
-    return [(c, "bury", None) for c in p.hand]
-
-
-def strat_runner(game, p):
-    """Runs everything it can for its side; buries only what would expire."""
-    side = choose_side(game, p.hand)
+def strat_banker(game, p):
+    """Buries everything to build money and buys; plays a story only when it
+    would otherwise be lost (era end, 1860)."""
     plays = []
+    side = choose_side(game, news(p.hand))
     for c in p.hand:
-        if game.expires_now(c) or (base(c)["kind"] == "trade" and p.patron):
+        if base(c)["kind"] == "news" and game.expires_now(c):
+            _, act, on = best_play(game, c, side)
+            plays.append((c, act, on))
+        elif not game.last_round():
             plays.append((c, "bury", None))
-        elif base(c)["kind"] == "news":
-            plays.append((c, "run", side))
     return plays
 
 
-def strat_half(game, p):
-    """Runs half its hand (the best influence), buries the other half."""
-    side = choose_side(game, p.hand)
-    ranked = sorted(p.hand, key=lambda c: -game.influence(c, side))
-    k = len(ranked) // 2
-    return [(c, "run", side) if i < k and game.influence(c, side) > 0 and not game.expires_now(c)
-            else (c, "bury", None) for i, c in enumerate(ranked)]
+def strat_spender(game, p):
+    """Plays every story it can, every round; buries only trade stories."""
+    side = choose_side(game, news(p.hand))
+    plays = []
+    for c in p.hand:
+        if base(c)["kind"] == "news":
+            _, act, on = best_play(game, c, side)
+            plays.append((c, act, on))
+        elif not game.last_round():
+            plays.append((c, "bury", None))
+    return plays
 
 
 STRATEGIES = {
-    "hunter": make_bot(target=4, keep_hand=10, patron_keep=1),    # wins the Patronage, dumps as Patron
-    "steady": make_bot(target=3, keep_hand=4, patron_keep=1),     # smaller bids, buries more
-    "bidder": make_bot(target=7, keep_hand=10, patron_keep=2),    # overbids for the Patronage
-    "burier": strat_burier,
-    "runner": strat_runner,
-    "half": strat_half,
+    "hunter": make_bot(target=4, keep_hand=3, patron_keep=1),     # bid for the Patronage, positive or negative
+    "positive": make_bot(target=4, keep_hand=3, patron_keep=1, allow_neg=False),
+    "negative": make_bot(target=4, keep_hand=3, patron_keep=1, only_neg=True),
+    "steady": make_bot(target=3, keep_hand=1, patron_keep=1),     # smaller bids, buries more
+    "bidder": make_bot(target=7, keep_hand=5, patron_keep=2),     # overbids for the Patronage
+    "banker": strat_banker,
+    "spender": strat_spender,
 }
 
 
@@ -480,6 +538,7 @@ def run_matchup(strategies, games, config=None, seed=0):
             st["lost"].append(p.lost)
             st["empty"].append(p.empty_rounds)
             st["money"].append(p.money)
+            st.setdefault("plays", []).append((p.ran, p.negs, p.buried))
     return dict(strategies=strategies, games=games, wins=wins, prestige=prestige, stats=stats,
                 history=history, short=short)
 
@@ -509,7 +568,7 @@ def report(games, seed, config=None):
     print("=" * 78)
     print("HEADS-UP: row's win rate against column (%d games, seats alternated)" % games)
     print("=" * 78)
-    field = ["hunter", "steady", "bidder", "half", "runner", "burier"]
+    field = ["hunter", "positive", "negative", "steady", "bidder", "banker", "spender"]
     print("  %-10s" % "" + "".join("%9s" % c for c in field))
     for a in field:
         row = "  %-10s" % a
@@ -562,10 +621,13 @@ def report(games, seed, config=None):
         print("    elections: decided by influence %s, matched history %s, contested Patron %s, same Patron twice %s"
               % (pct(mean([x["decided"] == "influence" for x in h])), pct(mean([x["matched"] for x in h])),
                  pct(mean([x["contested"] for x in h])), pct(mean([x["repeat"] for x in h]))))
+        pl = [x for st in r["stats"] for x in st["plays"]]
+        print("    per paper a game: played positive %.1f, negative %.1f, buried %.1f"
+              % (mean([x[0] for x in pl]), mean([x[1] for x in pl]), mean([x[2] for x in pl])))
         print("    Patronages per paper: %s   exchange short after release: %.1f rounds a game"
               % (" / ".join("%.1f" % mean(st["patronages"]) for st in r["stats"]), r["short"] / games))
         others = []
-        for s in ("steady", "bidder", "half", "runner", "burier"):
+        for s in ("positive", "negative", "steady", "bidder", "banker", "spender"):
             share, _ = rotated([s] + ["hunter"] * (n - 1), games, config, seed)
             others.append("%s %s" % (s, pct(share[s])))
         print("    one of these among hunters (fair %s): %s" % (pct(1 / n), "  ".join(others)))
@@ -574,28 +636,30 @@ def report(games, seed, config=None):
 
 def sweep(games, seed):
     print("=" * 78)
-    print("SWEEP (3 hunters/mixed + one burier + one runner checks); fair 3-seat = 33.3%")
+    print("SWEEP: one of each line among two hunters (fair 3-seat = 33.3%)")
     print("=" * 78)
     knobs = [
+        ("neg_patron", (True, False)),
+        ("floor_zero", (True, False)),
         ("patron_multiplier", (1, 2, 3)),
         ("start_money", (0, 6, 12)),
-        ("bonus", (0, 1, 2)),
-        ("exchange_size", (4, 6, 8)),
-        ("max_buys", (1, 2)),
+        ("bonus", (0, 1, 2, 3)),
         ("cost_add", (-2, 0, 2)),
+        ("max_buys", (1, 2)),
         ("prestige_by_era", ({"I": 1, "II": 1, "III": 1}, {"I": 1, "II": 2, "III": 3}, {"I": 1, "II": 3, "III": 5})),
     ]
+    lines = ("positive", "negative", "banker", "spender", "hunter/none")
     for knob, values in knobs:
         for v in values:
             cfg = {knob: v}
             r = run_matchup(["hunter"] * 3, games, cfg, seed)
-            b, _ = rotated(["burier", "hunter", "hunter"], games, cfg, seed)
-            nb, _ = rotated(["hunter/none", "hunter/mixed", "hunter/mixed"], games, cfg, seed)
-            ru, _ = rotated(["runner", "hunter", "hunter"], games, cfg, seed)
+            got = []
+            for s in lines:
+                sh, _ = rotated([s, "hunter", "hunter"], games, cfg, seed)
+                got.append("%s %s" % (s.replace("hunter/none", "non-buyer"), pct(sh[s])))
             label = v if not isinstance(v, dict) else "/".join(str(v[e]) for e in ("I", "II", "III"))
-            print("  %-18s %-7s burier %s  non-buyer %s  runner %s  | contested Patron %s, winner prestige %.1f"
-                  % (knob, label, pct(b["burier"]), pct(nb["hunter/none"]), pct(ru["runner"]),
-                     pct(mean([x["contested"] for x in r["history"]])),
+            print("  %-17s %-6s %s | contested %s, winner prestige %.1f"
+                  % (knob, label, "  ".join(got), pct(mean([x["contested"] for x in r["history"]])),
                      mean([max(r["prestige"][s][i] for s in range(3)) for i in range(games)])))
         print()
 

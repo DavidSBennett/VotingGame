@@ -149,3 +149,49 @@ influence / mixed / cheap / dear / trade / ahead / none.
   influence (2-3).
 - Scores are small: the winner buries ~20 prestige at 3 seats (1/2/3 per
   era).
+
+### Revision 3 (2026-09-28, the user): playing spends, burying recycles, negatives
+
+- A story **played on a candidate** is spent: it leaves the deck, and the
+  paper banks its **prestige** ("what you become known for").
+- A story **buried** gives its purchasing power (x2 for the Patron) and
+  goes back to the paper's discard pile. It is never lost.
+- Each candidate has a **positive** and a **negative** space. Negative
+  subtracts the story's influence (plus theme bonus if its theme matches
+  that candidate) from his total. Same cost as any story, for now.
+- Not specified; simulator defaults, both tested: a negative play counts
+  toward the Patronage of his rival (`neg_patron`); a candidate's net
+  influence never drops below 0 (`floor_zero`).
+
+`tools/simulate_eras.py` (240-3,000 games per line). New bots: positive
+(never negative), negative (only negative), banker (bury everything, buy,
+play only what would be lost), spender (play everything).
+
+- **Bot fix:** with sideless stories and negatives, every hand helps both
+  men equally; following history herded every paper onto one candidate
+  (matched history 100%). Papers now back the candidate whose theme their
+  hand fits, a coin for a tie. Seats fair (3,000 games: 33.0/33.9/33.1).
+- **Decks run dry.** Playing spends, money only comes from burying, 1 buy
+  a round: papers hold an empty hand ~9 of 17 rounds and buy ~0 Era III
+  stories. So hoarding wins: the banker 38% at 3 seats, **79-86% at 4-5**;
+  buying trade stories (never spent, bury every cycle) 44% / 73%.
+- No money knob fixes the flow: start money, prices, theme bonus, 2 buys
+  only move who wins (prices -2: banker 0%; +2: banker 88%).
+- **A steady income fixes it.** Every paper gets purchasing power each
+  round (subscriptions):
+
+  | income | empty-hand rounds | Era III buys | banker 3p / 4p | trade-buying 3p / 4p | winner prestige 3p |
+  | --- | --- | --- | --- | --- | --- |
+  | 0 | 8.6 | 0.3 | 38% / 79% | 44% / 73% | 12 |
+  | 1 | 5.5 | 2.0 | 0% / 1% | 9% / 37% | 23 |
+  | 2 | 3.1 | 3.5 | 0% / 0% | 0% / 1% | 29 |
+  | 3 | 1.1 | 5.5 | 0% / 0% | 0% / 0% | 34 |
+
+  A bigger starting deck (starters x2) did not help (empty 8.1).
+- **Negatives:** only-negative play is weak (15-18% at 3 seats, fair 33%);
+  papers that mix positive and negative use about 1-2 a game. If a
+  negative play did NOT count toward the Patronage, only-negative fell to
+  5%. Letting totals go below 0 changed little.
+- At income 2, "steady" (small bids, bury most) leads: 43% at 3 seats,
+  32% at 4.
+
