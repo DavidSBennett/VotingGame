@@ -24,7 +24,7 @@ NEGATIVE = {
 TYPE_OF_THEME = {"Political": "Political story", "Economic": "Economic story", "Social": "Social story"}
 
 FIELDS = ["key", "name", "type", "theme", "cost", "vp", "gen", "themed", "campaign", "draw", "trash",
-          "gain_upto", "chain", "per_same", "per_office", "attack", "defense",
+          "gain_upto", "chain", "per_same", "per_office", "attack", "defense", "retract",
           "ongoing_gen", "ongoing_draw", "others_bonus", "others_theme",
           "released", "year", "copies", "card_text", "flavor"]
 
@@ -32,7 +32,7 @@ FIELDS = ["key", "name", "type", "theme", "cost", "vp", "gen", "themed", "campai
 def blank(**kw):
     row = {f: "" for f in FIELDS}
     row.update({f: 0 for f in ("cost", "vp", "gen", "themed", "campaign", "draw", "trash", "gain_upto",
-                               "chain", "per_same", "per_office", "defense", "ongoing_gen",
+                               "chain", "per_same", "per_office", "defense", "retract", "ongoing_gen",
                                "ongoing_draw", "others_bonus")})
     row["copies"] = 1
     row.update(kw)
@@ -43,11 +43,11 @@ def blank(**kw):
 POLITICAL = {
     2: dict(gen=1, themed=2),
     3: dict(gen=1, themed=2, campaign=1),
-    4: dict(gen=1, themed=2, per_office=1),
-    5: dict(gen=2, themed=2, campaign=2),
-    6: dict(gen=2, themed=3, per_office=1),
-    7: dict(gen=2, themed=3, campaign=3),
-    8: dict(gen=3, themed=4, per_office=1),
+    4: dict(gen=1, themed=2, per_office=1, retract=1),
+    5: dict(gen=2, themed=2, campaign=2, retract=1),
+    6: dict(gen=2, themed=3, per_office=1, retract=1),
+    7: dict(gen=2, themed=3, campaign=3, retract=1),
+    8: dict(gen=3, themed=4, per_office=1, retract=1),
 }
 ECONOMIC = {
     2: dict(gen=2),
@@ -127,6 +127,8 @@ def text_of(r):
         s += " Attack: each rival paper discards a card at random."
     if r["attack"] == "scandal":
         s += " Attack: each rival paper gains a Scandal."
+    if r["retract"]:
+        s += " Retraction: draw a card, and you may destroy a Scandal in your hand or discard pile."
     if r["defense"]:
         s += " Defense: discard this from your hand to ignore a negative story, and draw a card."
     return s.strip()

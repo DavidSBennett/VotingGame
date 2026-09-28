@@ -33,7 +33,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
 THEMES = ("Political", "Economic", "Social")
 INT = ("cost", "vp", "gen", "themed", "campaign", "draw", "trash", "gain_upto", "chain", "per_same",
-       "per_office", "defense", "ongoing_gen", "ongoing_draw", "others_bonus", "copies")
+       "per_office", "defense", "ongoing_gen", "ongoing_draw", "others_bonus", "copies", "retract")
 
 
 def load():
@@ -42,7 +42,7 @@ def load():
         for r in csv.DictReader(fh):
             c = dict(r)
             for f in INT:
-                c[f] = int(r[f] or 0)
+                c[f] = int(r.get(f) or 0)
             c["theme"] = r["theme"] or None
             c["released"] = int(r["released"]) if r["released"] else None
             cards[c["key"]] = c
@@ -80,6 +80,10 @@ def card(cid):
 DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=60, unhistorical_extra=None,
                 threshold_add=0,
                 papers=True,                # each paper plays a newspaper character (DC's Super Heroes)
+                retract_min_cost=None,      # test: every Political story costing this or more has Retraction 1
+                intelligencer="first",      # 'all': never gains Scandals; 'first': ignores the first each round
+                intelligencer_draw=True,    # ... and draws a card when it does
+                retract_draw="always",      # Retraction draws a card ('always'); True = only if it destroys one
                 draw_cap=None,              # cap every story's draw
                 political_any=False,        # Political influence counts toward ANY candidate
                 catchup=0)                  # later seats: +1 influence per seat on their first turn
@@ -92,7 +96,8 @@ class Player:
         self.paper = self.paper or None
         self.deck = ["letter#%d.%d" % (seat, i) for i in range(7)] + ["notice#%d.%d" % (seat, i) for i in range(3)]
         self.hand, self.discard, self.locations = [], [], []
-        self.stats = dict(turns=0, elected=0, bought=0, attacks=0, scandals=0, trashed=0,
+        self.shielded = False       # the Intelligencer's shield, used this round
+        self.stats = dict(turns=0, elected=0, bought=0, attacks=0, scandals=0, trashed=0, retracted=0,
                           gen=0, themed=0, draws=0, unhistorical=0)
 
     def owned(self):
@@ -169,6 +174,7 @@ class Game:
     def turn(self, p):
         bot = BOTS[p.strategy]
         p.stats["turns"] += 1
+        p.shielded = False
         gen, campaign = 0, 0
         if p.stats["turns"] == 1:
             gen += self.cfg["catchup"] * p.seat
@@ -222,6 +228,11 @@ class Game:
                 p.stats["draws"] += len(self.draw(p, n_draw))
             if c["trash"]:
                 self.trash(p, bot)
+            retract = c["retract"]
+            if self.cfg["retract_min_cost"] is not None and c["type"] == "Political story":
+                retract = 1 if c["cost"] >= self.cfg["retract_min_cost"] else 0
+            for _ in range(retract):
+                self.retract(p)
             if c["gain_upto"]:
                 pick = bot.choose(self, p, [x for x in self.exchange if card(x)["cost"] <= c["gain_upto"]])
                 if pick:
@@ -325,6 +336,21 @@ class Game:
                 p.discard.append(cid)
         self.draw(p, self.cfg["hand"])
 
+    def retract(self, p):
+        """Retraction: destroy a Scandal in your hand or discard pile (and,
+        by the retract_draw setting, draw a card: 'always' draws even when
+        there is no Scandal to destroy)."""
+        if self.cfg["retract_draw"] == "always":
+            p.stats["draws"] += len(self.draw(p, 1))
+        for pile in (p.hand, p.discard):
+            sc = next((c for c in pile if c.startswith("scandal#")), None)
+            if sc:
+                pile.remove(sc)
+                p.stats["retracted"] += 1
+                if self.cfg["retract_draw"] is True:
+                    p.stats["draws"] += len(self.draw(p, 1))
+                return
+
     def trash(self, p, bot):
         order = [c for c in p.hand + p.discard if card(c)["type"] == "Scandal"]
         order += [c for c in p.hand + p.discard if c.startswith("notice#")]
@@ -346,8 +372,11 @@ class Game:
             c = self.rng.choice(q.hand)
             q.hand.remove(c)
             q.discard.append(c)
-        elif kind == "scandal" and q.paper == "intelligencer":
-            self.draw(q, 1)
+        elif kind == "scandal" and q.paper == "intelligencer" and (
+                self.cfg["intelligencer"] == "all" or not q.shielded):
+            q.shielded = True
+            if self.cfg["intelligencer_draw"]:
+                self.draw(q, 1)
             return
         elif kind == "scandal" and self.scandals:
             self.scandals -= 1
@@ -376,7 +405,7 @@ def value(c):
         return 1.2 * c["vp"] + 3 * (c["ongoing_gen"] + 1.3 * c["ongoing_draw"]) - 0.5 * c["others_bonus"]
     v = (1.2 * c["vp"] + c["gen"] + 0.8 * c["themed"] + 0.6 * c["campaign"] + 1.3 * c["draw"]
          + 0.8 * c["trash"] + 0.4 * c["gain_upto"] + 0.6 * c["chain"] + 0.8 * c["per_same"]
-         + 1.0 * c["per_office"] + 0.3 * c["defense"])
+         + 1.0 * c["per_office"] + 0.3 * c["defense"] + 0.8 * c.get("retract", 0))
     if c["attack"] == "scandal":
         v += 1.5
     elif c["attack"] == "discard":

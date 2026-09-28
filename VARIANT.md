@@ -345,3 +345,36 @@ Herald paid 4): Political still 4-12% against the other two themes; the Sun
   that wins few elections. Scandal immunity is too strong for any other
   deck (55% on a general deck).
 
+### 2026-09-28: Retraction on Political stories (the user's choice)
+
+"Retraction: draw a card, and you may destroy a Scandal in your hand or
+discard pile." Now on every Political story costing 4+ (16 cards). The
+Intelligencer is narrowed: the first Scandal each round is ignored, and
+it draws a card instead.
+
+Separating the effects (Political deck vs Economic + Social, fair 33%,
+240-300 games):
+
+| version | Political |
+| --- | --- |
+| no fix | 9% |
+| Intelligencer blocks Scandals and draws a card | 30% |
+| Intelligencer blocks Scandals, no draw | 8% |
+| Retraction on every Political story, no draw | 12% |
+| Retraction draws only when it destroys a Scandal | 17% |
+| **Retraction on cost 4+, always draws** | **33%** (Economic 29%, Social 38%) |
+| Retraction on cost 3+, always draws | 46% |
+| Retraction on every Political story, always draws | 49% |
+
+- **Correction to the earlier finding:** blocking Scandals was not what
+  helped. Political was short of cards: it drew ~7 a game to Social's
+  ~30. The Intelligencer's 30% came from the card it drew per attack.
+- With Retraction (4+, always draws): Political wins the most elections
+  (7.2 a game) and draws ~23 cards; games shorten to ~25 rounds; seats
+  36/34/30. One theme deck among two balanced (fair 33%): Political 26%,
+  Economic 34%, Social 36%, attacker 29%, never-negative 18%.
+- Papers on a balanced deck (fair 33%): Globe 34%, Argus 28%,
+  Intelligencer 44%, Journal 41%, Herald 16%, Sun 45%, North Star 27%,
+  Aurora 33%. Next: bring the Intelligencer and Sun down and the Herald
+  up.
+
