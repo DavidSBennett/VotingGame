@@ -12,7 +12,7 @@
  * playthrough". Everything I review between playtests comes from here,
  * so it is lossless by policy: add fields, never trim them.
  */
-require_once __DIR__ . '/engine.php';
+require_once __DIR__ . '/lib.php';
 
 require_method('GET');
 
@@ -30,6 +30,7 @@ if (isset($_GET['player_token'])) {
 $game = load_game($mysqli, $gameId);
 if (!$game) error('Game not found', 404);
 $players = load_players($mysqli, $gameId);
+vg_require_engine(vg_engine_of_config($game['config']));
 
 $export = engine_build_export($mysqli, $game, $players, $viewerSeat);
 

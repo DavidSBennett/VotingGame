@@ -39,6 +39,14 @@ foreach ($ids as $gameId) {
   $game = load_game($mysqli, $gameId);
   if (!$game) continue;
   $players = load_players($mysqli, $gameId);
+  if (vg_engine_of_config($game['config']) === 'dc') {
+    // engine.php is loaded here, not engine_dc.php: export the raw rows.
+    $games[] = ['export_version' => 'raw-dc', 'summary' => ['game_id' => $gameId, 'status' => $game['status'],
+                'ended_reason' => $game['ended_reason'], 'config' => $game['config']],
+                'final_board' => $game['state'], 'players' => array_values($players),
+                'events' => all_events($mysqli, $gameId)];
+    continue;
+  }
   $games[] = engine_build_export($mysqli, $game, $players);
 }
 

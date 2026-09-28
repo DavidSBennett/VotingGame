@@ -11,7 +11,7 @@
  * Polled every 1.5s by every open client, so it stays deliberately cheap:
  * one indexed read to compare versions before anything else happens.
  */
-require_once __DIR__ . '/engine.php';
+require_once __DIR__ . '/lib.php';
 
 require_method('GET');
 
@@ -41,6 +41,7 @@ if (isset($_GET['since']) && (int) $_GET['since'] === $version) {
 $game = load_game($mysqli, $gameId);
 if (!$game) error('Game not found', 404);
 $players = load_players($mysqli, $gameId);
+vg_require_engine(vg_engine_of_config($game['config']));
 
 $eventLimit = isset($_GET['events']) ? (int) $_GET['events'] : 60;
 

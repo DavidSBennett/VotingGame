@@ -49,6 +49,7 @@ define('DC_THEMES', ['Political', 'Economic', 'Social']);
 function engine_default_config() {
   return [
     'engine_version'   => ENGINE_STATE_VERSION,
+    'engine'           => 'dc',
     'hand'             => 5,
     'exchange_size'    => 5,
     'max_rounds'       => 60,     // safety: a game that stalls ends here

@@ -12,7 +12,7 @@
  * The token in the response is the ONLY credential for that seat. The
  * client stores it in localStorage; it is never re-issued.
  */
-require_once __DIR__ . '/engine.php';
+require_once __DIR__ . '/lib.php';
 
 require_method('POST');
 $body = read_json_body();
@@ -20,6 +20,11 @@ $body = read_json_body();
 $playerName = trim((string) ($body['player_name'] ?? ''));
 if ($playerName === '') error('A player name is required', 400);
 if (mb_strlen($playerName) > 40) $playerName = mb_substr($playerName, 0, 40);
+
+// Which rules engine: 'dc' opts into the DC-style deck-builder
+// (engine_dc.php); anything else is the newsroom game (engine.php).
+$engineName = ((string) ($body['engine'] ?? '')) === 'dc' ? 'dc' : 'newsroom';
+vg_require_engine($engineName);
 
 $defaults = engine_default_config();
 $humanSeats = isset($body['max_players']) ? (int) $body['max_players'] : 1;
@@ -45,6 +50,7 @@ if (isset($body['config']) && is_array($body['config'])) {
   }
 }
 $config['bots'] = $bots;
+if ($engineName === 'dc') $config['engine'] = 'dc';
 $level = (string) ($body['bot_level'] ?? 'easy');
 if (!in_array($level, ['easy', 'hard'], true)) error('bot_level must be easy or hard', 400);
 $config['bot_level'] = $level;

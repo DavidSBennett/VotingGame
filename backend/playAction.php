@@ -20,12 +20,13 @@
  * Rival papers commit inside the SAME transaction, so a solo player's
  * commitment resolves the round in one response.
  */
-require_once __DIR__ . '/engine.php';
+require_once __DIR__ . '/lib.php';
 
 require_method('POST');
 $me = authenticate($mysqli);
 $gameId = (int) $me['game_id'];
 $seat   = (int) $me['seat'];
+vg_require_engine_for_game($mysqli, $gameId);
 $body   = read_json_body();
 
 $action = (string) ($body['action'] ?? '');

@@ -9,11 +9,12 @@
  * Solo games never reach here — createGame.php starts them through the
  * same engine path at creation time.
  */
-require_once __DIR__ . '/engine.php';
+require_once __DIR__ . '/lib.php';
 
 require_method('POST');
 $me = authenticate($mysqli);
 $gameId = (int) $me['game_id'];
+vg_require_engine_for_game($mysqli, $gameId);
 if (empty($me['is_host'])) error('Only the host can start the game', 403);
 
 $mysqli->begin_transaction();

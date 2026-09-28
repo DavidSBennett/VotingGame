@@ -34,6 +34,9 @@ while ($r = $res->fetch_assoc()) {
   // A game running under an older engine can no longer be played, so it
   // is not "in progress" in any sense a player cares about. Leave it out.
   $cfg = json_col($r['config']);
+  // DC-style games are playable only through the API until the new UI
+  // lands (docs/BUILD-PLAN-DC.md, milestone 5): keep them off the list.
+  if (vg_engine_of_config($cfg) === 'dc') continue;
   if ($r['status'] === 'active'
       && (int) ($cfg['engine_version'] ?? 0) !== ENGINE_STATE_VERSION) continue;
   $games[] = [

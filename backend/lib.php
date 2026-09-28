@@ -439,6 +439,31 @@ function json_col($raw, $default = []) {
 }
 
 /**
+ * Which rules engine a game plays. Chosen when the game is created and
+ * kept in vg_games.config: 'dc' is the DC-style deck-builder
+ * (engine_dc.php, VARIANT.md revision 4); anything else is the newsroom
+ * game (engine.php). The two define the same function names, so a request
+ * loads exactly one of them, once it knows which game it serves.
+ */
+function vg_engine_of_config($config) {
+  return (is_array($config) && ($config['engine'] ?? '') === 'dc') ? 'dc' : 'newsroom';
+}
+
+function vg_require_engine($which) {
+  require_once __DIR__ . ($which === 'dc' ? '/engine_dc.php' : '/engine.php');
+}
+
+/** Load the engine the stored game was created with. */
+function vg_require_engine_for_game($mysqli, $gameId) {
+  $stmt = $mysqli->prepare("SELECT config FROM vg_games WHERE game_id = ?");
+  $stmt->bind_param('i', $gameId);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+  vg_require_engine(vg_engine_of_config($row ? json_col($row['config']) : []));
+}
+
+/**
  * Load a game row. $forUpdate=true takes the write lock — required for
  * every mutating path, and the reason two players cannot interleave a
  * half-applied turn.
