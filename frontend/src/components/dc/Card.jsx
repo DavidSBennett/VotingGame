@@ -7,7 +7,8 @@
  * the abilities centered.
  *
  * Clicking a card opens it in the CardModal (with Play / Buy / Choose when
- * the server allows them); `onOpen` does that. Every number comes from the
+ * the server allows them); `onOpen` does that. With `dragKey` the card can
+ * also be dragged (native drag and drop) onto the play area. Every number comes from the
  * server's card view. Literal class strings only (Tailwind cannot see
  * interpolated names).
  */
@@ -97,7 +98,7 @@ export function Abilities({ card, size = 'sm' }) {
  * The card thumbnail. size 'sm' (w-28, the Historians' hand size) or 'xs'
  * (w-20, for cards already played this turn).
  */
-export default function Card({ card, onOpen, footer = null, dim = false, tag = null, size = 'sm', lifted = false }) {
+export default function Card({ card, onOpen, footer = null, dim = false, tag = null, size = 'sm', lifted = false, dragKey = null }) {
   const t = typeStyle(card);
   const xs = size === 'xs';
   const tip = [card.name, card.card_text].filter(Boolean).join('\n\n');
@@ -107,6 +108,16 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
         type="button"
         onClick={onOpen}
         title={tip}
+        draggable={Boolean(dragKey)}
+        onDragStart={
+          dragKey
+            ? (e) => {
+                e.dataTransfer.setData('text/plain', dragKey);
+                e.dataTransfer.effectAllowed = 'move';
+              }
+            : undefined
+        }
+        style={dragKey ? { cursor: 'grab' } : undefined}
         className={`group relative flex flex-col overflow-hidden border border-gold-700 text-center surface-paper shadow-card transition-all duration-200 ease-desk hover:shadow-card-hover ${
           xs ? 'h-28 w-20' : 'h-44 w-28'
         } ${dim ? 'opacity-50' : 'hover:-translate-y-1'} ${lifted ? '-translate-y-1 ring-2 ring-gold-300' : ''}`}

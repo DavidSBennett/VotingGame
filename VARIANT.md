@@ -618,3 +618,16 @@ the hand, exchange and played cards are centered rows. Tightened: the
 election panel is about half its height (slim Elect buttons), Buy shows
 only under what you can afford, panels use less padding.
 
+### 2026-09-28: drag to play; the exchange moves left (the user)
+
+With clicks now opening a card, there was nowhere to drag one. The table
+is three columns on a desktop: the exchange down the left (two cards
+abreast, Buy under what you can afford), the election and "the press" in
+the middle -- a dashed drop zone holding what has been played this turn,
+with the centered hand below -- and the papers and the wire at the right.
+Drag a hand card into the press to play it (native drag and drop; only
+cards the server lists as playable can be dragged, and the server
+re-checks); click still opens it. Checked by firing the drag events on a
+live test game: the card carried its key, the play reached the server,
+the hand went 4 -> 3. On a phone the columns stack.
+

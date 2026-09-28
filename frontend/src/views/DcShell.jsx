@@ -179,7 +179,27 @@ export default function DcShell({ seat, state, events, error, refresh, onLeave }
 
         {ended && <FinalScores state={state} />}
 
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_19rem]">
+        {/* Three columns on a desktop: the exchange at the left, the table
+            (election, the press, your hand) in the middle, the papers and
+            the wire at the right. Stacked on a phone. */}
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[16.5rem_minmax(0,1fr)_18rem]">
+          <div className="min-w-0">
+            {active && (
+              <ExchangeRow
+                exchange={state.exchange}
+                editorial={state.editorial}
+                mainCount={state.main_count}
+                scandalsLeft={state.scandals_left}
+                canBuy={av.buy || []}
+                onBuy={(card) => act('buy', { card })}
+                busy={busy}
+                myTurn={myTurn}
+                news={state.news}
+                showNew={state.election && state.election.index > 0}
+                open={open}
+              />
+            )}
+          </div>
           <div className="flex min-w-0 flex-col gap-2">
             {active && (
               <>
@@ -191,19 +211,6 @@ export default function DcShell({ seat, state, events, error, refresh, onLeave }
                   onElect={(side) => act('elect', { side })}
                   busy={busy}
                   globe={globe}
-                />
-                <ExchangeRow
-                  exchange={state.exchange}
-                  editorial={state.editorial}
-                  mainCount={state.main_count}
-                  scandalsLeft={state.scandals_left}
-                  canBuy={av.buy || []}
-                  onBuy={(card) => act('buy', { card })}
-                  busy={busy}
-                  myTurn={myTurn}
-                  news={state.news}
-                  showNew={state.election && state.election.index > 0}
-                  open={open}
                 />
                 <TurnArea state={state} me={me} act={act} busy={busy} open={open} />
               </>

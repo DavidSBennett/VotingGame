@@ -2,7 +2,8 @@ import Card from './Card.jsx';
 
 /**
  * The exchange: five stories for sale (the Line-Up) and the Editorial pile
- * (always for sale), centered. Click a card to open it; the Buy button under
+ * (always for sale), as a column of cards two abreast down the left of the
+ * table (a centered row on narrow screens). Click a card to open it; the Buy button under
  * it (and in the card) lights up for exactly what the server says you can
  * afford now.
  *
@@ -28,11 +29,11 @@ export default function ExchangeRow({ exchange, editorial, mainCount, scandalsLe
       <div className="text-center">
         <div className="section-title">The exchange</div>
         <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-cream-200/60">
-          main deck {mainCount} · Scandals left {scandalsLeft}
-          {editorial ? ` · Editorials left ${editorial.left}` : ''}
+          main deck {mainCount} · Scandals {scandalsLeft}
+          {editorial ? ` · Editorials ${editorial.left}` : ''}
         </p>
       </div>
-      <div className="mt-2 flex flex-wrap justify-center gap-3">
+      <div className="mt-2 flex flex-wrap justify-center gap-2 lg:grid lg:grid-cols-2 lg:justify-items-center">
         {row.length === 0 && <p className="font-serif text-sm italic text-cream-200/50">Nothing for sale.</p>}
         {row.map((c, i) => (
           <Card
