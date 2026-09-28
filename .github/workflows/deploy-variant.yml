@@ -44,6 +44,11 @@ jobs:
           done
           echo "All backend PHP files parse cleanly."
 
+      # The cards the engine plays are generated from docs/*-dc.csv. A CSV
+      # edited without rerunning tools/export_cards_php.py fails here.
+      - name: Check backend/cards_dc.php matches the content spreadsheets
+        run: python3 -X utf8 tools/export_cards_php.py --check
+
       - name: Install & build frontend
         working-directory: frontend
         run: |

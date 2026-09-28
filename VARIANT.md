@@ -472,3 +472,13 @@ plus Play all, with prompts for choices; Defense automatic; papers chosen
 in the lobby (bots take the rest at random -- the simulator dealt them at
 random); PHP 8.3 installed locally for linting and engine tests.
 
+### 2026-09-28: milestone 1 -- content pipeline
+
+`tools/export_cards_php.py` writes `backend/cards_dc.php` (`dc_cards()`,
+`dc_elections()`, `dc_papers()`, `dc_card($key)`, `dc_election($i)`) from
+the three CSVs, through the simulator's own loader so engine and
+simulator read the same cards. `--check` runs PHP and compares every
+field: 110 card kinds, 17 elections, 8 papers, 3,256 fields match; a
+hand-edited value is caught. The variant deploy now runs the check after
+the PHP lint. Nothing uses the file yet; the live game is unchanged.
+
