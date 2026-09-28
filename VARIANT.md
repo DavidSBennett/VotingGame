@@ -248,3 +248,64 @@ hunters, 300 games per cell; fair 33% / 25%.
 - Either way, the same catch as income: once money flows, the hunter line
   beats every alternative.
 
+## Revision 4 (2026-09-28, the user): a strict deck-builder on DC Heroes Unite
+
+The user sent the DC Deck-Building Game: Heroes Unite card list and asked
+for a strict deck-builder on its rules. Burying is gone. Translation:
+
+- **Super-Villains = the 17 elections**, thresholds rising linearly. Each
+  election card has **two thresholds, one per candidate**; reaching one
+  elects that man (history can be rewritten; the historical winner is 2
+  cheaper). The winner gains the card: its **Patron bonus is printed on
+  it** (+1 influence and +2..4 of the man's theme when played), worth 3..7
+  prestige.
+- **Three currencies** (the user): every story has plain influence (spends
+  on anything) and themed influence -- Political, Economic or Social --
+  that spends only on stories of that theme or on electing a candidate of
+  that theme. Hero = Political, Equipment = Economic, Super Power = Social.
+  "A political paper should feel different from an economic one":
+  Political = elections (themed influence, Campaign for elections only,
+  +per office held); Economic = engine (plain influence, trash, gain,
+  compounding); Social = momentum (draw, chains, Defense).
+- **Villains = negative stories**: attack rivals (discard at random, or
+  gain a **Scandal**, -1 prestige, the Weakness).
+- **Locations = media events** (the 8 trade stories): stay in play; a
+  bonus to the owner each turn, a smaller one to everyone else.
+- DC structure: papers **take turns**; start 7 Letters (+1) + 3 Local
+  Notices (0); hand 5; exchange of 5 (the Line-Up); Editorials (the Kick:
+  cost 3, +2, 1 prestige); win at most one election a turn; the game ends
+  when 1860 is decided; most prestige wins.
+- Dates kept, card loss dropped (the user): stories enter the main deck
+  when the election in progress reaches their year.
+
+Content: `docs/deck-dc.csv` (106 stories: 24 Political, 26 Economic, 21
+Social, 27 negative, 8 media events; plus starters, Editorial, Scandal) and
+`docs/elections-dc.csv`, first built by `tools/build_deck_dc.py` from
+templates by theme and cost. Simulator: `tools/simulate_dc.py`.
+
+### 2026-09-28: first simulator pass
+
+Bots: balanced; political / economic / social (prefer their theme x1.5);
+attacker; pacifist (never buys negatives); bigmoney (cost 5+ only).
+
+- First templates: Political 0% (its cards gave less per cost); Social
+  drew ~50 cards a game and won 65% against the other two themes. Fixed
+  in the templates (Political stronger; Social draw 1 below cost 7).
+- A too-strict theme bot (x1.8 on theme, x0.6 off) filled up on
+  Editorials and made Political look dead; softened to x1.5 / x0.85.
+- **Now** (240 games per line), three themes at one table: Political
+  5%, Economic 44%, Social 52%. One focused paper among two balanced:
+  Political 12%, Economic 54%, Social 60%, attacker 42%, pacifist 13%,
+  bigmoney 2% (fair 33%).
+- **The decks do feel different**: Political wins the most elections when
+  its influence can reach any candidate; Economic trashes 9-12 starters a
+  game; Social draws 27-34 cards and attacks most.
+- **Political is still weak**: half of what it makes is locked to
+  Political stories and Political candidates, and much of it goes
+  unspent. Letting Political influence count toward ANY candidate
+  (`political_any`) raises it to 10-18% and shortens games (34 -> 26
+  rounds), but it is still the weakest line.
+- **Negative stories are strong**: never buying them (pacifist) wins 12-13%.
+- **Seats**: fair at 3 (31/37/32); at 4 the last seat is weakest (18-22%).
+- Games run long: 26-34 rounds per paper, 28-38 purchases each.
+
