@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import CornerOrnament from './CornerOrnament.jsx';
 import FleuronDivider from './FleuronDivider.jsx';
-import { Abilities, typeStyle } from './Card.jsx';
+import { Abilities, PrestigeSeal, typeStyle } from './Card.jsx';
 
 /**
  * CardModal -- the open card, ported from The Historians' CardModal
@@ -109,11 +109,12 @@ export default function CardModal({ card, onClose, actions = null, onPrev = null
               {card.year ? ` · ${card.year}` : ''}
             </p>
             <h2 className="mt-1 font-display text-3xl font-bold leading-tight text-ink-900">{card.name}</h2>
-            <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.2em] text-ink-700">
-              {card.cost ? `Cost ◆${card.cost}` : 'No cost'}
-              <span className="mx-2 text-gold-700">·</span>
-              Prestige ★{card.vp}
-            </p>
+            {card.candidate && <p className="mt-1 font-serif italic text-ink-700">Patron of {card.candidate}</p>}
+            <div className="mt-3 flex items-center justify-center gap-4">
+              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-700">{card.cost ? `Cost ◆${card.cost}` : 'No cost'}</span>
+              <PrestigeSeal vp={card.vp} size="lg" />
+              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-700">prestige</span>
+            </div>
 
             <FleuronDivider className="my-5" />
 

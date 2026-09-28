@@ -67,6 +67,7 @@ function check_invariants($game, $players, $where) {
   $add($st['main'], 'main');
   $add($st['exchange'], 'exchange');
   $add($st['trash'], 'trash');
+  $add($st['turn']['looking'] ?? [], 'looking');
   ok(!$dup, "$where: no card in two places " . implode('; ', array_slice($dup, 0, 3)));
   $releasedThrough = (int) dc_election(min($st['e'], count(dc_elections()) - 1))['year'];
   foreach (dc_cards() as $k => $c) {
@@ -368,6 +369,124 @@ if ($gainCard) {
   }
   check_invariants($g, $P, 'gain');
 }
+
+
+// ---- election cards' powers (DC's Super-Villains) ---------------------------
+/** Put an election card in the hand of the paper on turn (counted as won, so conservation holds). */
+function give_office(&$game, &$players, $idx, $side) {
+  $id = 'elec#' . $idx . ':' . $side;
+  $s = $game['state']['turn']['seat'];
+  $players[$s]['private_state']['hand'][] = $id;
+  $e = dc_election($idx);
+  $game['state']['history'][] = ['index' => $idx, 'year' => (int) $e['year'], 'side' => $side, 'winner' => $e[$side],
+                                 'loser' => '', 'seat' => $s, 'matched_history' => true, 'round' => 1];
+  dc_count($players[$s]);
+  return $id;
+}
+$v = dc_view('elec#1:states');
+eq([$v['name'], $v['gen'], $v['draw'], $v['trash']], ['The Revolution of 1800', 2, 2, 1], 'office 1800: +2, draw 2, destroy 1');
+eq(dc_view('elec#6:nation')['trash_draw'], 1, 'office 1820: draws for each destroyed');
+
+list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
+give_hand($g, $P, ['notice#0.0', 'notice#0.1']);
+$id = give_office($g, $P, 6, 'states');
+act($g, $P, 'play', ['card' => $id]);
+eq($g['state']['turn']['pending']['type'], 'trash', '1820: a destroy prompt');
+eq($g['state']['turn']['pending']['left'], 2, '1820: up to two');
+$h0 = count($P[0]['private_state']['hand']);
+act($g, $P, 'choose', ['card' => 'notice#0.0']);
+eq(count($P[0]['private_state']['hand']), $h0, '1820: destroy one from hand, draw one');
+eq($g['state']['turn']['pending']['left'], 1, '1820: one more to go');
+act($g, $P, 'choose', ['card' => 'notice#0.1']);
+eq($g['state']['turn']['pending'], null, '1820: done after two');
+ok(in_array('notice#0.0', $g['state']['trash'], true) && in_array('notice#0.1', $g['state']['trash'], true), '1820: both destroyed');
+check_invariants($g, $P, '1820');
+
+list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
+give_hand($g, $P, []);
+foreach (['letter#0.0', 'notice#0.0'] as $x) {
+  foreach (['hand', 'deck'] as $z) $P[0]['private_state'][$z] = array_values(array_diff($P[0]['private_state'][$z], [$x]));
+  $P[0]['private_state']['discard'][] = $x;
+}
+dc_count($P[0]);
+$id = give_office($g, $P, 7, 'nation');
+act($g, $P, 'play', ['card' => $id]);
+eq($g['state']['turn']['pending']['type'], 'recover', '1824: a recover prompt');
+act($g, $P, 'choose', ['card' => 'letter#0.0']);
+act($g, $P, 'choose', ['card' => 'notice#0.0']);
+ok(in_array('letter#0.0', $P[0]['private_state']['hand'], true) && in_array('notice#0.0', $P[0]['private_state']['hand'], true), '1824: two cards back to hand');
+check_invariants($g, $P, '1824');
+
+list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
+give_hand($g, $P, []);
+$top3 = array_slice($g['state']['main'], -3);
+$id = give_office($g, $P, 12, 'states');
+act($g, $P, 'play', ['card' => $id]);
+eq($g['state']['turn']['pending']['type'], 'scry', '1844: a look-at-the-top prompt');
+eq(count($g['state']['turn']['looking']), 3, '1844: three stories looked at');
+check_invariants($g, $P, '1844 looking');
+$keep = $g['state']['turn']['pending']['options'][0];
+act($g, $P, 'choose', ['card' => $keep]);
+ok(in_array($keep, $P[0]['private_state']['hand'], true), '1844: the kept story is in hand');
+$rest = array_values(array_diff($top3, [$keep]));
+ok(count(array_intersect(array_slice($g['state']['main'], 0, 2), $rest)) === 2, '1844: the rest are at the bottom');
+eq($g['state']['turn']['looking'], [], '1844: nothing left being looked at');
+check_invariants($g, $P, '1844');
+
+// concede while looking: the stories go back, none are lost
+list($g, $P) = new_game(3, [], [0 => 'globe', 1 => 'sun', 2 => 'argus']);
+give_hand($g, $P, []);
+$id = give_office($g, $P, 12, 'states');
+act($g, $P, 'play', ['card' => $id]);
+act($g, $P, 'concede', ['seat' => 0]);
+check_invariants($g, $P, '1844 then concede');
+
+list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
+$pol = find_card(function ($c) { return $c['type'] === 'Political story' && (int) $c['released'] === 1796 && !$c['trash'] && !$c['retract'] && !$c['per_office']; });
+give_hand($g, $P, ['letter#0.0', $pol]);
+$id = give_office($g, $P, 4, 'nation');
+act($g, $P, 'play_all');
+$c1 = dc_card($pol);
+eq(dc_pools($g, $P)['gen'], 1 + (int) $c1['gen'] + 3, '1812: +1 per different kind played (Starter, Political story, Election)');
+
+// ---- First Appearance ---------------------------------------------------------
+list($g, $P) = new_game(3, [], [0 => 'globe', 1 => 'sun', 2 => 'herald']);
+$g['state']['e'] = 3;   // 1808 in progress; deciding it reveals 1812: Impressment (the prestige leader gains a Scandal)
+foreach ([1800, 1804, 1808] as $y) dc_release($g, $y);
+dc_refill($g);
+$P[2]['private_state']['discard'][] = 'elec#0:nation';   // seat 2 won 1796
+$g['state']['history'][] = ['index' => 0, 'year' => 1796, 'side' => 'nation', 'winner' => 'x', 'loser' => '', 'seat' => 2, 'matched_history' => true, 'round' => 1];
+foreach ($P as $s => $_) dc_count($P[$s]);
+give_hand($g, $P, []);
+set_pools($g, ['gen' => 30]);
+act($g, $P, 'elect', ['side' => 'states']);
+$sc = function ($p) { return count(array_filter(dc_owned($p), function ($x) { return strpos($x, 'scandal#') === 0; })); };
+eq([$sc($P[0]), $sc($P[1]), $sc($P[2])], [1, 0, 1], 'Impressment: the prestige leaders (1808 and 1796, both 3) gain a Scandal');
+eq($g['state']['last_fa']['name'], 'Impressment', 'First appearance recorded for the view');
+check_invariants($g, $P, 'first appearance');
+
+list($g, $P) = new_game(3, [], [0 => 'globe', 1 => 'sun', 2 => 'argus']);
+$g['state']['e'] = 9;   // 1832 in progress; deciding it reveals 1836: the Panic (the office leaders discard 2)
+foreach ([1800, 1804, 1808, 1812, 1816, 1820, 1824, 1828, 1832] as $y) dc_release($g, $y);
+dc_refill($g);
+give_hand($g, $P, []);
+set_pools($g, ['gen' => 40]);
+$h1 = count($P[1]['private_state']['hand']);
+act($g, $P, 'elect', ['side' => 'states']);
+eq(count($P[1]['private_state']['hand']), $h1, 'Panic of 1837: a paper with no office keeps its hand');
+eq($g['state']['last_fa']['seats'], [0], 'Panic of 1837: only the office leader is hit');
+check_invariants($g, $P, 'panic');
+
+list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
+$g['state']['e'] = 8;   // 1828; deciding it reveals 1832: the Veto sweeps the exchange
+foreach ([1800, 1804, 1808, 1812, 1816, 1820, 1824, 1828] as $y) dc_release($g, $y);
+dc_refill($g);
+$before = $g['state']['exchange'];
+give_hand($g, $P, []);
+set_pools($g, ['gen' => 40]);
+act($g, $P, 'elect', ['side' => 'states']);
+ok(count(array_intersect($before, $g['state']['exchange'])) < count($before), 'The Veto: the exchange is dealt afresh');
+check_invariants($g, $P, 'veto');
 
 // ---- the end --------------------------------------------------------------
 list($g, $P) = new_game(2);

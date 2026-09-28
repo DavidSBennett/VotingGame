@@ -10,7 +10,7 @@ import { THEME } from './Card.jsx';
  * "Your reach" is an advisory sum of the pools the server reported; the
  * Elect button appears only when the server lists the side as electable.
  */
-export default function ElectionPanel({ election, pools, myTurn, canElect = [], onElect, busy, globe }) {
+export default function ElectionPanel({ election, pools, myTurn, canElect = [], onElect, busy, globe, lastFa = null }) {
   if (!election) return null;
   const reach = (theme) => {
     if (!pools) return null;
@@ -63,6 +63,25 @@ export default function ElectionPanel({ election, pools, myTurn, canElect = [], 
       <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
         {side('nation')}
         {side('states')}
+      </div>
+      <div className="mt-1.5 grid gap-1 text-center sm:grid-cols-2">
+        <p className="font-serif text-[13px] leading-snug text-cream-100" title="What this card does in your deck once you win it">
+          <span className="label mr-1.5 text-gold-400">{election.card_name}</span>
+          {election.power_text}
+        </p>
+        {election.fa_name && (
+          <p
+            className={
+              lastFa && lastFa.year === election.year
+                ? 'border-l-2 border-oxblood-500 pl-2 font-serif text-[13px] italic leading-snug text-oxblood-300'
+                : 'font-serif text-[13px] italic leading-snug text-cream-200/60'
+            }
+            title="First appearance: what happened to every paper when this campaign opened"
+          >
+            <span className="label mr-1.5 text-oxblood-300">First appearance · {election.fa_name}</span>
+            {election.fa_text}
+          </p>
+        )}
       </div>
     </section>
   );

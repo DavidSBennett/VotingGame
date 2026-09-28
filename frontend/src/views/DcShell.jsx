@@ -211,6 +211,7 @@ export default function DcShell({ seat, state, events, error, refresh, onLeave }
                   onElect={(side) => act('elect', { side })}
                   busy={busy}
                   globe={globe}
+                  lastFa={state.last_fa}
                 />
                 <TurnArea state={state} me={me} act={act} busy={busy} open={open} />
               </>

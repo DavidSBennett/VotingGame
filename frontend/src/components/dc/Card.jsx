@@ -72,13 +72,35 @@ export function effects(card) {
   if (card.per_same) out.push([`+${card.per_same} per ${card.theme}`, note]);
   if (card.chain) out.push([`chain +${card.chain}`, note]);
   if (card.per_office) out.push([`+${card.per_office} per office`, note]);
+  if (card.per_kind) out.push([`+${card.per_kind} per kind`, note]);
   if (card.retract) out.push(['Retraction', note]);
-  if (card.trash) out.push(['destroy', note]);
+  if (card.trash) out.push([card.trash > 1 ? `destroy ${card.trash}${card.trash_draw ? ', draw each' : ''}` : card.trash_draw ? 'destroy, draw' : 'destroy', note]);
   if (card.gain_upto) out.push([`gain ≤${card.gain_upto}`, note]);
+  if (card.recover) out.push([`recover ${card.recover}`, note]);
+  if (card.scry) out.push([`look ${card.scry}, keep 1`, note]);
   if (card.attack === 'scandal') out.push(['attack: Scandal', 'bg-oxblood-700 text-cream-50']);
   if (card.attack === 'discard') out.push(['attack: discard', 'bg-oxblood-700 text-cream-50']);
   if (card.defense) out.push(['Defense', 'bg-emerald-900 text-emerald-300']);
   return out;
+}
+
+/**
+ * The prestige seal: a gilt disc with the card's prestige, the score. Muted
+ * at 0; oxblood below 0 (a Scandal). `size` 'sm' on a card, 'lg' in the modal.
+ */
+export function PrestigeSeal({ vp, size = 'sm' }) {
+  const shape =
+    size === 'lg'
+      ? 'flex h-12 w-12 flex-col items-center justify-center rounded-full border-2 shadow-card'
+      : 'flex h-7 w-7 flex-col items-center justify-center rounded-full border shadow-card';
+  const tone =
+    vp > 0 ? 'border-gold-600 bg-gold-300 text-ink-950' : vp < 0 ? 'border-oxblood-500 bg-oxblood-700 text-cream-50' : 'border-cream-300 bg-cream-200 text-ink-700/60';
+  return (
+    <div className={`${shape} ${tone}`} title={`Prestige ${vp}: the score`}>
+      <span className={size === 'lg' ? 'text-[10px] leading-none' : 'text-[6px] leading-none'}>★</span>
+      <span className={size === 'lg' ? 'font-display text-xl font-bold leading-none' : 'font-display text-[13px] font-bold leading-none'}>{vp}</span>
+    </div>
+  );
 }
 
 /** The ability chips, centered. `size` 'sm' on the card, 'md' in the modal. */
@@ -145,11 +167,18 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
       >
         <div className="pointer-events-none absolute inset-1 border border-gold-500/20" />
         <div className={`h-1 w-full shrink-0 ${t.stripe}`} />
-        <div className="flex items-baseline justify-between px-2 pt-1 font-mono text-[9px] text-ink-700">
-          <span title="Cost">{card.cost ? `◆${card.cost}` : '·'}</span>
-          <span title="Prestige">{card.vp > 0 ? `★${card.vp}` : card.vp < 0 ? `★${card.vp}` : '☆'}</span>
+        {/* Cost at the top left; the prestige seal at the top right. */}
+        <div className="flex items-start justify-between px-1.5 pt-1">
+          <span
+            title="Cost"
+            className={card.cost ? 'border border-gold-600/60 px-1 font-mono text-[10px] font-bold text-ink-800' : 'px-1 font-mono text-[10px] text-ink-700/40'}
+          >
+            {card.cost ? `◆${card.cost}` : '·'}
+          </span>
+          {!xs && <PrestigeSeal vp={card.vp} />}
+          {xs && <span className="font-mono text-[9px] font-bold text-ink-800">★{card.vp}</span>}
         </div>
-        <div className="flex min-h-0 flex-1 flex-col items-center px-1.5">
+        <div className="-mt-2 flex min-h-0 flex-1 flex-col items-center px-1.5">
           <p className={`font-mono text-[7px] uppercase tracking-[0.18em] ${t.eyebrow}`}>{t.label}</p>
           <h3
             className={
@@ -160,6 +189,7 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
           >
             {card.name}
           </h3>
+          {!xs && card.candidate ? <p className="mt-0.5 font-serif text-[10px] italic leading-tight text-ink-700">Patron of {card.candidate}</p> : null}
           {!xs && card.year ? <p className="mt-0.5 font-mono text-[8px] text-ink-700/70">{card.year}</p> : null}
         </div>
         <div className="px-1 pb-1.5">

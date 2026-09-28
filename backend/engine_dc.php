@@ -93,16 +93,19 @@ function engine_is_current($game) {
 function dc_view($id) {
   $id = (string) $id;
   if (strpos($id, 'elec#') === 0) {
+    // An election won: DC's Super-Villain. Its power is p_* in docs/elections-dc.csv.
     list($i, $side) = explode(':', substr($id, 5));
     $e = dc_election((int) $i);
     return [
-      'key' => $id, 'kind' => 'election', 'name' => $e['year'] . ': ' . $e[$side],
+      'key' => $id, 'kind' => 'election', 'name' => $e['card_name'], 'candidate' => $e[$side],
       'type' => 'Election', 'theme' => $e[$side . '_theme'], 'cost' => 0, 'vp' => (int) $e['vp'],
-      'gen' => (int) $e['patron_gen'], 'themed' => (int) $e['patron_themed'], 'campaign' => 0, 'draw' => 0,
-      'trash' => 0, 'gain_upto' => 0, 'chain' => 0, 'per_same' => 0, 'per_office' => 0, 'attack' => null,
-      'defense' => 0, 'retract' => 0, 'ongoing_gen' => 0, 'ongoing_draw' => 0, 'others_bonus' => 0,
+      'gen' => (int) $e['p_gen'], 'themed' => (int) $e['patron_themed'], 'campaign' => 0, 'draw' => (int) $e['p_draw'],
+      'trash' => (int) $e['p_trash'], 'trash_draw' => (int) $e['p_trash_draw'], 'gain_upto' => (int) $e['p_gain_upto'],
+      'recover' => (int) $e['p_recover'], 'per_kind' => (int) $e['p_per_kind'], 'scry' => (int) $e['p_scry'],
+      'chain' => 0, 'per_same' => 0, 'per_office' => 0, 'attack' => $e['p_attack'] ?: null,
+      'defense' => 0, 'retract' => 0, 'ongoing_gen' => (int) $e['p_stay_gen'], 'ongoing_draw' => 0, 'others_bonus' => 0,
       'others_theme' => null, 'released' => null, 'year' => (int) $e['year'], 'copies' => 1,
-      'card_text' => 'Patron of ' . $e[$side] . ' (' . $e['year'] . '): +' . $e['patron_gen'] . ' influence, +'
+      'card_text' => 'Patron of ' . $e[$side] . ' (' . $e['year'] . '). ' . $e['power_text'] . ' Also +'
                      . $e['patron_themed'] . ' ' . $e[$side . '_theme'] . '. Worth ' . $e['vp'] . ' prestige.',
       'flavor' => null,
     ];
@@ -317,6 +320,8 @@ function dc_new_turn($seat) {
     'counts' => ['Political' => 0, 'Economic' => 0, 'Social' => 0],
     'elected' => null, 'bought' => [], 'hits' => 0, 'attacks' => 0,
     'used' => ['sun' => false, 'herald' => false], 'star_done' => false, 'pending' => null,
+    'queue' => [],       // prompts waiting behind the pending one
+    'looking' => [],     // stories taken off the main deck to choose from (Manifest Destiny)
   ];
 }
 
@@ -365,6 +370,9 @@ function dc_pools($game, $players) {
     if ($c['type'] === 'Negative story') $negatives[$c['kind']] = true;
   }
   if (($p['public_state']['paper'] ?? null) === 'aurora') $total['gen'] += count($negatives);
+  $kinds = [];
+  foreach ($t['played'] as $id) $kinds[dc_view($id)['type']] = true;
+  foreach ($t['played'] as $id) $total['gen'] += (int) (dc_view($id)['per_kind'] ?? 0) * count($kinds);
   $out = [];
   foreach ($total as $k => $v) $out[$k] = $v - (int) $t['spent'][$k];
   return $out;
@@ -430,20 +438,25 @@ function dc_play(&$game, &$players, $cardId, $mysqli) {
   if ((int) $c['per_office']) $t['base'][$th] += (int) $c['per_office'] * dc_offices($players[$seat]);
   if ((int) $c['draw']) dc_draw($game, $p, (int) $c['draw']);
   for ($i = 0; $i < (int) $c['retract']; $i++) dc_retract($game, $p);
+  // Choices, asked in order: destroy, gain, recover, look.
   if ((int) $c['trash']) {
-    $opts = array_values(array_merge($p['private_state']['hand'], $p['private_state']['discard']));
-    if ($opts) $t['pending'] = ['type' => 'trash', 'card' => $cardId, 'options' => $opts];
+    dc_push_prompt($t, ['type' => 'trash', 'card' => $cardId, 'left' => (int) $c['trash'],
+                        'draw_each' => !empty($c['trash_draw'])]);
   }
   if ((int) $c['gain_upto']) {
-    $opts = [];
-    foreach ($game['state']['exchange'] as $x) if ((int) dc_view($x)['cost'] <= (int) $c['gain_upto']) $opts[] = $x;
-    if ($opts) {
-      // A card with both a trash and a gain resolves the trash first.
-      $gain = ['type' => 'gain', 'card' => $cardId, 'options' => $opts, 'max_cost' => (int) $c['gain_upto']];
-      if ($t['pending']) $t['pending']['then'] = $gain; else $t['pending'] = $gain;
+    dc_push_prompt($t, ['type' => 'gain', 'card' => $cardId, 'max_cost' => (int) $c['gain_upto'], 'left' => 1]);
+  }
+  if ((int) ($c['recover'] ?? 0)) {
+    dc_push_prompt($t, ['type' => 'recover', 'card' => $cardId, 'left' => (int) $c['recover']]);
+  }
+  if ((int) ($c['scry'] ?? 0)) {
+    for ($i = 0; $i < (int) $c['scry'] && !empty($game['state']['main']); $i++) {
+      $t['looking'][] = array_pop($game['state']['main']);
     }
+    if ($t['looking']) dc_push_prompt($t, ['type' => 'scry', 'card' => $cardId, 'left' => 1]);
   }
   unset($p, $t);
+  if (!$game['state']['turn']['pending']) dc_next_prompt($game, $players);
   if ($c['attack']) {
     $hits = 0;
     foreach ($game['state']['order'] as $s) {
@@ -510,40 +523,188 @@ function dc_attack(&$game, &$q, $kind) {
   return false;
 }
 
-/** Answer the pending prompt (trash or gain). $pick null = decline. */
-function dc_choose(&$game, &$players, $pick) {
+/** Queue a prompt; the first one becomes pending when dc_next_prompt runs. */
+function dc_push_prompt(&$t, $prompt) {
+  if (!isset($t['queue'])) $t['queue'] = [];
+  $t['queue'][] = $prompt;
+}
+
+/** What a prompt can choose from, right now. */
+function dc_prompt_options($game, $player, $pend) {
+  switch ($pend['type']) {
+    case 'trash':
+      return array_values(array_merge($player['private_state']['hand'], $player['private_state']['discard']));
+    case 'gain':
+      $opts = [];
+      foreach ($game['state']['exchange'] as $x) if ((int) dc_view($x)['cost'] <= (int) $pend['max_cost']) $opts[] = $x;
+      return $opts;
+    case 'recover':
+      return array_values($player['private_state']['discard']);
+    case 'scry':
+      return array_values($game['state']['turn']['looking'] ?? []);
+  }
+  return [];
+}
+
+/** Make the next queued prompt with anything to choose from pending (or none). */
+function dc_next_prompt(&$game, &$players) {
   $t = &$game['state']['turn'];
-  $pend = $t['pending'];
+  $t['pending'] = null;
+  while (!empty($t['queue'])) {
+    $next = array_shift($t['queue']);
+    $next['options'] = dc_prompt_options($game, $players[$t['seat']], $next);
+    if ($next['options']) { $t['pending'] = $next; return; }
+  }
+}
+
+/** Put the stories being looked at on the bottom of the main deck. */
+function dc_unlook(&$game) {
+  $look = $game['state']['turn']['looking'] ?? [];
+  if ($look) $game['state']['main'] = array_merge($look, $game['state']['main']);   // the bottom is the start
+  $game['state']['turn']['looking'] = [];
+}
+
+/**
+ * Answer the pending prompt. $pick null = decline (and, for a count, stop).
+ *   trash    destroy a card in hand or discard (draw one each, for some)
+ *   gain     a story off the exchange, to the discard pile
+ *   recover  a card from the discard pile into hand
+ *   scry     keep one of the stories looked at; the rest go to the bottom
+ */
+function dc_choose(&$game, &$players, $pick) {
+  $pend = $game['state']['turn']['pending'];
   if (!$pend) throw new Exception('Nothing to choose.');
-  $p = &$players[$t['seat']];
+  $seat = $game['state']['turn']['seat'];
+  $p = &$players[$seat];
+  $done = true;
   if ($pick !== null && $pick !== '') {
     if (!in_array($pick, $pend['options'], true)) throw new Exception('That is not one of the choices.');
-    if ($pend['type'] === 'trash') {
-      foreach (['hand', 'discard'] as $pile) {
-        $i = array_search($pick, $p['private_state'][$pile], true);
-        if ($i !== false) { array_splice($p['private_state'][$pile], $i, 1); break; }
-      }
-      $game['state']['trash'][] = $pick;
-    } else {
-      $i = array_search($pick, $game['state']['exchange'], true);
-      if ($i === false) throw new Exception('That story is no longer on the exchange.');
-      array_splice($game['state']['exchange'], $i, 1);
-      $p['private_state']['discard'][] = $pick;
-      dc_refill($game);
+    switch ($pend['type']) {
+      case 'trash':
+        foreach (['hand', 'discard'] as $pile) {
+          $i = array_search($pick, $p['private_state'][$pile], true);
+          if ($i !== false) { array_splice($p['private_state'][$pile], $i, 1); break; }
+        }
+        $game['state']['trash'][] = $pick;
+        if (!empty($pend['draw_each'])) dc_draw($game, $p, 1);
+        break;
+      case 'gain':
+        $i = array_search($pick, $game['state']['exchange'], true);
+        if ($i === false) throw new Exception('That story is no longer on the exchange.');
+        array_splice($game['state']['exchange'], $i, 1);
+        $p['private_state']['discard'][] = $pick;
+        dc_refill($game);
+        break;
+      case 'recover':
+        $i = array_search($pick, $p['private_state']['discard'], true);
+        array_splice($p['private_state']['discard'], $i, 1);
+        $p['private_state']['hand'][] = $pick;
+        break;
+      case 'scry':
+        $i = array_search($pick, $game['state']['turn']['looking'], true);
+        array_splice($game['state']['turn']['looking'], $i, 1);
+        $p['private_state']['hand'][] = $pick;
+        dc_unlook($game);
+        break;
     }
+    $left = (int) ($pend['left'] ?? 1) - 1;
+    if ($left > 0 && $pend['type'] !== 'scry' && $pend['type'] !== 'gain') {
+      $pend['left'] = $left;
+      $pend['options'] = dc_prompt_options($game, $p, $pend);
+      if ($pend['options']) { $game['state']['turn']['pending'] = $pend; $done = false; }
+    }
+  } elseif ($pend['type'] === 'scry') {
+    dc_unlook($game);
   }
-  $next = $pend['then'] ?? null;
-  if ($next && $next['type'] === 'gain') {
-    // Recompute: the exchange may have changed.
-    $opts = [];
-    foreach ($game['state']['exchange'] as $x) if ((int) dc_view($x)['cost'] <= (int) $next['max_cost']) $opts[] = $x;
-    $next['options'] = $opts;
-    $t['pending'] = $opts ? $next : null;
-  } else {
-    $t['pending'] = null;
-  }
-  unset($t);
+  if ($done) dc_next_prompt($game, $players);
   dc_count($p);
+  unset($p);
+}
+
+/**
+ * An election's First Appearance: when its campaign opens it hits every
+ * paper (or the leaders, or the papers behind), as DC's Super-Villains do.
+ * No choices, so nobody waits; Defense does not stop it; the Intelligencer
+ * never gains Scandals.
+ */
+function dc_first_appearance(&$game, &$players, $mysqli) {
+  $e = dc_election($game['state']['e']);
+  $kind = (string) ($e['fa_kind'] ?? '');
+  $n = (int) ($e['fa_n'] ?? 0);
+  if ($kind === '') return;
+  $live = [];
+  foreach ($game['state']['order'] as $s) if (empty($players[$s]['conceded'])) $live[] = $s;
+  if ($kind === 'sweep') {
+    $game['state']['main'] = array_merge($game['state']['exchange'], $game['state']['main']);
+    $game['state']['exchange'] = [];
+    dc_refill($game);
+    $targets = [];
+  } elseif ($kind === 'scandal_leader') {
+    $top = max(array_map(function ($s) use ($players) { return dc_prestige($players[$s]); }, $live));
+    $targets = array_values(array_filter($live, function ($s) use ($players, $top) { return dc_prestige($players[$s]) === $top; }));
+  } elseif ($kind === 'discard_leader') {
+    $high = max(array_map(function ($s) use ($players) { return dc_offices($players[$s]); }, $live));
+    $targets = array_values(array_filter($live, function ($s) use ($players, $high) { return dc_offices($players[$s]) === $high; }));
+  } elseif ($kind === 'draw_fewest') {
+    $low = min(array_map(function ($s) use ($players) { return dc_offices($players[$s]); }, $live));
+    $targets = array_values(array_filter($live, function ($s) use ($players, $low) { return dc_offices($players[$s]) === $low; }));
+  } else {
+    $targets = $live;
+  }
+  $cost = function ($id) { return (int) dc_view($id)['cost']; };
+  foreach ($targets as $s) {
+    $q = &$players[$s];
+    for ($k = 0; $k < $n; $k++) {
+      $hand = &$q['private_state']['hand'];
+      if ($kind === 'draw' || $kind === 'draw_fewest') {
+        dc_draw($game, $q, 1);
+      } elseif (($kind === 'discard' || $kind === 'discard_leader') && $hand) {
+        $i = mt_rand(0, count($hand) - 1);
+        $q['private_state']['discard'][] = $hand[$i];
+        array_splice($hand, $i, 1);
+      } elseif ($kind === 'discard_dearest' && $hand) {
+        $i = 0;
+        foreach ($hand as $j => $id) if ($cost($id) > $cost($hand[$i])) $i = $j;
+        $q['private_state']['discard'][] = $hand[$i];
+        array_splice($hand, $i, 1);
+      } elseif ($kind === 'destroy_cheapest' && $hand) {
+        $i = 0;
+        foreach ($hand as $j => $id) if ($cost($id) < $cost($hand[$i])) $i = $j;
+        $game['state']['trash'][] = $hand[$i];
+        array_splice($hand, $i, 1);
+      } elseif (($kind === 'scandal' || $kind === 'scandal_leader')
+                && ($q['public_state']['paper'] ?? null) !== 'intelligencer' && (int) $game['state']['scandals'] > 0) {
+        $game['state']['scandals'] -= 1;
+        $q['private_state']['discard'][] = 'scandal#' . $game['state']['scandals'];
+        $q['public_state']['scandals_taken'] = 1 + (int) ($q['public_state']['scandals_taken'] ?? 0);
+      } elseif ($kind === 'unscandal') {
+        foreach (['hand', 'discard'] as $pile) {
+          $hit = false;
+          foreach ($q['private_state'][$pile] as $j => $id) {
+            if (strpos($id, 'scandal#') === 0) {
+              array_splice($q['private_state'][$pile], $j, 1);
+              $game['state']['trash'][] = $id;
+              $hit = true;
+              break;
+            }
+          }
+          if ($hit) break;
+        }
+      }
+      unset($hand);
+    }
+    dc_count($q);
+    unset($q);
+  }
+  $game['state']['last_fa'] = ['year' => (int) $e['year'], 'name' => $e['fa_name'], 'text' => $e['fa_text'],
+                               'seats' => array_values(array_map('intval', $targets))];
+  if ($mysqli) {
+    $names = [];
+    foreach ($targets as $s) $names[] = $players[$s]['player_name'];
+    engine_log($mysqli, $game, null, 'first_appearance',
+      'First appearance, ' . $e['fa_name'] . ': ' . $e['fa_text'] . ($targets && count($targets) < count($live) ? ' (' . implode(', ', $names) . ')' : ''),
+      $game['state']['last_fa']);
+  }
 }
 
 /** Elect: reach one candidate's threshold, take the election card. */
@@ -581,6 +742,7 @@ function dc_elect(&$game, &$players, $side, $mysqli) {
     dc_release($game, (int) dc_election($game['state']['e'])['year']);
     dc_refill($game);
     if ($mysqli) engine_log($mysqli, $game, null, 'campaign_begins', dc_campaign_text($game));
+    dc_first_appearance($game, $players, $mysqli);
   }
   dc_count($players[$seat]);
 }
@@ -650,11 +812,17 @@ function dc_use_paper(&$game, &$players, $mysqli) {
 
 /** End the turn: discard, media events into play, draw, and pass to the next paper. */
 function dc_end_turn(&$game, &$players, $mysqli) {
+  // A turn cut short (a concede) may leave stories being looked at: they go
+  // to the bottom of the main deck, and any unanswered prompts lapse.
+  dc_unlook($game);
+  $game['state']['turn']['pending'] = null;
+  $game['state']['turn']['queue'] = [];
   $t = $game['state']['turn'];
   $seat = $t['seat'];
   $p = &$players[$seat];
   foreach ($t['played'] as $id) {
-    if (dc_view($id)['type'] === 'Media event') $p['public_state']['locations'][] = $id;
+    $v = dc_view($id);
+    if ($v['type'] === 'Media event' || ($v['type'] === 'Election' && (int) $v['ongoing_gen'] > 0)) $p['public_state']['locations'][] = $id;
     else $p['private_state']['discard'][] = $id;
   }
   foreach ($p['private_state']['hand'] as $id) $p['private_state']['discard'][] = $id;
@@ -912,9 +1080,16 @@ function dc_bot_turn(&$game, &$players, $mysqli) {
     $t = $game['state']['turn'];
     if ($t['pending']) {
       $pend = $t['pending'];
-      $pick = ($pend['type'] === 'trash')
-        ? dc_bot_trash_pick($players[$seat], $pend['options'])
-        : dc_bot_choose($game, $style, $pend['options'], false);
+      if ($pend['type'] === 'trash') {
+        $pick = dc_bot_trash_pick($players[$seat], $pend['options']);
+      } elseif ($pend['type'] === 'recover') {
+        $pick = null;                                  // the most valuable card in the discard pile
+        foreach ($pend['options'] as $id) {
+          if ($pick === null || dc_bot_value(dc_view($id)) > dc_bot_value(dc_view($pick))) $pick = $id;
+        }
+      } else {
+        $pick = dc_bot_choose($game, $style, $pend['options'], false);
+      }
       dc_choose($game, $players, $pick);
       continue;
     }
@@ -1103,7 +1278,8 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'historical_winner' => $e['historical_winner'],
       'nation' => ['name' => $e['nation'], 'theme' => $e['nation_theme'], 'threshold' => (int) $e['nation_threshold']],
       'states' => ['name' => $e['states'], 'theme' => $e['states_theme'], 'threshold' => (int) $e['states_threshold']],
-      'patron_gen' => (int) $e['patron_gen'], 'patron_themed' => (int) $e['patron_themed'],
+      'patron_themed' => (int) $e['patron_themed'], 'card_name' => $e['card_name'],
+      'power_text' => $e['power_text'], 'fa_name' => $e['fa_name'], 'fa_text' => $e['fa_text'],
     ];
   }
 
@@ -1124,7 +1300,8 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     $pending = null;
     if ($turn && (int) $turn['seat'] === (int) $viewerSeat && $turn['pending']) {
       $pending = ['type' => $turn['pending']['type'], 'card' => dc_view($turn['pending']['card']),
-                  'options' => dc_views($turn['pending']['options'])];
+                  'options' => dc_views($turn['pending']['options']), 'left' => (int) ($turn['pending']['left'] ?? 1),
+                  'draw_each' => !empty($turn['pending']['draw_each'])];
     }
     $you = [
       'seat' => (int) $viewerSeat, 'hand' => dc_views($me['private_state']['hand'] ?? []),
@@ -1159,6 +1336,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     'news' => dc_views($state['last_released'] ?? []),
     'turn' => $turnPublic,
     'last_turn' => $state['last_turn'] ?? null,
+    'last_fa' => $state['last_fa'] ?? null,
     'players' => $seats,
     'you' => $you,
     'available_actions' => engine_available_actions($game, $players, $viewerSeat),
