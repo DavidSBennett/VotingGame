@@ -195,3 +195,30 @@ play only what would be lost), spender (play everything).
 - At income 2, "steady" (small bids, bury most) leads: 43% at 3 seats,
   32% at 4.
 
+### 2026-09-28: the reserve rule returns (the user), with no prestige
+
+Every paper that does not become Patron keeps one story it played this
+round (positive or negative): it returns to hand, and its prestige is NOT
+banked. Every other story played is spent and scores. (It had been
+dropped at revision 2 without the user deciding it.) Simulator: `reserve`
+(on), `reserve_pick` (which story a bot keeps; 'influence' or 'prestige'
+made no difference).
+
+One of each line among hunters, 300 games per cell; fair 33% / 25%:
+
+| rules | empty-hand rounds (3p) | Era III buys | winner prestige (3p) | banker 3p / 4p | trade-buying 3p / 4p | negative-only 3p / 4p | steady 3p / 4p |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| no reserve, no income | 8.6 | 0.3 | 12 | 38% / 79% | 44% / 73% | 17% / 14% | 27% / 24% |
+| **reserve**, no income | 6.4 | 0.3 | 12 | 24% / 66% | 48% / 76% | 25% / 24% | 37% / 23% |
+| no reserve, income 1 | 5.5 | 2.0 | 23 | 0% / 1% | 9% / 37% | 15% / 17% | 44% / 31% |
+| reserve, income 1 | 3.0 | 2.3 | 23 | 0% / 1% | 1% / 31% | 8% / 9% | 69% / 50% |
+| no reserve, income 2 | 3.1 | 3.5 | 29 | 0% / 0% | 0% / 1% | 11% / 16% | 43% / 32% |
+| reserve, income 2 | 0.4 | 5.2 | 31 | 0% / 0% | 0% / 0% | 5% / 13% | 11% / 25% |
+
+- The reserve keeps hands fuller and makes negative-only play viable at
+  3-4 seats (25% / 24%), but money is still the bottleneck: nobody can
+  buy Era III stories and hoarding still wins at four seats.
+- Reserve + income 1 overshoots toward small bids (steady 69% at 3 seats).
+  Reserve + income 2 has full hands and a working market, but the hunter
+  line beats every alternative (negatives 5-13%).
+

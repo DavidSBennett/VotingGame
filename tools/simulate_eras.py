@@ -121,6 +121,8 @@ DEFAULTS = dict(
     floor_zero=True,        # a candidate's net influence never drops below 0
     income=0,               # purchasing power every paper gets each round (subscriptions)
     starter_copies=1,       # multiply every starter's copies
+    reserve=True,           # every paper but the new Patron keeps one story it played (no prestige for it)
+    reserve_pick="influence",   # which played story a paper keeps: 'influence' or 'prestige'
     # stat overrides for sweeps (None = the spreadsheet's value)
     bonus=None,
     prestige_by_era=None,   # e.g. {"I": 1, "II": 2, "III": 3}
@@ -141,6 +143,7 @@ class Player:
         self.buried = 0
         self.ran = 0             # played positive
         self.negs = 0            # played negative
+        self.kept = 0            # played stories kept by the reserve rule
         self.lost = 0            # cards lost at era changes
         self.empty_rounds = 0
 
@@ -258,8 +261,8 @@ class Game:
                     p.money += base(cid)["profit"] * (self.cfg["patron_multiplier"] if p.patron else 1)
                     p.buried += 1
                     continue
-                # Played: spent, and known for it.
-                p.prestige += self.prestige(cid)
+                # Played: spent, and known for it (prestige banked below,
+                # once we know whether it is the story the paper keeps).
                 book = pos if act == "pos" else neg
                 book[side][p.seat] = book[side].get(p.seat, 0) + self.influence(cid, side, e)
                 if act == "pos":
@@ -288,11 +291,24 @@ class Game:
             p.patron = (p.seat == patron)
             p.patronages += p.patron
 
-        # Stories buried go home to be buried again; stories played are spent.
+        # Stories buried go home to be buried again. Every paper but the new
+        # Patron keeps one story it played: back to hand, no prestige for
+        # it. Every other story played is spent, and its prestige banked.
         for p in self.players:
+            played = [c for c, a, _ in commits[p.seat] if a != "bury"]
+            kept = None
+            if self.cfg["reserve"] and played and p.seat != patron:
+                if self.cfg["reserve_pick"] == "prestige":
+                    kept = max(played, key=lambda c: (self.prestige(c), base(c)["influence"]))
+                else:
+                    kept = max(played, key=lambda c: (base(c)["influence"], self.prestige(c)))
+                p.hand.append(kept)
+                p.kept += 1
             for cid, act, _ in commits[p.seat]:
                 if act == "bury":
                     p.discard.append(cid)
+                elif cid != kept:
+                    p.prestige += self.prestige(cid)
         for p in self.players:
             p.money += self.cfg["income"]
         self.buy(wishes)
