@@ -1,7 +1,53 @@
 import { useEffect, useState } from 'react';
 import { createGame, joinGame, listOpenGames } from '../api/client.js';
 import HighScores from '../components/HighScores.jsx';
-import Rules from '../components/Rules.jsx';
+import RulesDc from '../components/dc/RulesDc.jsx';
+
+/**
+ * Choose a newspaper (DC's Super Heroes): each has an ability of its own.
+ * `taken` greys out papers another seat already has; null = dealt at start.
+ */
+function PaperPicker({ papers, value, onChange, taken = [] }) {
+  if (!papers.length) return null;
+  return (
+    <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        className={value === null ? 'border border-gold-300 bg-ink-800 px-2 py-1.5 text-left' : 'border border-gold-500/30 px-2 py-1.5 text-left hover:border-gold-300'}
+      >
+        <div className="font-display text-base text-cream-50">Deal me one</div>
+        <div className="font-serif text-[11px] italic text-cream-200/60">A paper at random when the presses start.</div>
+      </button>
+      {papers.map((pp) => {
+        const off = taken.includes(pp.key);
+        return (
+          <button
+            key={pp.key}
+            type="button"
+            disabled={off}
+            title={pp.flavor}
+            onClick={() => onChange(pp.key)}
+            className={
+              value === pp.key
+                ? 'border border-gold-300 bg-ink-800 px-2 py-1.5 text-left'
+                : off
+                  ? 'border border-cream-200/10 px-2 py-1.5 text-left opacity-40'
+                  : 'border border-gold-500/30 px-2 py-1.5 text-left hover:border-gold-300'
+            }
+          >
+            <div className="font-display text-base leading-tight text-cream-50">
+              {pp.name}
+              <span className="ml-1 font-mono text-[8px] uppercase tracking-[0.15em] text-gold-500">{pp.leans}</span>
+              {off && <span className="ml-1 font-mono text-[8px] uppercase tracking-[0.15em] text-cream-200/60">taken</span>}
+            </div>
+            <div className="font-serif text-[11px] leading-snug text-cream-200/70">{pp.ability}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * The lobby, laid out as a title page: kicker, masthead, an italic line of
@@ -37,6 +83,9 @@ export default function Lobby({ onSeated }) {
     }
   };
   const [games, setGames] = useState([]);
+  const [papers, setPapers] = useState([]);
+  const [paper, setPaper] = useState(null);        // the paper I open a table with
+  const [joinPaper, setJoinPaper] = useState(null); // the paper I take a seat with
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [showRules, setShowRules] = useState(false);
@@ -45,6 +94,7 @@ export default function Lobby({ onSeated }) {
     try {
       const data = await listOpenGames(true);
       setGames(data.games || []);
+      setPapers(data.papers || []);
     } catch (err) {
       setError(err.message);
     }
@@ -87,7 +137,16 @@ export default function Lobby({ onSeated }) {
     setBusy(true);
     setError(null);
     try {
-      seated(await createGame({ player_name: playerName.trim(), max_players: 1, bots: rivals, bot_level: level }));
+      seated(
+        await createGame({
+          player_name: playerName.trim(),
+          max_players: 1,
+          bots: rivals,
+          bot_level: level,
+          engine: 'dc',
+          paper: paper || undefined,
+        }),
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -100,7 +159,7 @@ export default function Lobby({ onSeated }) {
     setBusy(true);
     setError(null);
     try {
-      seated(await joinGame({ player_name: playerName.trim(), join_code: code.trim().toUpperCase() }));
+      seated(await joinGame({ player_name: playerName.trim(), join_code: code.trim().toUpperCase(), paper: joinPaper || undefined }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -122,7 +181,7 @@ export default function Lobby({ onSeated }) {
         </div>
         <h1 className="mt-3 font-display text-6xl font-bold leading-none text-cream-50 sm:text-7xl">The Fourth Estate</h1>
         <p className="mx-auto mt-4 max-w-2xl font-display text-xl italic text-gold-300">
-          Run the stories, make the presidents, bury what pays. Seventeen elections; the richest press wins.
+          Buy the news, run the stories, make the presidents. Seventeen elections; the most honoured paper wins.
         </p>
         <div className="mx-auto mt-6 flex max-w-xs items-center gap-3">
           <span className="h-px flex-1 bg-gold-500/50" />
@@ -200,10 +259,13 @@ export default function Lobby({ onSeated }) {
               ))}
             </div>
             <p className="mt-2 font-serif text-sm italic text-cream-200/50">
-              {level === 'easy'
-                ? 'Steady papers that run what is cheap and bury the rest.'
-                : 'Papers that play the way the winning playtests did: bid for the Patronage as cheaply as they can, and bury their hoard for double when they hold it.'}
+              Both levels play the balanced rival the game was tuned against, for now.
             </p>
+          </div>
+
+          <div className="mt-5">
+            <span className="label text-cream-200/60">Your newspaper</span>
+            <PaperPicker papers={papers} value={paper} onChange={setPaper} />
           </div>
 
           <button type="button" onClick={doCreate} disabled={busy} className="btn-solid mt-6 w-full">
@@ -233,6 +295,16 @@ export default function Lobby({ onSeated }) {
             </button>
           </div>
 
+          <div className="mt-5">
+            <span className="label text-cream-200/60">Your newspaper at that table</span>
+            <PaperPicker
+              papers={papers}
+              value={joinPaper}
+              onChange={setJoinPaper}
+              taken={(openTables.find((g) => g.join_code === joinCode.trim().toUpperCase()) || {}).papers_taken || []}
+            />
+          </div>
+
           <div className="mt-6 flex-1">
             <span className="label text-cream-200/60">Open tables</span>
             {openTables.length === 0 ? (
@@ -246,8 +318,18 @@ export default function Lobby({ onSeated }) {
                       <span className="ml-3 font-serif text-sm text-cream-200/70">
                         {g.seated}/{g.max_players} · {g.players.join(', ')}
                       </span>
+                      {g.papers_taken && g.papers_taken.length > 0 && (
+                        <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.12em] text-cream-200/40">
+                          taken: {g.papers_taken.map((k) => (papers.find((pp) => pp.key === k) || { name: k }).name).join(', ')}
+                        </span>
+                      )}
                     </div>
-                    <button type="button" onClick={() => doJoin(g.join_code)} disabled={busy} className="btn">
+                    <button
+                      type="button"
+                      onClick={() => doJoin(g.join_code)}
+                      disabled={busy || (joinPaper && (g.papers_taken || []).includes(joinPaper))}
+                      className="btn"
+                    >
                       Sit
                     </button>
                   </li>
@@ -264,7 +346,7 @@ export default function Lobby({ onSeated }) {
 
       {showRules && (
         <div className="mt-6 animate-rise">
-          <Rules inline />
+          <RulesDc inline />
         </div>
       )}
 

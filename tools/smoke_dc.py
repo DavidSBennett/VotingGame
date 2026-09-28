@@ -160,7 +160,7 @@ def finish(base, token, st, ck, say, label):
 
 def solo(base, bots, level, ck, say):
     seat = call(base, "/createGame.php", {"player_name": "smoke-dc", "max_players": 1, "bots": bots,
-                                         "bot_level": level, "engine": "dc"})
+                                         "bot_level": level})     # the DC game is the default now
     token = seat["player_token"]
     st = state_of(base, token)
     ck.check(st["status"] == "active", "solo: starts at once")
@@ -181,16 +181,27 @@ def solo(base, bots, level, ck, say):
 
 
 def two_people(base, ck, say):
-    host = call(base, "/createGame.php", {"player_name": "smoke-dc-A", "max_players": 2, "bots": 1, "engine": "dc"})
+    host = call(base, "/createGame.php", {"player_name": "smoke-dc-A", "max_players": 2, "bots": 1, "paper": "globe"})
     ta = host["player_token"]
     listed = call(base, "/listOpenGames.php")
-    ck.check(all(g["game_id"] != host["game_id"] for g in listed.get("games", [])),
-             "two: a DC game is kept off the lobby list")
-    guest = call(base, "/joinGame.php", {"player_name": "smoke-dc-B", "join_code": host["join_code"]})
+    mine = [g for g in listed.get("games", []) if g["game_id"] == host["game_id"]]
+    ck.check(len(mine) == 1, "two: the new table is on the lobby list")
+    ck.check(bool(mine) and mine[0].get("papers_taken") == ["globe"], "two: the list shows the host's paper taken",
+             str(mine[0].get("papers_taken") if mine else None))
+    ck.check(len(listed.get("papers", [])) == 8, "two: the list carries the eight newspapers")
+    try:
+        call(base, "/joinGame.php", {"player_name": "smoke-dc-X", "join_code": host["join_code"], "paper": "globe"})
+        ck.check(False, "two: a paper already taken is refused")
+    except ApiError as e:
+        ck.check("already taken" in str(e), "two: a paper already taken is refused", str(e))
+    guest = call(base, "/joinGame.php", {"player_name": "smoke-dc-B", "join_code": host["join_code"], "paper": "sun"})
     tb = guest["player_token"]
     call(base, "/startGame.php", {"player_token": ta})
     sa, sb = state_of(base, ta), state_of(base, tb)
     ck.check(sa["status"] == "active", "two: started")
+    ck.check(sa.get("engine") == "dc", "two: the state says engine dc")
+    papers = {p["player_name"]: p["paper"]["key"] for p in sa["players"]}
+    ck.check(papers.get("smoke-dc-A") == "globe" and papers.get("smoke-dc-B") == "sun", "two: chosen papers kept", str(papers))
     a_hand = [c["key"] for c in sa["you"]["hand"]]
     b_json = json.dumps(sb)
     ck.check(not any('"%s"' % k in b_json for k in a_hand if k.startswith(("letter#", "notice#"))),

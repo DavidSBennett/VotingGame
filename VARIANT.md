@@ -555,3 +555,31 @@ checks). One run lost a request to a dropped connection from the host
 (WinError 10054); actions are not retried, since a retry could apply
 twice.
 
+### 2026-09-28: milestone 5 -- the UI; the DC game is now the default
+
+New tables play the DC-style game (`createGame` defaults to engine
+`dc`; `"engine": "newsroom"` still makes the old one, which the old smoke
+test now asks for). The lobby lists only DC tables, with the eight
+newspapers and which each table has taken; the host (`createGame`) and a
+guest (`joinGame`) may choose a paper, and a paper already taken at a
+table is refused. The state carries `engine: 'dc'`.
+
+Frontend: `GameShell` routes a DC state to `views/DcShell.jsx` (an old
+game still in progress keeps its old screen). New components in
+`components/dc/`: Card (cost, type band, prestige, effect chips, flavour),
+ElectionPanel (both men, themes, thresholds, your reach, Elect),
+ElectionStrip (1796-1860: who elected whom, history rewritten marked),
+ExchangeRow (five stories, Editorial pile, Buy lit when affordable),
+TurnArea (pools, played cards, hand -- click to play -- Play all, the
+Sun / Herald button, End turn), PromptModal (destroy / gain), PapersPanel
+(each paper's newspaper, ability, prestige, offices, counts, media
+events), FinalScores (prestige by source), RulesDc. Lobby: a newspaper
+picker for opening and for joining a table; new title line.
+
+Previewed through the dev server against the live backend (a game
+created through the API, its seat loaded into the browser): opening
+position, a turn in progress, a trash prompt, and the final count all
+render; fixed on sight: "new" tags covering costs (and marking every
+1796 story), truncated negative labels, empty card middles (now the
+flavour line).
+

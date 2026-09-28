@@ -8,7 +8,8 @@
  * Seat assignment happens under FOR UPDATE on the game row, so two
  * players hitting Join in the same instant cannot land on the same seat.
  */
-require_once __DIR__ . '/engine.php';
+require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/cards_dc.php';
 
 require_method('POST');
 $body = read_json_body();
@@ -44,16 +45,29 @@ try {
     throw new Exception('That table is full');
   }
 
+  // The guest's newspaper (DC game): one no other seat has taken.
+  $paper = (string) ($body['paper'] ?? '');
+  if (vg_engine_of_config($game['config']) !== 'dc' || $paper === '') $paper = null;
+  if ($paper !== null) {
+    if (!isset(dc_papers()[$paper])) throw new Exception('Unknown newspaper: ' . $paper);
+    foreach ($players as $p) {
+      if (($p['public_state']['paper'] ?? null) === $paper) {
+        throw new Exception(dc_papers()[$paper]['name'] . ' is already taken at this table. Choose another paper.');
+      }
+    }
+  }
+  $guestState = json_encode($paper !== null ? ['paper' => $paper] : new stdClass());
+
   // Lowest free seat index, so a seat vacated before start gets reused.
   $seat = 0;
   while (isset($players[$seat])) $seat++;
 
   $stmt = $mysqli->prepare("
     INSERT INTO vg_game_players (game_id, seat, player_name, player_token, public_state, private_state)
-    VALUES (?, ?, ?, ?, '{}', '{}')
+    VALUES (?, ?, ?, ?, ?, '{}')
   ");
   if (!$stmt) throw new Exception('DB prepare failed: ' . $mysqli->error);
-  $stmt->bind_param('iiss', $gameId, $seat, $playerName, $token);
+  $stmt->bind_param('iisss', $gameId, $seat, $playerName, $token, $guestState);
   if (!$stmt->execute()) throw new Exception('Failed to take a seat: ' . $stmt->error);
   $playerId = (int) $mysqli->insert_id;
   $stmt->close();

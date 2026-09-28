@@ -21,10 +21,16 @@ $playerName = trim((string) ($body['player_name'] ?? ''));
 if ($playerName === '') error('A player name is required', 400);
 if (mb_strlen($playerName) > 40) $playerName = mb_substr($playerName, 0, 40);
 
-// Which rules engine: 'dc' opts into the DC-style deck-builder
-// (engine_dc.php); anything else is the newsroom game (engine.php).
-$engineName = ((string) ($body['engine'] ?? '')) === 'dc' ? 'dc' : 'newsroom';
+// Which rules engine: the DC-style deck-builder (engine_dc.php) unless the
+// request asks for the old newsroom game ("engine": "newsroom").
+$engineName = ((string) ($body['engine'] ?? '')) === 'newsroom' ? 'newsroom' : 'dc';
 vg_require_engine($engineName);
+
+// The host's newspaper (DC game), chosen in the lobby; blank = dealt at start.
+$paper = (string) ($body['paper'] ?? '');
+if ($engineName !== 'dc' || $paper === '') $paper = null;
+if ($paper !== null && !isset(dc_papers()[$paper])) error('Unknown newspaper: ' . $paper, 400);
+$hostState = json_encode($paper !== null ? ['paper' => $paper] : new stdClass());
 
 $defaults = engine_default_config();
 $humanSeats = isset($body['max_players']) ? (int) $body['max_players'] : 1;
@@ -84,10 +90,10 @@ try {
 
   $stmt = $mysqli->prepare("
     INSERT INTO vg_game_players (game_id, seat, player_name, player_token, is_bot, public_state, private_state)
-    VALUES (?, 0, ?, ?, 0, '{}', '{}')
+    VALUES (?, 0, ?, ?, 0, ?, '{}')
   ");
   if (!$stmt) throw new Exception('DB prepare failed: ' . $mysqli->error);
-  $stmt->bind_param('iss', $gameId, $playerName, $token);
+  $stmt->bind_param('isss', $gameId, $playerName, $token, $hostState);
   if (!$stmt->execute()) throw new Exception('Failed to seat the host: ' . $stmt->error);
   $playerId = (int) $mysqli->insert_id;
   $stmt->close();

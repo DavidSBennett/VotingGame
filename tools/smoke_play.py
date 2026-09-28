@@ -278,7 +278,8 @@ def main():
     print()
 
     seat = call(args.base, "/createGame.php",
-                {"player_name": args.name, "max_players": 1, "bots": 1, "bot_level": args.level})
+                {"player_name": args.name, "max_players": 1, "bots": 1, "bot_level": args.level,
+                 "engine": "newsroom"})
     token = seat["player_token"]
     game_id = seat["game_id"]
     print("created game %s (%s), seat %s, status %s"

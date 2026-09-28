@@ -9,6 +9,7 @@ import News from '../components/News.jsx';
 import CommitBoard from '../components/CommitBoard.jsx';
 import BoardStrip from '../components/BoardStrip.jsx';
 import Collapsible from '../components/Collapsible.jsx';
+import DcShell from './DcShell.jsx';
 
 /**
  * The game screen: a masthead, a status line, the timeline of elections,
@@ -103,6 +104,12 @@ export default function GameShell({ seat, onLeave }) {
         </button>
       </div>
     );
+  }
+
+  // The DC-style game (backend/engine_dc.php) has its own screen. Its state
+  // says engine 'dc' and carries an `election` (the newsroom game's has `race`).
+  if (state.engine === 'dc' || 'election' in state) {
+    return <DcShell seat={seat} state={state} events={events} error={error} refresh={refresh} onLeave={onLeave} />;
   }
 
   const ended = state.status === 'ended';

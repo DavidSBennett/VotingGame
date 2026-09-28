@@ -1134,6 +1134,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
   }
 
   return [
+    'engine' => 'dc',
     'game_id' => (int) $game['game_id'], 'join_code' => $game['join_code'] ?? null, 'status' => $status,
     'variant' => $game['variant'] ?? null, 'phase' => $game['phase'], 'round' => (int) $game['round_number'],
     'current_seat' => $game['current_seat'], 'max_players' => (int) ($game['max_players'] ?? 0),
