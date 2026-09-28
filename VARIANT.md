@@ -222,3 +222,29 @@ One of each line among hunters, 300 games per cell; fair 33% / 25%:
   Reserve + income 2 has full hands and a working market, but the hunter
   line beats every alternative (negatives 5-13%).
 
+### 2026-09-28: more profit per story instead of income (the user's question)
+
+With the reserve on and no income; knobs `profit_add`, `profit_mult`,
+`cost_follows` (prices rise by the same amount). One of each line among
+hunters, 300 games per cell; fair 33% / 25%.
+
+| rules | empty rounds 3p / 4p | Era III buys 3p / 4p | winner prestige 3p | banker 3p / 4p | trade 3p / 4p | negative-only 3p / 4p | steady 3p / 4p |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| reserve only | 6.4 / 6.5 | 0.3 / 0.0 | 12 | 24% / 66% | 48% / 76% | 25% / 24% | 37% / 23% |
+| profit +1 | 3.4 / 5.2 | 2.2 / 0.7 | 25 | 0% / 1% | 0% / 24% | 4% / 12% | 52% / 53% |
+| profit +2 | 0.9 / 3.4 | 5.2 / 2.2 | 33 | 0% / 0% | 0% / 0% | 4% / 12% | 7% / 24% |
+| profit +3 | 0.2 / 1.1 | 6.3 / 3.9 | 34 | 0% / 0% | 0% / 0% | 11% / 9% | 2% / 7% |
+| profit x1.5 | 2.9 / 4.9 | 2.9 / 1.0 | 28 | 0% / 2% | 0% / 16% | 5% / 12% | 37% / 43% |
+| profit x2 | 0.6 / 2.9 | 5.8 / 2.8 | 33 | 0% / 0% | 0% / 1% | 8% / 13% | 4% / 13% |
+| profit +2, prices +2 | 4.6 / 5.7 | 1.2 / 0.2 | 21 | 0% / 9% | 13% / 60% | 8% / 15% | 71% / 52% |
+| profit x2, prices x2 | 5.7 / 6.1 | 0.8 / 0.2 | 16 | 15% / 46% | 21% / 58% | 20% / 21% | 41% / 32% |
+| income 2 (for comparison) | 0.4 / 0.9 | 5.2 / 3.5 | 31 | 0% / 0% | 0% / 0% | 5% / 13% | 11% / 25% |
+
+- Raising profit while prices stay put does the same job as income:
+  +2 per story (or x2) matches income 2 at three seats. At four seats it
+  is weaker (Era III buys 2.2 vs 3.5), because the money arrives only when
+  a paper has something to bury.
+- If prices rise with profit, the gain cancels and the shortage returns.
+- Either way, the same catch as income: once money flows, the hunter line
+  beats every alternative.
+

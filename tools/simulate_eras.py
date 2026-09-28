@@ -127,6 +127,9 @@ DEFAULTS = dict(
     bonus=None,
     prestige_by_era=None,   # e.g. {"I": 1, "II": 2, "III": 3}
     cost_add=0,
+    profit_add=0,           # add to every story's profit (starters and trade included)
+    profit_mult=1,          # ... or multiply it
+    cost_follows=False,     # raise each price by the same amount its profit rose
 )
 
 
@@ -183,8 +186,14 @@ class Game:
         c = base(cid)
         return c["theme_bonus"] if self.cfg["bonus"] is None or c["kind"] == "trade" else self.cfg["bonus"]
 
+    def profit(self, cid):
+        return base(cid)["profit"] * self.cfg["profit_mult"] + self.cfg["profit_add"]
+
     def price(self, cid):
-        return max(1, base(cid)["cost"] + self.cfg["cost_add"])
+        cost = base(cid)["cost"] + self.cfg["cost_add"]
+        if self.cfg["cost_follows"]:
+            cost += self.profit(cid) - base(cid)["profit"]
+        return max(1, cost)
 
     def influence(self, cid, side, e=None):
         c = base(cid)
@@ -258,7 +267,7 @@ class Game:
             for cid, act, side in commits[p.seat]:
                 p.hand.remove(cid)
                 if act == "bury":
-                    p.money += base(cid)["profit"] * (self.cfg["patron_multiplier"] if p.patron else 1)
+                    p.money += self.profit(cid) * (self.cfg["patron_multiplier"] if p.patron else 1)
                     p.buried += 1
                     continue
                 # Played: spent, and known for it (prestige banked below,
@@ -500,7 +509,7 @@ STRATEGIES = {
 def make_buyer(rank):
     def buyer(game, p, plays):
         mult = game.cfg["patron_multiplier"] if p.patron else 1
-        cash = p.money + sum(base(c)["profit"] * mult for c, a, _ in plays if a == "bury")
+        cash = p.money + sum(game.profit(c) * mult for c, a, _ in plays if a == "bury")
         ok = [c for c in game.exchange if game.price(c) <= cash and game.usable_later(c)]
         return sorted(ok, key=lambda c: rank(game, c))
     return buyer
