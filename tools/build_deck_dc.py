@@ -42,7 +42,7 @@ def blank(**kw):
 # Templates by theme and cost: the theme's identity.
 POLITICAL = {
     2: dict(gen=1, themed=2),
-    3: dict(gen=1, themed=2, campaign=1),
+    3: dict(gen=1, themed=2, campaign=1, retract=1),
     4: dict(gen=1, themed=2, per_office=1, retract=1),
     5: dict(gen=2, themed=2, campaign=2, retract=1),
     6: dict(gen=2, themed=3, per_office=1, retract=1),

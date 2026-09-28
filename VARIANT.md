@@ -378,3 +378,38 @@ Separating the effects (Political deck vs Economic + Social, fair 33%,
   Aurora 33%. Next: bring the Intelligencer and Sun down and the Herald
   up.
 
+### 2026-09-28: balancing the papers
+
+Each paper on a general-purpose (balanced) bot among two balanced bots
+with random papers; fair 33%.
+
+| paper | before | final ability | after (600 games) |
+| --- | --- | --- | --- |
+| The Washington Globe | 34% | Political influence counts toward any candidate (dropped +1 Political per Political story) | 30% |
+| The Albany Argus | 28% | +1 prestige per election won (was +2; +3 overshot to 44%) | 32% |
+| The National Intelligencer | 44% | never gains Scandals, no card draw | 35% |
+| The Journal of Commerce | 41% | 1st and 2nd Economic story each turn +1 influence (the 2nd drew a card) | 38% |
+| The New York Herald | 16% | pay **2** to put the top story of the main deck **into your hand** (was 3, to discard) | 39% |
+| The Sun | 45% | discard a **Scandal** to draw **three** (could discard Letters or Notices and draw one: 45-52%) | 32% |
+| The North Star | 27% | two Social stories: draw a card (draw 2 pushed Social decks to 45%) | 32% |
+| The Aurora | 33% | unchanged | 38% |
+
+Spread 32 points -> 9 (7 on the final 300-game recheck).
+
+Two changes outside the papers were needed to keep the rest balanced:
+
+- **Retraction now on Political stories costing 3+** (19 cards, was 4+):
+  once the papers changed, Political lost its best partner (the old
+  Intelligencer's draw) and Social rose to 45% head to head.
+- **Turn-order catch-up** (new rule, not the user's): on its first turn
+  each later seat gets +1 influence per seat (seat 2 +1, seat 3 +2, ...).
+  Without it, 3 seats won 43/31/25 and 4 seats 36/27/21/15. With it:
+  2 seats 51/49, 3 seats 32/31/37, 4 seats 22/26/26/26.
+
+Themes with the final papers: one theme deck among two balanced (fair
+33%): Political 29%, Economic 30%, Social 31%. Three theme decks head to
+head: Political 39%, **Economic 23%**, Social 39% -- Economic lags when
+all three focused decks meet; the Journal's card draw did not fix it
+(23%). Negative stories still near-essential: attacker 22%, never buying
+them 21%. Games ~24 rounds.
+

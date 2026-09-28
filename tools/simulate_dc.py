@@ -81,12 +81,24 @@ DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=60, unhistorical_extra=None,
                 threshold_add=0,
                 papers=True,                # each paper plays a newspaper character (DC's Super Heroes)
                 retract_min_cost=None,      # test: every Political story costing this or more has Retraction 1
-                intelligencer="first",      # 'all': never gains Scandals; 'first': ignores the first each round
-                intelligencer_draw=True,    # ... and draws a card when it does
+                intelligencer="all",      # 'all': never gains Scandals; 'first': ignores the first each round
+                intelligencer_draw=False,    # ... and draws a card when it does
+                intelligencer_discard=False,  # ... and ignores the first discard attack each round
+                # paper abilities (the knobs the balancing pass turns)
+                sun_junk="scandal",            # the Sun discards 'both' (a Scandal or Notice) / 'notice' / 'scandal'
+                sun_draw=3,                 # ... and draws this many
+                journal_second="gen",      # the Journal's 2nd Economic story: 'draw' / 'gen' (+1) / 'none'
+                north_star_at=2,            # the North Star draws after this many Social stories
+                north_star_draw=1,
+                argus_vp=1,                 # the Argus: prestige per election won
+                herald_cost=2,              # the Herald's scoop price
+                herald_to_hand=True,       # the scoop goes to hand (else discard)
+                globe_per=0,                # the Globe: Political per Political story
+                aurora_per=1,               # the Aurora: influence per different negative story
                 retract_draw="always",      # Retraction draws a card ('always'); True = only if it destroys one
                 draw_cap=None,              # cap every story's draw
                 political_any=False,        # Political influence counts toward ANY candidate
-                catchup=0)                  # later seats: +1 influence per seat on their first turn
+                catchup=1)                  # later seats: +1 influence per seat on their first turn (turn order)
 
 
 class Player:
@@ -97,6 +109,8 @@ class Player:
         self.deck = ["letter#%d.%d" % (seat, i) for i in range(7)] + ["notice#%d.%d" % (seat, i) for i in range(3)]
         self.hand, self.discard, self.locations = [], [], []
         self.shielded = False       # the Intelligencer's shield, used this round
+        self.argus_vp = 2
+        self.guarded = False        # the Intelligencer's discard guard, used this round
         self.stats = dict(turns=0, elected=0, bought=0, attacks=0, scandals=0, trashed=0, retracted=0,
                           gen=0, themed=0, draws=0, unhistorical=0)
 
@@ -107,7 +121,7 @@ class Player:
         return sum(1 for c in self.owned() if c.startswith("elec#"))
 
     def prestige(self):
-        bonus = 2 * self.offices() if self.paper == "argus" else 0     # the machine rewards offices
+        bonus = self.argus_vp * self.offices() if self.paper == "argus" else 0     # the machine rewards offices
         return sum(card(c)["vp"] for c in self.owned()) + bonus
 
 
@@ -118,6 +132,8 @@ class Game:
             self.cfg.update(config)
         self.rng = rng or random.Random()
         self.players = [Player(i, s) for i, s in enumerate(strategies)]
+        for p in self.players:
+            p.argus_vp = self.cfg["argus_vp"]
         if self.cfg["papers"]:
             # Unnamed seats are dealt a paper at random from those not taken.
             free = [k for k in PAPERS if k not in {p.paper for p in self.players}]
@@ -175,6 +191,7 @@ class Game:
         bot = BOTS[p.strategy]
         p.stats["turns"] += 1
         p.shielded = False
+        p.guarded = False
         gen, campaign = 0, 0
         if p.stats["turns"] == 1:
             gen += self.cfg["catchup"] * p.seat
@@ -195,12 +212,13 @@ class Game:
                     gen += c["others_bonus"]
 
         if p.paper == "sun":
-            junk = [c for c in p.hand if card(c)["type"] == "Scandal"] + \
-                   [c for c in p.hand if c.startswith("notice#")]
+            mode = self.cfg["sun_junk"]
+            junk = [c for c in p.hand if card(c)["type"] == "Scandal" and mode in ("both", "scandal")]
+            junk += [c for c in p.hand if c.startswith("notice#") and mode in ("both", "notice")]
             if junk:
                 p.hand.remove(junk[0])
                 p.discard.append(junk[0])
-                p.stats["draws"] += len(self.draw(p, 1))
+                p.stats["draws"] += len(self.draw(p, self.cfg["sun_draw"]))
 
         played = []
         count = {t: 0 for t in THEMES}
@@ -214,11 +232,14 @@ class Game:
                 if p.paper == "journal" and c["theme"] == "Economic":
                     if count["Economic"] == 1:
                         gen += 1
-                    elif count["Economic"] == 2:
+                    elif count["Economic"] == 2 and self.cfg["journal_second"] == "draw":
                         p.stats["draws"] += len(self.draw(p, 1))
-                if p.paper == "north_star" and c["theme"] == "Social" and count["Social"] == 2 and not star_done:
+                    elif count["Economic"] == 2 and self.cfg["journal_second"] == "gen":
+                        gen += 1
+                if (p.paper == "north_star" and c["theme"] == "Social"
+                        and count["Social"] == self.cfg["north_star_at"] and not star_done):
                     star_done = True
-                    p.stats["draws"] += len(self.draw(p, 1))
+                    p.stats["draws"] += len(self.draw(p, self.cfg["north_star_draw"]))
             gen += c["gen"]
             if c["theme"]:
                 themed[c["theme"]] += c["themed"]
@@ -254,9 +275,9 @@ class Game:
             if c["per_office"]:
                 themed[c["theme"]] += c["per_office"] * p.offices()
         if p.paper == "globe":
-            themed["Political"] += by_theme["Political"]
+            themed["Political"] += self.cfg["globe_per"] * by_theme["Political"]
         if p.paper == "aurora":
-            gen += len({card(x)["key"] for x in played if card(x)["type"] == "Negative story"})
+            gen += self.cfg["aurora_per"] * len({card(x)["key"] for x in played if card(x)["type"] == "Negative story"})
         p.stats["gen"] += gen
         p.stats["themed"] += sum(themed.values())
 
@@ -323,9 +344,9 @@ class Game:
                 self.exchange.remove(pick)
             p.discard.append(pick)
             p.stats["bought"] += 1
-        if p.paper == "herald" and gen >= 3 and self.main and bot.scoop(self, p):
-            gen -= 3
-            p.discard.append(self.main.pop())
+        if p.paper == "herald" and gen >= self.cfg["herald_cost"] and self.main and bot.scoop(self, p):
+            gen -= self.cfg["herald_cost"]
+            (p.hand if self.cfg["herald_to_hand"] else p.discard).append(self.main.pop())
             p.stats["bought"] += 1
         self.refill()
 
@@ -368,14 +389,19 @@ class Game:
             q.discard.append(shield)
             self.draw(q, 1)
             return
+        if kind == "discard" and q.paper == "intelligencer" and self.cfg["intelligencer_discard"] and not q.guarded:
+            q.guarded = True            # the first discard attack each round misses
+            return
         if kind == "discard" and q.hand:
             c = self.rng.choice(q.hand)
             q.hand.remove(c)
             q.discard.append(c)
         elif kind == "scandal" and q.paper == "intelligencer" and (
-                self.cfg["intelligencer"] == "all" or not q.shielded):
+                self.cfg["intelligencer"] in ("all", "all_draw_first") or not q.shielded):
+            # 'all_draw_first': every Scandal ignored; the first each round draws a card.
+            draw = self.cfg["intelligencer_draw"] and (self.cfg["intelligencer"] != "all_draw_first" or not q.shielded)
             q.shielded = True
-            if self.cfg["intelligencer_draw"]:
+            if draw:
                 self.draw(q, 1)
             return
         elif kind == "scandal" and self.scandals:
