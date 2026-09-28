@@ -23,6 +23,8 @@ export default {
           700: '#27525b',
         },
         gold: {
+          700: '#665015',    // from The Historians: card borders
+          600: '#8e6f24',
           500: '#b8923a',
           400: '#c9a652',
           300: '#d8b968',
@@ -32,6 +34,7 @@ export default {
           100: '#f4ead0',
           200: '#e6d4a8',
           300: '#cdb888',
+          400: '#b8a36a',
         },
         oxblood: {
           900: '#4a1212',
@@ -61,6 +64,12 @@ export default {
         card: '0 1px 2px rgba(0,0,0,0.45), 0 6px 14px rgba(0,0,0,0.35)',
         lift: '0 4px 8px rgba(0,0,0,0.45), 0 18px 32px rgba(0,0,0,0.45)',
         glow: '0 0 0 1px rgba(216,185,104,0.55), 0 0 24px rgba(216,185,104,0.25)',
+        // The Historians' cards: paper with weight on the teal ground.
+        'card-hover': '0 8px 16px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.7)',
+        'card-lift': '0 16px 32px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.7)',
+      },
+      transitionTimingFunction: {
+        desk: 'cubic-bezier(0.22, 1, 0.36, 1)',
       },
       keyframes: {
         rise: {

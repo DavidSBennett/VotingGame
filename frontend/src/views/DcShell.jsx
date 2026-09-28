@@ -11,6 +11,7 @@ import PromptModal from '../components/dc/PromptModal.jsx';
 import PapersPanel from '../components/dc/PapersPanel.jsx';
 import FinalScores from '../components/dc/FinalScores.jsx';
 import RulesDc from '../components/dc/RulesDc.jsx';
+import CardModal from '../components/dc/CardModal.jsx';
 
 /**
  * The game screen for the DC-style game (backend/engine_dc.php): the
@@ -27,6 +28,9 @@ export default function DcShell({ seat, state, events, error, refresh, onLeave }
   const [actionError, setActionError] = useState(null);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  // The open card: a row of cards, which one, and where they came from.
+  const [modal, setModal] = useState(null);
+  const open = (cards, index, source) => setModal({ cards, index, source });
 
   const act = async (action, params) => {
     setBusy(true);
@@ -73,6 +77,27 @@ export default function DcShell({ seat, state, events, error, refresh, onLeave }
   const av = state.available_actions || {};
   const myTurn = active && state.turn && state.you && state.turn.seat === state.you.seat;
   const globe = me && me.paper && me.paper.key === 'globe';
+
+  // What the open card can do right now -- only what the server lists.
+  const modalCard = modal ? modal.cards[modal.index] : null;
+  let modalActions = null;
+  if (modalCard && myTurn && !(state.you && state.you.pending)) {
+    if (modal.source === 'hand' && (av.play || []).includes(modalCard.key)) {
+      modalActions = (
+        <button type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); act('play', { card: modalCard.key }); }}>
+          Play this story
+        </button>
+      );
+    } else if (modal.source === 'exchange' && (av.buy || []).includes(modalCard.key)) {
+      modalActions = (
+        <button type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); act('buy', { card: modalCard.key }); }}>
+          Buy for ◆{modalCard.cost}
+        </button>
+      );
+    } else if (modal.source === 'exchange') {
+      modalActions = <span className="font-serif text-sm italic text-ink-700">Not enough influence to buy this yet.</span>;
+    }
+  }
 
   return (
     <div className="flex min-h-full flex-col">
@@ -178,8 +203,9 @@ export default function DcShell({ seat, state, events, error, refresh, onLeave }
                   myTurn={myTurn}
                   news={state.news}
                   showNew={state.election && state.election.index > 0}
+                  open={open}
                 />
-                <TurnArea state={state} me={me} act={act} busy={busy} />
+                <TurnArea state={state} me={me} act={act} busy={busy} open={open} />
               </>
             )}
           </div>
@@ -210,6 +236,16 @@ export default function DcShell({ seat, state, events, error, refresh, onLeave }
       </main>
 
       {myTurn && state.you && state.you.pending && <PromptModal pending={state.you.pending} act={act} busy={busy} />}
+      {modalCard && (
+        <CardModal
+          card={modalCard}
+          onClose={() => setModal(null)}
+          actions={modalActions}
+          onPrev={modal.index > 0 ? () => setModal({ ...modal, index: modal.index - 1 }) : null}
+          onNext={modal.index < modal.cards.length - 1 ? () => setModal({ ...modal, index: modal.index + 1 }) : null}
+          position={{ current: modal.index + 1, total: modal.cards.length }}
+        />
+      )}
       {rulesOpen && <RulesDc onClose={() => setRulesOpen(false)} />}
       {reportOpen && <PlaytestReportModal playerToken={seat.player_token} onClose={() => setReportOpen(false)} />}
     </div>

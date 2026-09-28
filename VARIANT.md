@@ -604,3 +604,17 @@ flavour line).
   threshold ... +N of the candidate's theme"). Historical flavour lines
   ("the Jackson men") are unchanged.
 
+### 2026-09-28: cards in The Historians' style (the user)
+
+Reused from The Historians (`Historians_(Board_Game)/board/frontend`):
+the thin card (CardThumbnail: w-28 paper tile, gold-700 border, inset
+gilt hairline, `surface-paper` linen weave, hover lift), the CardModal
+(paper document with CornerOrnaments and a FleuronDivider, Close, paging
+with chevrons and the arrow keys, Escape), the centered hand fan
+(BoardHandFan, without its tag flags), and its card shadows and easing.
+Clicking a card now opens it; the modal carries Play (hand) or Buy
+(exchange) when the server allows it. Titles and abilities are centered;
+the hand, exchange and played cards are centered rows. Tightened: the
+election panel is about half its height (slim Elect buttons), Buy shows
+only under what you can afford, panels use less padding.
+
