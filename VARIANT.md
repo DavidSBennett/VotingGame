@@ -465,3 +465,10 @@ paper +1 influence** that turn. All 27 negative stories updated in
 32/33/35, 4p 25/25/27/23; games ~20 rounds (were ~23); a paper now makes
 ~8 attacks and takes ~4 Scandals a game (were ~12 and ~5).
 
+### 2026-09-28: engine and UI build planned
+
+`docs/BUILD-PLAN-DC.md`. Decisions (the user): cards played one at a time
+plus Play all, with prompts for choices; Defense automatic; papers chosen
+in the lobby (bots take the rest at random -- the simulator dealt them at
+random); PHP 8.3 installed locally for linting and engine tests.
+

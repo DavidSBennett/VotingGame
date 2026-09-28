@@ -18,13 +18,19 @@ tested and what has been tried so far, and keep it up to date.
 ## How the game is built (same as main)
 
 - `backend/engine.php` is the rules engine (server-authoritative PHP);
-  `backend/game_data.php` holds the races and the story cards. There is no
-  local PHP: the deploy's `php -l` step is the only syntax check. Escape
-  apostrophes in single-quoted PHP strings.
+  `backend/game_data.php` holds the races and the story cards. PHP 8.3 is
+  installed locally (winget `PHP.PHP.8.3`, 2026-09-28): run `php -l` on
+  every changed backend file before pushing; the deploy's `php -l` step is
+  the last check. Escape apostrophes in single-quoted PHP strings.
 - `tools/simulate.py` is a Python port of the rules that plays thousands of
   games; it parses `game_data.php` directly. Change a rule in `engine.php`
   and mirror it in `simulate.py`, then run `py tools/simulate.py --games 1000`
   to see its effect before anyone plays it.
+- The variant is being rebuilt as a DC Heroes Unite style deck-builder:
+  `tools/simulate_dc.py` plays it from `docs/deck-dc.csv`,
+  `docs/elections-dc.csv` and `docs/papers-dc.csv`; `docs/BUILD-PLAN-DC.md`
+  is the engine and UI plan. `tools/simulate.py` still models the engine
+  that is live until that build lands.
 - `tools/smoke_play.py` plays a full game against the live variant and checks
   invariants: `py -X utf8 tools/smoke_play.py --level hard`.
 - Frontend: `frontend/` (Vite + React + Tailwind; literal class strings
