@@ -309,3 +309,39 @@ attacker; pacifist (never buys negatives); bigmoney (cost 5+ only).
 - **Seats**: fair at 3 (31/37/32); at 4 the last seat is weakest (18-22%).
 - Games run long: 26-34 rounds per paper, 28-38 purchases each.
 
+### 2026-09-28: newspapers as the Super Heroes (the user)
+
+Each player is a newspaper with a permanent ability, converted from the
+eight Heroes Unite Super Heroes and aimed at Political's problems
+(`docs/papers-dc.csv`; unnamed seats get a random paper):
+
+| DC Super Hero | Paper | Ability (as tested, second version) |
+| --- | --- | --- |
+| Hawkman | The Washington Globe | +1 Political per Political story; Political influence counts toward any candidate |
+| Red Tornado | The Albany Argus | +2 prestige per election won |
+| Booster Gold | The National Intelligencer | never gains Scandals; draws a card when a negative story targets it |
+| Nightwing | The Journal of Commerce | 1st Economic story each turn +1 influence, 2nd draws a card |
+| Shazam! | The New York Herald | once a turn, pay 3: gain the top story of the main deck |
+| Batgirl | The Sun | once a turn, discard a Scandal or Local Notice to draw |
+| Starfire | The North Star | once a turn, two Social stories played: draw a card |
+| Black Canary | The Aurora | +1 influence per different negative story played |
+
+First version (weaker Globe/Argus/Intelligencer, Sun could discard Letters,
+Herald paid 4): Political still 4-12% against the other two themes; the Sun
+52% on a general deck. Second version, 240 games per line:
+
+- Each paper on a general-purpose (balanced) bot among two balanced bots
+  (fair 33%): Globe 33%, Argus 30%, **Intelligencer 55%**, Journal 39%,
+  Herald 20%, Sun 40%, North Star 22%, Aurora 24%.
+- Three theme decks at one table (fair 33%), Political's paper varied:
+  no paper chosen 9%, Globe 16%, Argus 2%, **Intelligencer 30%**.
+- One theme deck on its own paper among two balanced: Political+Globe 28%,
+  +Argus 15%, +Intelligencer 38%; Economic+Journal 57%, +Herald 32%;
+  Social+Sun 61%, +North Star 49%; attacker+Aurora 48%.
+- Seats with random papers: 3p 33/38/30; 4p 26/30/21/22. ~30 rounds.
+- **Finding:** what holds Political back is negative stories. It has no
+  way to block or trash Scandals; given one (the Intelligencer) it reaches
+  a fair share. Extra prestige per office (Argus) does not help a deck
+  that wins few elections. Scandal immunity is too strong for any other
+  deck (55% on a general deck).
+

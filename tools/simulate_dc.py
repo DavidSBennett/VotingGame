@@ -57,6 +57,8 @@ def load():
 
 
 CARDS, ELECTIONS = load()
+with open(os.path.join(DOCS, "papers-dc.csv"), encoding="utf-8-sig") as fh:
+    PAPERS = {r["key"]: r for r in csv.DictReader(fh)}      # the Super Heroes: one per player
 assert len(ELECTIONS) == 17
 STORIES = [k for k, c in CARDS.items() if c["released"]]
 for k in STORIES:
@@ -77,6 +79,7 @@ def card(cid):
 
 DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=60, unhistorical_extra=None,
                 threshold_add=0,
+                papers=True,                # each paper plays a newspaper character (DC's Super Heroes)
                 draw_cap=None,              # cap every story's draw
                 political_any=False,        # Political influence counts toward ANY candidate
                 catchup=0)                  # later seats: +1 influence per seat on their first turn
@@ -84,7 +87,9 @@ DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=60, unhistorical_extra=None,
 
 class Player:
     def __init__(self, seat, strategy):
-        self.seat, self.strategy = seat, strategy
+        self.seat = seat
+        self.strategy, _, self.paper = strategy.partition("@")    # "political@globe"
+        self.paper = self.paper or None
         self.deck = ["letter#%d.%d" % (seat, i) for i in range(7)] + ["notice#%d.%d" % (seat, i) for i in range(3)]
         self.hand, self.discard, self.locations = [], [], []
         self.stats = dict(turns=0, elected=0, bought=0, attacks=0, scandals=0, trashed=0,
@@ -97,7 +102,8 @@ class Player:
         return sum(1 for c in self.owned() if c.startswith("elec#"))
 
     def prestige(self):
-        return sum(card(c)["vp"] for c in self.owned())
+        bonus = 2 * self.offices() if self.paper == "argus" else 0     # the machine rewards offices
+        return sum(card(c)["vp"] for c in self.owned()) + bonus
 
 
 class Game:
@@ -107,6 +113,16 @@ class Game:
             self.cfg.update(config)
         self.rng = rng or random.Random()
         self.players = [Player(i, s) for i, s in enumerate(strategies)]
+        if self.cfg["papers"]:
+            # Unnamed seats are dealt a paper at random from those not taken.
+            free = [k for k in PAPERS if k not in {p.paper for p in self.players}]
+            self.rng.shuffle(free)
+            for p in self.players:
+                if p.paper is None:
+                    p.paper = free.pop()
+        else:
+            for p in self.players:
+                p.paper = None
         for p in self.players:
             self.rng.shuffle(p.deck)
             self.draw(p, self.cfg["hand"])
@@ -172,11 +188,31 @@ class Game:
                 else:
                     gen += c["others_bonus"]
 
+        if p.paper == "sun":
+            junk = [c for c in p.hand if card(c)["type"] == "Scandal"] + \
+                   [c for c in p.hand if c.startswith("notice#")]
+            if junk:
+                p.hand.remove(junk[0])
+                p.discard.append(junk[0])
+                p.stats["draws"] += len(self.draw(p, 1))
+
         played = []
+        count = {t: 0 for t in THEMES}
+        star_done = False
         while p.hand:
             cid = p.hand.pop(0)
             c = card(cid)
             played.append(cid)
+            if c["theme"] and c["type"] != "Election":
+                count[c["theme"]] += 1
+                if p.paper == "journal" and c["theme"] == "Economic":
+                    if count["Economic"] == 1:
+                        gen += 1
+                    elif count["Economic"] == 2:
+                        p.stats["draws"] += len(self.draw(p, 1))
+                if p.paper == "north_star" and c["theme"] == "Social" and count["Social"] == 2 and not star_done:
+                    star_done = True
+                    p.stats["draws"] += len(self.draw(p, 1))
             gen += c["gen"]
             if c["theme"]:
                 themed[c["theme"]] += c["themed"]
@@ -206,6 +242,10 @@ class Game:
                 gen += c["chain"]
             if c["per_office"]:
                 themed[c["theme"]] += c["per_office"] * p.offices()
+        if p.paper == "globe":
+            themed["Political"] += by_theme["Political"]
+        if p.paper == "aurora":
+            gen += len({card(x)["key"] for x in played if card(x)["type"] == "Negative story"})
         p.stats["gen"] += gen
         p.stats["themed"] += sum(themed.values())
 
@@ -215,7 +255,8 @@ class Game:
         for side in ("nation", "states"):
             th = e[side + "_theme"]
             need = self.threshold(side)
-            extra = themed["Political"] if self.cfg["political_any"] and th != "Political" else 0
+            any_ = self.cfg["political_any"] or p.paper == "globe"
+            extra = themed["Political"] if any_ and th != "Political" else 0
             if themed[th] + campaign + extra + gen >= need:
                 spend_gen = max(0, need - themed[th] - campaign - extra)
                 rank = (spend_gen, side != e["historical_winner"])
@@ -228,7 +269,7 @@ class Game:
             need -= use
             use = min(campaign, need)
             need -= use
-            if self.cfg["political_any"] and th != "Political":
+            if (self.cfg["political_any"] or p.paper == "globe") and th != "Political":
                 use = min(themed["Political"], need)
                 themed["Political"] -= use
                 need -= use
@@ -271,6 +312,10 @@ class Game:
                 self.exchange.remove(pick)
             p.discard.append(pick)
             p.stats["bought"] += 1
+        if p.paper == "herald" and gen >= 3 and self.main and bot.scoop(self, p):
+            gen -= 3
+            p.discard.append(self.main.pop())
+            p.stats["bought"] += 1
         self.refill()
 
         for cid in played:
@@ -301,6 +346,9 @@ class Game:
             c = self.rng.choice(q.hand)
             q.hand.remove(c)
             q.discard.append(c)
+        elif kind == "scandal" and q.paper == "intelligencer":
+            self.draw(q, 1)
+            return
         elif kind == "scandal" and self.scandals:
             self.scandals -= 1
             q.discard.append("scandal#%d" % self.scandals)
@@ -367,6 +415,11 @@ class Bot:
 
     def will_elect(self, game, p, side):
         return True
+
+    def scoop(self, game, p):
+        """The Herald's scoop: a blind story for 4 -- worth it while stories
+        still build the deck."""
+        return game.e < len(ELECTIONS) - 2
 
     def trash_letters(self, game, p):
         bought = sum(1 for c in p.owned() if not c.startswith(("letter#", "notice#", "scandal#")))
