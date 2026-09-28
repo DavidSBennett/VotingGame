@@ -800,8 +800,7 @@ function engine_concede(&$game, &$players, $seat, $mysqli) {
 
 /**
  * Let every bot whose turn it is play, until a person is on turn or the
- * game ends. Milestone 3 replaces dc_bot_turn with the port of the
- * simulator's bot.
+ * game ends.
  */
 function engine_run_bots(&$game, &$players, $mysqli) {
   $guard = 0;
@@ -813,25 +812,143 @@ function engine_run_bots(&$game, &$players, $mysqli) {
   }
 }
 
-/** Placeholder bot (milestone 3 ports the simulator's): play all, elect if able, buy the dearest affordable, end. */
+// ---------------------------------------------------------------------
+// The bot -- a port of Bot / value() in tools/simulate_dc.py (the
+// "balanced" bot the balance was tuned against). Keep them in step.
+// ---------------------------------------------------------------------
+
+/** Bot styles by name, as in the simulator's BOTS. Both bot levels play "balanced" for now. */
+function dc_bot_styles() {
+  return [
+    'balanced'  => ['focus' => null, 'attack' => 1.0, 'big' => false, 'min_value' => 1.5],
+    'political' => ['focus' => 'Political', 'attack' => 1.0, 'big' => false, 'min_value' => 1.5],
+    'economic'  => ['focus' => 'Economic', 'attack' => 1.0, 'big' => false, 'min_value' => 1.5],
+    'social'    => ['focus' => 'Social', 'attack' => 1.0, 'big' => false, 'min_value' => 1.5],
+    'attacker'  => ['focus' => null, 'attack' => 2.5, 'big' => false, 'min_value' => 1.5],
+    'pacifist'  => ['focus' => null, 'attack' => 0.0, 'big' => false, 'min_value' => 1.5],
+    'bigmoney'  => ['focus' => null, 'attack' => 1.0, 'big' => true, 'min_value' => 1.5],
+  ];
+}
+
+function dc_bot_style($game, $player) {
+  $styles = dc_bot_styles();
+  $name = $player['public_state']['bot_style'] ?? 'balanced';
+  return $styles[$name] ?? $styles['balanced'];
+}
+
+/** How much a bot wants a card: value() in the simulator. */
+function dc_bot_value($c) {
+  if ($c['type'] === 'Media event') {
+    return 1.2 * $c['vp'] + 3 * ($c['ongoing_gen'] + 1.3 * $c['ongoing_draw']) - 0.5 * $c['others_bonus'];
+  }
+  $v = 1.2 * $c['vp'] + $c['gen'] + 0.8 * $c['themed'] + 0.6 * $c['campaign'] + 1.3 * $c['draw']
+     + 0.8 * $c['trash'] + 0.4 * $c['gain_upto'] + 0.6 * $c['chain'] + 0.8 * $c['per_same']
+     + 1.0 * $c['per_office'] + 0.3 * $c['defense'] + 0.8 * $c['retract'];
+  if ($c['attack'] === 'scandal') $v += 1.5;
+  elseif ($c['attack'] === 'discard') $v += 1.0;
+  return $v;
+}
+
+/** Bot.score: the value, bent by the bot's style; near the end only prestige counts. */
+function dc_bot_score($game, $style, $id) {
+  $c = ($id === 'editorial') ? dc_card('editorial') : dc_view($id);
+  $v = dc_bot_value($c);
+  if ($style['focus']) {
+    if ($c['theme'] === $style['focus']) $v *= 1.5;
+    elseif ($c['theme'] || $c['type'] === 'Editorial') $v *= 0.85;
+  }
+  if ($c['attack']) $v *= $style['attack'];
+  if ($style['big'] && $c['type'] !== 'Editorial' && (int) $c['cost'] < 5) $v = 0;
+  if ((int) $game['state']['e'] >= count(dc_elections()) - 2) $v = $c['vp'] * 2 + 0.2 * $v;
+  return $v;
+}
+
+/** Bot.choose: the best option (cost breaks a tie, the first wins a full tie); buying needs min_value. */
+function dc_bot_choose($game, $style, $options, $buying) {
+  $best = null;
+  $bestKey = null;
+  foreach ($options as $id) {
+    $c = ($id === 'editorial') ? dc_card('editorial') : dc_view($id);
+    $key = [dc_bot_score($game, $style, $id), (int) $c['cost']];
+    if ($bestKey === null || $key > $bestKey) { $best = $id; $bestKey = $key; }
+  }
+  if ($best !== null && $buying && $bestKey[0] < $style['min_value']) return null;
+  return $best;
+}
+
+/** The trash choice: a Scandal, then a Local Notice, then (once the deck has grown) a Letter. */
+function dc_bot_trash_pick($player, $options) {
+  $hand = $player['private_state']['hand'];
+  $discard = $player['private_state']['discard'];
+  $pool = array_merge($hand, $discard);
+  foreach ($pool as $id) if (strpos($id, 'scandal#') === 0 && in_array($id, $options, true)) return $id;
+  foreach ($pool as $id) if (strpos($id, 'notice#') === 0 && in_array($id, $options, true)) return $id;
+  $grown = 0;
+  foreach (dc_owned($player) as $id) {
+    if (strpos($id, 'letter#') !== 0 && strpos($id, 'notice#') !== 0 && strpos($id, 'scandal#') !== 0) $grown++;
+  }
+  if ($grown >= 8) {
+    foreach ($discard as $id) if (strpos($id, 'letter#') === 0 && in_array($id, $options, true)) return $id;
+  }
+  return null;
+}
+
+/** One whole bot turn, in the simulator's order. */
 function dc_bot_turn(&$game, &$players, $mysqli) {
   $seat = (int) $game['state']['turn']['seat'];
+  $style = dc_bot_style($game, $players[$seat]);
+  $paper = $players[$seat]['public_state']['paper'] ?? null;
+
+  // The Sun first: discard a Scandal, draw.
+  if ($paper === 'sun') {
+    foreach ($players[$seat]['private_state']['hand'] as $id) {
+      if (strpos($id, 'scandal#') === 0) { dc_use_paper($game, $players, $mysqli); break; }
+    }
+  }
+  // Play everything, answering prompts as the simulator's bot does.
   $safety = 0;
-  while (++$safety < 100) {
+  while (++$safety < 200) {
     $t = $game['state']['turn'];
-    if ($t['pending']) { dc_choose($game, $players, $t['pending']['options'][0] ?? null); continue; }
+    if ($t['pending']) {
+      $pend = $t['pending'];
+      $pick = ($pend['type'] === 'trash')
+        ? dc_bot_trash_pick($players[$seat], $pend['options'])
+        : dc_bot_choose($game, $style, $pend['options'], false);
+      dc_choose($game, $players, $pick);
+      continue;
+    }
     if (empty($players[$seat]['private_state']['hand'])) break;
     dc_play($game, $players, $players[$seat]['private_state']['hand'][0], $mysqli);
   }
-  foreach (dc_electable($game, $players) as $side) { dc_elect($game, $players, $side, $mysqli); break; }
-  while (true) {
+  // Elect: the man it can reach spending the least plain influence; history breaks a tie.
+  $sides = dc_electable($game, $players);
+  if ($sides) {
+    $pools = dc_pools($game, $players);
+    $e = dc_election($game['state']['e']);
     $best = null;
-    foreach (dc_affordable($game, $players) as $id) {
-      $c = $id === 'editorial' ? dc_card('editorial') : dc_view($id);
-      if ($best === null || (int) $c['cost'] > $best[1]) $best = [$id, (int) $c['cost']];
+    foreach ($sides as $side) {
+      $need = dc_threshold($game, $side);
+      $other = 0;
+      foreach (dc_elect_order($players[$seat], $e[$side . '_theme']) as $k) {
+        if ($k !== 'gen') $other += max(0, $pools[$k]);
+      }
+      $rank = [max(0, $need - $other), $side !== $e['historical_winner'] ? 1 : 0];
+      if ($best === null || $rank < $best[0]) $best = [$rank, $side];
     }
-    if ($best === null) break;
-    dc_buy($game, $players, $best[0], $mysqli);
+    dc_elect($game, $players, $best[1], $mysqli);
+  }
+  // Buy while something is worth it.
+  $safety = 0;
+  while (++$safety < 50) {
+    $pick = dc_bot_choose($game, $style, dc_affordable($game, $players), true);
+    if ($pick === null) break;
+    dc_buy($game, $players, $pick, $mysqli);
+  }
+  // The Herald's scoop, while stories still build the deck.
+  if ($paper === 'herald' && !$game['state']['turn']['used']['herald'] && !empty($game['state']['main'])
+      && (int) $game['state']['e'] < count(dc_elections()) - 2
+      && max(0, dc_pools($game, $players)['gen']) >= (int) $game['config']['herald_cost']) {
+    dc_use_paper($game, $players, $mysqli);
   }
   dc_end_turn($game, $players, $mysqli);
 }

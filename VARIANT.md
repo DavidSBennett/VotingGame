@@ -508,3 +508,25 @@ Scandals conserved; one election card per election; pools never negative;
 public counts and prestige match): 146,523 actions, 25 million checks, 0
 failures. Found and fixed: setup did not fill the exchange.
 
+### 2026-09-28: milestone 3 -- bots on the engine
+
+The simulator's bot (value, score by style, choose, trash and gain
+picks, elect the man reachable with the least plain influence, buy while
+worth it, the Sun first and the Herald's scoop last) ported to
+`engine_dc.php` as `dc_bot_turn`, with the simulator's styles
+(balanced, political, economic, social, attacker, pacifist, bigmoney).
+Both bot levels play "balanced" for now. Bot turns are logged in plain
+words ("The New York Tribune: 6 cards played (9 influence); elected John
+Adams (1796).").
+
+Parity (`tools/parity_dc.py`: all-bot games on the engine via
+`tools/engine_botgames.php` against the same match-ups in
+`simulate_dc.py`, 300 games each): rounds, prestige, elections per
+paper, purchases, attacks, Scandals taken, history rewritten and
+completion all within ~3%. Seat win rates within noise: over four seeds
+of 1,500 four-bot games, first seat 24.1% on the engine and 22.3% in the
+simulator; each varies as much against itself.
+
+Local PHP now has a php.ini with mbstring enabled (the server has it;
+the engine uses mb_strlen for log lines).
+
