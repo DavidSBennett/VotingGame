@@ -33,6 +33,41 @@ Design chosen by the user (2026-09-27), from three options each:
   first**. A bought story goes to your discard pile. An empty hand is no
   longer the end: you can pass and still buy.
 
+### Revision 2 (2026-09-28, designed with the user; NOT yet simulated or built)
+
+The newsroom above is live. The user has redesigned the loop around eras:
+
+- **Stories have no side.** Play a story on either candidate for its
+  **influence**, plus its **theme bonus** if its theme (Economic /
+  Political / Social) matches that candidate's theme for that race.
+- **The election**: the candidate with the most total influence wins; the
+  most influence on him makes a paper **Patron**. No track, no negative
+  runs, no Union stability, no exposure.
+- **Burying** a story gives its **purchasing power** (doubled for the
+  Patron) and banks its **prestige**. **Most prestige buried by 1860
+  wins.** Purchasing power buys stories off the exchange at their **cost**.
+- **Three eras**: I 1796-1816, II 1820-1840, III 1844-1860. Entering a new
+  era, a paper loses every card of the previous era. A card's era is set by
+  the election that releases it, so next-era stories arrive three
+  elections early (Era II from 1808, Era III from 1832), fully playable.
+- **Starters** are generic Era I cards, lost in 1820.
+- Candidates are sided by what they ran on, not party (the Jeffersonians
+  of 1804-1816 governed as nationalists), with themes balanced to
+  Nation 5/6/6 and States 6/6/5 (Economic/Political/Social).
+
+Content: `docs/deck-v2.csv` (every card: era, theme, influence,
+theme_bonus, profit, prestige, cost) and `docs/candidates.csv`. The
+numbers are a first pass by formula, to be tuned in the simulator.
+Era II was thin (20 stories); seven were added (Cumberland Road,
+Adams-Onis, McCulloch, Denmark Vesey, Freedom's Journal, Anti-Masonic
+Party, Cherokee Phoenix), plus Indian Removal and The Liberator in Era
+III (their 1830-31 dates release them in 1832). Now I 35 / II 27 / III 44.
+
+Simulator: `tools/simulate_eras.py` reads both spreadsheets. Defaults not
+set by the user: draw 2, hand limit 10, start purchasing power 6, exchange
+6, 1 buy a round, a tie for most influence = no Patron, a tied election
+goes to history, after an era change each paper draws back up to 5.
+
 ## Changes from main
 
 | Date | Change | Simulator result | Playtest notes |
@@ -85,3 +120,32 @@ plays the variant by default; `--shared` plays main's shared deck).
 - The market never ran dry for the hard bots (exchange always full; supply 9-26).
   Easy bots at five seats bury their own decks away and hold an empty hand
   19% of rounds: a mistake that punishes itself.
+
+### 2026-09-28: revision 2 (eras) in the simulator, first pass
+
+`py -X utf8 tools/simulate_eras.py` (300-600 games per line). Bots:
+hunter (win the Patronage with about 4 influence, bury the hand as
+Patron), steady (bid 3, keep 4 in hand), bidder (bid 7), half, runner
+(run everything), burier (bury everything); buy policies prestige /
+influence / mixed / cheap / dear / trade / ahead / none.
+
+- **The loop works as designed at x2.** Burying everything never wins the
+  Patronage, so never doubles its purchasing power: 0-2% at every table
+  size. A paper that never buys: 0%. Seats are fair (3,000 games: 33.5 /
+  33.5 / 33.1).
+- **Strategies:** steady beats hunter 76-79% heads-up but is below fair at
+  3-4 seats (24% / 16%); overbidding (bidder) and running everything
+  (runner) lose. Buy policies prestige / influence / mixed / ahead all
+  near fair; trade-only buying and "cheapest" lose.
+- **Market:** the exchange never ran short, Era II included. About 2 cards
+  lost per paper at each era change; papers buy ~5-12 stories a game.
+- **Knife edge on price vs. the Patron bonus.** Patron x1: the burier wins
+  90%. Prices -2: burier 60%. Prices -1 or 0: burier 0%. The pure-economy
+  line flips from worthless to dominant within a step or two; the numbers
+  must sit where both lines are viable, not at either cliff.
+- **The theme bonus barely matters at +1** (bonus 0 / 1 / 2 changed
+  nothing much for the hunter mirror). At +3 it reshapes play (half 68%).
+  If themes are meant to matter, the bonus must be large next to base
+  influence (2-3).
+- Scores are small: the winner buries ~20 prestige at 3 seats (1/2/3 per
+  era).

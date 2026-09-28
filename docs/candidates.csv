@@ -1,0 +1,18 @@
+﻿year,era,nation_candidate,nation_theme,states_candidate,states_theme,historical_winner
+1796,I,John Adams,Political,Thomas Jefferson,Social,nation
+1800,I,John Adams,Social,Thomas Jefferson,Political,states
+1804,I,Thomas Jefferson,Political,Charles C. Pinckney,Economic,nation
+1808,I,James Madison,Political,Charles C. Pinckney,Economic,nation
+1812,I,James Madison,Social,DeWitt Clinton,Political,nation
+1816,I,James Monroe,Economic,Rufus King,Social,nation
+1820,II,John Quincy Adams,Social,James Monroe,Political,states
+1824,II,John Quincy Adams,Social,Andrew Jackson,Political,nation
+1828,II,John Quincy Adams,Economic,Andrew Jackson,Social,states
+1832,II,Henry Clay,Economic,Andrew Jackson,Social,states
+1836,II,William Henry Harrison,Political,Martin Van Buren,Economic,states
+1840,II,William Henry Harrison,Social,Martin Van Buren,Economic,nation
+1844,III,Henry Clay,Economic,James K. Polk,Social,states
+1848,III,Zachary Taylor,Social,Lewis Cass,Political,nation
+1852,III,Winfield Scott,Political,Franklin Pierce,Economic,states
+1856,III,John C. Fremont,Economic,James Buchanan,Political,states
+1860,III,Abraham Lincoln,Political,Stephen A. Douglas,Economic,nation

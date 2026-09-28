@@ -1,0 +1,111 @@
+﻿key,deck,era,released,year,name,kind,theme,influence,theme_bonus,profit,prestige,cost,copies,flavor
+shipping_news,starter,I,start,,Shipping News,trade,,0,0,2,0,,2,"Arrivals, departures and cargoes. Merchants pay to read it."
+merchants_letter,starter,I,start,,A Merchant's Letter,news,Economic,1,1,1,0,,1,"A correspondent on prices, credit and the harbour."
+publius_letter,starter,I,start,,"A Letter from ""Publius""",news,Political,1,1,1,0,,1,"A reader, under a Roman name, on the constitution of things."
+farmers_letter,starter,I,start,,A Letter from a Farmer,news,Social,1,1,1,0,,1,"A plain man's view of the great men, and of his neighbours."
+stamp_act,history,I,1796,1765,The Stamp Act,news,Economic,3,1,3,1,4,1,"A tax on every sheet a printer used. The printers led the resistance, and never forgot who had tried to tax the press."
+boston_massacre,history,I,1796,1770,The Boston Massacre,news,Social,3,1,4,1,5,1,Five dead on King Street. Revere's engraving of it outsold anything true.
+tea_party,history,I,1796,1773,The Boston Tea Party,news,Economic,2,1,4,1,5,1,"Three shiploads of East India tea in the harbour, and a question about who governs a colony."
+common_sense,history,I,1796,1776,Common Sense,news,Social,2,1,6,1,7,1,"Paine's pamphlet ran through edition after edition in months. Kings, it turned out, were optional."
+declaration,history,I,1796,1776,The Declaration of Independence,news,Political,2,1,5,1,6,1,Printed overnight as a broadside and read aloud from courthouse steps. Everyone would claim it.
+saratoga,history,I,1796,1777,Saratoga,news,Political,2,1,5,1,6,1,"Burgoyne surrendered an army, and France decided the rebellion was worth backing."
+valley_forge,history,I,1796,1777,Valley Forge,news,Social,2,1,2,1,3,1,A winter camp starved by a Congress that could ask the states for supplies but not require them.
+articles_confederation,history,I,1796,1781,The Articles of Confederation,news,Political,3,1,2,1,3,1,"A league of friendship among sovereign states, with no power to tax and no one to enforce it."
+newburgh,history,I,1796,1783,The Newburgh Conspiracy,news,Political,2,1,2,1,3,1,Unpaid officers threatened Congress. Washington fumbled for his spectacles and talked them down.
+treaty_of_paris,history,I,1796,1783,The Treaty of Paris,news,Economic,2,1,6,1,7,1,"Independence, fisheries and the land to the Mississippi. Peace sells as well as war."
+pennsylvania_packet,history,I,1796,1784,The First American Daily,trade,,0,0,6,0,6,1,The Pennsylvania Packet went daily. Advertisers discovered they could reach a city every morning.
+shays_rebellion,history,I,1796,1786,Shays' Rebellion,news,Economic,3,1,3,1,4,1,"Farmers closed the courts in western Massachusetts, and the Confederation could do nothing about it."
+antifederalist_papers,history,I,1796,1787,Brutus and the Federal Farmer,news,Political,3,1,3,1,4,1,The case against ratification: a consolidated government would swallow the states and the liberties with them.
+constitutional_convention,history,I,1796,1787,The Constitutional Convention,news,Political,3,1,3,1,4,1,Delegates sent to amend the Articles locked the doors in Philadelphia and wrote a new government.
+federalist_papers,history,I,1796,1787,The Federalist,news,Political,3,1,4,1,5,1,"Eighty-five essays by Publius in the New York papers, arguing for a government that could act."
+northwest_ordinance,history,I,1796,1787,The Northwest Ordinance,news,Economic,2,1,3,1,4,1,"Congress would govern the western territories, and no slavery would cross the Ohio."
+gazette_of_the_us,history,I,1796,1789,The Gazette of the United States,news,Social,2,1,4,1,5,1,Fenno's paper followed the government to New York and spoke for Hamilton's Treasury.
+judiciary_act,history,I,1796,1789,The Judiciary Act,news,Political,2,1,2,1,3,1,"A Supreme Court, circuit courts and district courts: the federal government acquired a reach."
+assumption,history,I,1796,1790,The Assumption of State Debts,news,Economic,3,1,4,1,5,1,"The nation took on the war debts of the states, and the speculators who held them grew rich."
+residence_act,history,I,1796,1790,The Residence Act,news,Economic,2,1,4,1,5,1,"The capital would go to the Potomac, the price the South extracted for assumption."
+bank_of_the_us,history,I,1796,1791,The Bank of the United States,news,Economic,3,1,5,1,6,1,"Hamilton's bank, chartered under powers the Constitution never named. Jefferson called it unconstitutional."
+bill_of_rights,history,I,1796,1791,The Bill of Rights,news,Social,3,1,1,1,2,1,"Ten amendments, the first of which said Congress shall make no law abridging the freedom of the press."
+national_gazette,history,I,1796,1791,The National Gazette,news,Social,2,1,4,1,5,1,"Freneau's opposition paper, subsidised by a clerkship in Jefferson's own State Department."
+report_manufactures,history,I,1796,1791,The Report on Manufactures,news,Economic,2,1,4,1,5,1,Hamilton on why a farming republic should build factories it does not yet want.
+rights_of_man,history,I,1796,1791,The Rights of Man,news,Social,2,1,4,1,5,1,"Paine's defence of the French Revolution, printed in America with a note from the Secretary of State."
+postal_act_1792,history,I,1796,1792,The Postal Act of 1792,trade,,0,0,8,0,8,1,"Newspapers carried anywhere in the Union for a cent or a cent and a half, and printers swapped papers postage-free. A national press became a business."
+citizen_genet,history,I,1796,1793,Citizen Genet,news,Social,2,1,3,1,4,1,"The French minister appealed to the people over Washington's head, and embarrassed his friends."
+democratic_societies,history,I,1796,1794,The Democratic-Republican Societies,news,Social,2,1,3,1,4,1,Clubs of mechanics and farmers toasting France. Washington blamed them for the rebellion in the west.
+whiskey_rebellion,history,I,1796,1794,The Whiskey Rebellion,news,Economic,2,1,3,1,4,1,Thirteen thousand militia marched on western Pennsylvania to collect a tax on whiskey.
+jay_treaty,history,I,1796,1795,The Jay Treaty,news,Political,2,1,4,1,5,1,"Peace with Britain, bought with the carrying trade. Burned in effigy from Boston to Charleston."
+alien_sedition,history,I,1800,1798,The Alien and Sedition Acts,news,Social,3,1,2,1,3,1,"Twenty-five arrests, and most of them printers. The press learned what it was worth."
+kentucky_resolutions,history,I,1800,1798,The Kentucky and Virginia Resolutions,news,Political,3,1,2,1,3,1,"Jefferson and Madison, anonymously, arguing that a state might judge the compact for itself."
+xyz_affair,history,I,1800,1798,The XYZ Affair,news,Social,2,1,4,1,5,1,"Millions for defence, not one cent for tribute. The best copy the Federalists ever had."
+marbury,history,I,1804,1803,Marbury v. Madison,news,Political,2,1,2,1,3,1,Marshall gave up a commission and took the power to void an act of Congress.
+louisiana_purchase,history,I,1804,1803,The Louisiana Purchase,news,Economic,2,1,6,1,7,1,"Fifteen million dollars, and a strict constructionist who could not find the clause."
+burr_conspiracy,history,II,1808,1807,The Burr Conspiracy,news,Social,3,1,4,2,6,1,A former Vice President tried for treason over a western empire. Jefferson wanted him hanged; Marshall let him walk.
+chesapeake_affair,history,II,1808,1807,The Chesapeake Affair,news,Social,2,1,4,2,6,1,A British broadside into an American frigate in American water. Impressment made personal.
+embargo_act,history,II,1808,1807,The Embargo Act,news,Economic,2,1,3,2,5,1,Grass grew on the wharves of Salem. New England read it as a southern war on shipping.
+niles_register,history,II,1812,1811,Niles' Weekly Register,trade,,0,0,6,0,6,1,"A Baltimore weekly of documents, prices and speeches, read in every state and quoted by every rival."
+tippecanoe,history,II,1812,1811,Tippecanoe,news,Social,3,1,4,2,6,1,Harrison's battle on the Wabash. It would still be winning him votes thirty years later.
+war_of_1812,history,II,1812,1812,Mr. Madison's War,news,Political,3,1,4,2,6,1,"The second war of independence, or a Virginian adventure at New England expense."
+gerrymander,history,II,1812,1812,The Gerrymander,news,Political,2,1,4,2,6,1,"A Massachusetts district drawn in the shape of a salamander, signed into law by Governor Gerry."
+hartford_convention,history,II,1816,1814,The Hartford Convention,news,Social,3,1,2,2,4,1,"New England Federalists met in secret to discuss leaving, and destroyed their own party."
+treaty_of_ghent,history,II,1816,1814,The Treaty of Ghent,news,Political,1,1,5,2,7,1,Status quo ante bellum. Everyone claimed to have won.
+second_bank,history,II,1816,1816,The Second Bank of the United States,news,Economic,3,1,5,2,7,1,"A national currency, and a monster, depending on which paper you took."
+tariff_of_1816,history,II,1816,1816,The Tariff of 1816,news,Economic,2,1,4,2,6,1,"The first protective tariff, passed by southerners who had learned what a blockade does."
+cumberland_road,history,II,1820,1818,The Cumberland Road,news,Economic,2,1,5,2,7,1,A federal highway reaches the Ohio at Wheeling. Who pays to mend it is another question.
+mcculloch,history,II,1820,1819,McCulloch v. Maryland,news,Economic,3,1,3,2,5,1,Maryland taxed the national bank; Marshall ruled the power to tax is the power to destroy.
+adams_onis,history,II,1820,1819,The Adams-Onis Treaty,news,Political,2,1,5,2,7,1,"Spain gives up Florida, and a line is drawn to the Pacific on paper."
+panic_of_1819,history,II,1820,1819,The Panic of 1819,news,Economic,3,1,5,2,7,1,The Bank called in its loans and the west discovered what credit was.
+missouri_compromise,history,II,1820,1820,The Missouri Compromise,news,Social,3,1,4,2,6,1,"A fire bell in the night, muffled for thirty years by a line at 36 degrees 30 minutes."
+denmark_vesey,history,II,1824,1822,Denmark Vesey,news,Social,3,1,2,2,4,1,"Charleston hangs thirty-five men for a rising that never happened, and tightens every law it has."
+crawford_radicals,history,II,1824,1823,The Crawford Radicals,news,Political,3,1,3,2,5,1,The Old Republicans rallied behind Crawford and the caucus. A stroke left their man half-blind before the canvass began.
+monroe_doctrine,history,II,1824,1823,The Monroe Doctrine,news,Political,2,1,4,2,6,1,"A hemisphere closed to European colonisation, announced by a nation that could not enforce it."
+american_system,history,II,1824,1824,The American System,news,Economic,3,1,5,2,7,1,"Clay wanted tariffs, a bank and roads, and to be remembered for all three."
+erie_canal,history,II,1828,1825,The Erie Canal,news,Economic,2,1,6,2,8,1,"Three hundred and sixty-three miles, and the price of flour in New York fell by half."
+lowell_mills,history,II,1828,1826,The Lowell Mills,news,Social,1,1,6,2,8,1,"Textile capital with a moral architecture attached, and a constituency for protection."
+freedoms_journal,history,II,1828,1827,Freedom's Journal,news,Social,2,1,3,2,5,1,"The first newspaper owned and edited by Black Americans: ""We wish to plead our own cause."""
+anti_masonic_party,history,II,1828,1828,The Anti-Masonic Party,news,Political,3,1,3,2,5,1,"A stonemason vanishes in western New York, and a crusade against secret societies becomes a party."
+cherokee_phoenix,history,II,1828,1828,The Cherokee Phoenix,news,Social,2,1,3,2,5,1,"Printed at New Echota in English and Sequoyah's syllabary, while Georgia eyes the land beneath it."
+sc_exposition,history,II,1828,1828,The South Carolina Exposition,news,Political,3,1,2,2,4,1,"Calhoun, anonymously and while Vice President, on the right of a state to say no."
+tariff_abominations,history,II,1828,1828,The Tariff of Abominations,news,Economic,3,1,3,2,5,1,"Written to be so bad it would fail, and passed anyway."
+cotton_boom,history,III,1832,1830,The Cotton Boom,news,Economic,2,1,7,3,10,1,"Two thirds of American exports, sold to Liverpool. Independence was never that simple."
+indian_removal,history,III,1832,1830,The Indian Removal Act,news,Political,3,1,3,3,6,1,"Congress votes the money to move the southern nations west, and calls it voluntary."
+webster_hayne,history,III,1832,1830,The Webster-Hayne Debate,news,Political,3,1,4,3,7,1,"Liberty and Union, now and forever, one and inseparable. It sold very well in print."
+the_liberator,history,III,1832,1831,The Liberator,news,Social,3,1,4,3,7,1,"Garrison's weekly in Boston: ""I will not equivocate - I will not excuse - and I will be heard."""
+bank_war,history,III,1832,1832,The Bank War,news,Economic,3,1,4,3,7,1,The Bank tried to make itself the election. Jackson was delighted to oblige.
+force_bill,history,III,1836,1833,The Force Bill,news,Political,3,1,2,3,5,1,"Authority to collect the tariff by arms, signed the same day as the compromise that made it moot."
+penny_press,history,III,1836,1833,The Penny Press,trade,,0,0,6,0,6,1,"A cent a copy, sold in the street rather than by subscription. Your own trade, industrialised."
+gag_rule,history,III,1836,1836,The Gag Rule,news,Social,2,1,2,3,5,1,"Antislavery petitions tabled unread, which turned the right of petition into the argument."
+specie_circular,history,III,1836,1836,The Specie Circular,news,Economic,2,1,4,3,7,1,Public land for gold and silver only. The paper economy discovered how thin it was.
+panic_of_1837,history,III,1840,1837,The Panic of 1837,news,Economic,3,1,5,3,8,1,"Six years of depression, and a president renamed Van Ruin for the duration."
+amistad,history,III,1840,1839,The Amistad,news,Social,3,1,3,3,6,1,Africans who seized a slave ship were tried in Connecticut. John Quincy Adams took their case to the Supreme Court.
+log_cabin_campaign,history,III,1840,1840,Log Cabin and Hard Cider,news,Social,3,1,5,3,8,1,"The Whigs sold a Virginia planter's son as a frontiersman, and printed songbooks by the hundred thousand."
+tyler_vetoes,history,III,1844,1841,His Accidency's Vetoes,news,Political,3,1,3,3,6,1,Tyler vetoed the Whig bank twice. His cabinet resigned and his party expelled him.
+dorr_rebellion,history,III,1844,1842,The Dorr Rebellion,news,Social,2,1,3,3,6,1,"Rhode Island briefly had two governors, over who was allowed to vote."
+webster_ashburton,history,III,1844,1842,The Webster-Ashburton Treaty,news,Economic,3,1,4,3,7,1,"The Maine border settled by negotiation, without the war the papers had been promising."
+telegraph,history,III,1844,1844,The Magnetic Telegraph,trade,,0,0,7,0,7,1,Morse's line from Washington to Baltimore. News now moved faster than the mail that carried the papers.
+texas_annexation,history,III,1848,1845,The Annexation of Texas,news,Political,3,1,5,3,8,1,Admitted by joint resolution because a treaty could not get two thirds.
+oregon_treaty,history,III,1848,1846,Fifty-four Forty,news,Social,2,1,4,3,7,1,"Fifty-four forty or fight, settled quietly at forty-nine."
+associated_press,history,III,1848,1846,The Associated Press,trade,,0,0,6,0,6,1,"New York papers pooled the cost of news from the Mexican War, and sold it to everyone else."
+mexican_war,history,III,1848,1846,The Mexican War,news,Political,3,1,5,3,8,1,"American blood shed on American soil, if you accepted where the soil began."
+wilmot_proviso,history,III,1848,1846,The Wilmot Proviso,news,Social,3,1,2,3,5,1,Neither slavery nor involuntary servitude in any territory taken from Mexico. It passed the House eight times.
+rotary_press,history,III,1848,1847,The Rotary Press,trade,,0,0,8,0,8,1,"Hoe's type-revolving press printed thousands of sheets an hour. Circulation was now limited by readers, not machines."
+free_soil,history,III,1848,1848,The Free Soil Party,news,Economic,3,1,4,3,7,1,"Free soil, free speech, free labor and free men. Van Buren ran on it and handed New York to Taylor."
+gold_rush,history,III,1852,1849,The Gold Rush,news,Economic,1,1,8,3,11,1,"Ninety thousand people crossed a continent in a year, and California wanted in at once."
+compromise_1850,history,III,1852,1850,The Compromise of 1850,news,Economic,2,1,4,3,7,1,Five bills passed separately because no majority existed for all five together.
+fugitive_slave_act,history,III,1852,1850,The Fugitive Slave Act,news,Social,3,1,3,3,6,1,"Federal power used against the North on behalf of the South, and it radicalised both."
+georgia_platform,history,III,1852,1850,The Georgia Platform,news,Political,2,1,3,3,6,1,"Georgia would accept the Compromise, and named the conditions under which it would not."
+nashville_convention,history,III,1852,1850,The Nashville Convention,news,Political,2,1,2,3,5,1,Nine states met to consider what the South would do if the territories were closed.
+cheap_postage,history,III,1852,1851,The Cheap Postage Act,trade,,0,0,6,0,6,1,"Congress cut newspaper postage again, and the country weekly reached its county for next to nothing."
+uncle_toms_cabin,history,III,1852,1852,Uncle Tom's Cabin,news,Social,3,1,6,3,9,1,Three hundred thousand copies in a year. The best-selling argument any of you ever printed.
+transcontinental_railroad,history,III,1856,1853,The Pacific Railroad Surveys,news,Economic,2,1,6,3,9,1,Every proposed route was an argument about which section would own the future.
+gadsden_purchase,history,III,1856,1854,The Gadsden Purchase,news,Economic,2,1,5,3,8,1,"Ten million dollars of desert, bought for a southern railroad route."
+kansas_nebraska,history,III,1856,1854,The Kansas-Nebraska Act,news,Political,3,1,3,3,6,1,"Douglas repealed the Missouri line to get his railroad, and detonated the party system."
+ostend_manifesto,history,III,1856,1854,The Ostend Manifesto,news,Economic,3,1,3,3,6,1,"Three ministers abroad proposed simply taking Cuba, and someone leaked it."
+personal_liberty_laws,history,III,1856,1855,The Personal Liberty Laws,news,Social,3,1,3,3,6,1,"Northern states nullifying a federal statute, which the South noticed with interest."
+bleeding_kansas,history,III,1856,1856,Bleeding Kansas,news,Political,3,1,4,3,7,1,"Two territorial governments, two constitutions, and a body count. Circulation soared."
+sumner_caning,history,III,1856,1856,The Caning of Charles Sumner,news,Social,2,1,4,3,7,1,Beaten unconscious on the Senate floor. The South sent Brooks replacement canes.
+filibusters,history,III,1856,1856,The Filibusters,news,Economic,2,1,3,3,6,1,Walker took Nicaragua with fifty-eight men and reinstated slavery there.
+dred_scott,history,III,1860,1857,Dred Scott v. Sandford,news,Economic,3,1,3,3,6,1,"No rights which the white man was bound to respect, and Congress powerless in the territories."
+lecompton_constitution,history,III,1860,1857,The Lecompton Constitution,news,Political,3,1,3,3,6,1,"A proslavery constitution written by a minority, which split the Democratic party in two."
+freeport_doctrine,history,III,1860,1858,The Freeport Doctrine,news,Political,2,1,4,3,7,1,Douglas held that a territory could exclude slavery by simply declining to police it. It cost him the South.
+lincoln_douglas,history,III,1860,1858,The Lincoln-Douglas Debates,news,Political,2,1,5,3,8,1,"Seven towns, three hours each, printed verbatim in every paper in the country. Including yours."
+ableman_v_booth,history,III,1860,1859,Ableman v. Booth,news,Social,2,1,2,3,5,1,Taney told Wisconsin that no state court could overrule a federal one.
+john_browns_raid,history,III,1860,1859,John Brown at Harpers Ferry,news,Social,2,1,4,3,7,1,"A martyr or a murderer, and no paper in the country could avoid choosing."
