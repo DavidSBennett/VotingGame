@@ -21,6 +21,9 @@ $limit = max(1, min(200, $limit));
 $variant = isset($_GET['variant']) ? (string) $_GET['variant'] : '';
 // The DC game's score breakdown has a 'prestige' field; the newsroom game's does not.
 $dcOnly = (($_GET['engine'] ?? '') === 'dc') ? " AND detail LIKE '%\"prestige\"%'" : '';
+// Games played by the test scripts (tools/smoke_*.py, the UI preview) are not
+// on the board.
+$dcOnly .= " AND player_name NOT LIKE 'smoke%' AND player_name <> 'UI preview'";
 if ($variant !== '' && !preg_match('/^[a-z0-9_.-]{1,40}$/i', $variant)) {
   error('Invalid variant', 400);
 }
