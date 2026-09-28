@@ -482,3 +482,29 @@ field: 110 card kinds, 17 elections, 8 papers, 3,256 fields match; a
 hand-edited value is caught. The variant deploy now runs the check after
 the PHP lint. Nothing uses the file yet; the live game is unchanged.
 
+### 2026-09-28: milestone 2 -- the engine core
+
+`backend/engine_dc.php` (not yet loaded by any endpoint; the live game is
+unchanged): the DC-style rules with the same entry points as engine.php
+(`engine_setup`, `engine_apply_action`, `engine_run_bots`,
+`engine_public_state`, `engine_available_actions`, `engine_build_export`,
+`engine_record_scores`), state version 9, no database migration. Actions:
+play, play_all, choose (trash / gain prompts), elect, buy, paper (the Sun,
+the Herald), end_turn, concede. Defense automatic; payment allocated by the
+engine (themed first, then Campaign, then plain); the exchange refills at
+the end of a turn (at once after a gain); the Herald's scoop joins the
+next hand (the simulator's timing); a tie for the win goes to more
+elections won. A placeholder bot (play all, elect, buy the dearest) until
+milestone 3.
+
+`tools/engine_test.php` (local PHP, no database): 1,861 rule checks
+(setup, play, buying and electing payment order, the Globe, attacks,
+Defense, the Intelligencer, the +1 for a hit, Retraction, the Journal,
+North Star, Sun, Herald, Argus, media events, catch-up and rounds, trash
+and gain prompts, the ending after 1860, concede, hidden information),
+then 300 games of random legal moves at 2-5 seats with every invariant
+checked after every action (each card exactly once; Editorials and
+Scandals conserved; one election card per election; pools never negative;
+public counts and prestige match): 146,523 actions, 25 million checks, 0
+failures. Found and fixed: setup did not fill the exchange.
+
