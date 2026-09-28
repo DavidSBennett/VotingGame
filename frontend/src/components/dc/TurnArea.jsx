@@ -2,9 +2,9 @@ import Card from './Card.jsx';
 
 const POOLS = [
   ['gen', 'Plain', 'text-cream-50', 'spends on anything'],
-  ['Political', 'Political', 'text-federal-300', 'Political stories, Political men'],
-  ['Economic', 'Economic', 'text-gold-300', 'Economic stories, Economic men'],
-  ['Social', 'Social', 'text-emerald-300', 'Social stories, Social men'],
+  ['Political', 'Political', 'text-federal-300', 'Political stories, Political candidates'],
+  ['Economic', 'Economic', 'text-gold-300', 'Economic stories, Economic candidates'],
+  ['Social', 'Social', 'text-emerald-300', 'Social stories, Social candidates'],
   ['campaign', 'Campaign', 'text-gold-400', 'elections only'],
 ];
 

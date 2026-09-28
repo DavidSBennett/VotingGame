@@ -7,7 +7,7 @@ function Body() {
   return (
     <div className="font-serif text-[15px] leading-relaxed text-ink-950/85">
       <p>
-        You run a partisan newspaper, 1796 to 1860. Seventeen elections, each between two men.{' '}
+        You run a partisan newspaper, 1796 to 1860. Seventeen elections, each between two candidates.{' '}
         <em>The most honoured paper at the end wins</em>: add up the <span className="font-semibold">prestige</span> (★) on every card you own.
       </p>
 
@@ -17,11 +17,11 @@ function Body() {
           <span className="font-semibold">Play</span> the stories in your hand. Each makes <span className="font-semibold">influence</span>: plain
           influence spends on anything; <span className="font-semibold text-federal-700">Political</span>,{' '}
           <span className="font-semibold text-wood-700">Economic</span> and <span className="font-semibold text-emerald-800">Social</span> influence spend
-          only on stories of that theme or on electing a man of that theme; <span className="font-semibold">Campaign</span> only on elections.
+          only on stories of that theme or on electing a candidate of that theme; <span className="font-semibold">Campaign</span> only on elections.
         </li>
         <li>
-          <span className="font-semibold">Elect</span> (once a turn): reach either man's threshold and take the election card as his Patron. It goes
-          into your deck, pays its bonus whenever you play it, and is worth its prestige. History's choice is 2 cheaper; the other man rewrites
+          <span className="font-semibold">Elect</span> (once a turn): reach either candidate's threshold and take the election card as that candidate's Patron. It goes
+          into your deck, pays its bonus whenever you play it, and is worth its prestige. History's choice is 2 cheaper; the other candidate rewrites
           history.
         </li>
         <li>

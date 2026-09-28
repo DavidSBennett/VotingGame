@@ -1,6 +1,6 @@
 /**
  * The seventeen elections, 1796 to 1860: who was elected and by which
- * paper, the one in progress, and those to come. A man history did not
+ * paper, the one in progress, and those to come. A candidate history did not
  * elect is marked with a dagger.
  */
 export default function ElectionStrip({ elections, history, current, players }) {

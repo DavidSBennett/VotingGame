@@ -598,4 +598,9 @@ flavour line).
   282 -> 238 kB). A table still on the older rules gets a notice (export,
   or back to the lobby); its engine stays on the server for the API.
 - CLAUDE.md describes the DC game, its content pipeline and its tests.
+- Wording (the user): the rules say "candidate", not "man" -- the rules
+  sheet, the influence tooltips, the engine's error message, and every
+  election card's text ("Elect one candidate: reach that candidate's
+  threshold ... +N of the candidate's theme"). Historical flavour lines
+  ("the Jackson men") are unchanged.
 

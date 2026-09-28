@@ -20,7 +20,7 @@
  * Local Notices (nothing), shuffled; draws 5. On its turn a paper:
  *   - PLAYS stories from its hand, one at a time, making influence:
  *     plain (spends on anything), Political / Economic / Social (spend
- *     only on stories of that theme or electing a man of that theme), and
+ *     only on stories of that theme or electing a candidate of that theme), and
  *     Campaign (elections only);
  *   - may ELECT once: reach either candidate's threshold for the election
  *     in progress and take the election card as his Patron (its bonus pays
@@ -389,7 +389,7 @@ function dc_buy_order($c) {
   return ($c['theme'] && in_array($c['theme'], DC_THEMES, true)) ? [$c['theme'], 'gen'] : ['gen'];
 }
 
-/** The pools that may elect a man of $theme, in spending order. */
+/** The pools that may elect a candidate of $theme, in spending order. */
 function dc_elect_order($player, $theme) {
   $order = [$theme, 'campaign'];
   if (($player['public_state']['paper'] ?? null) === 'globe' && $theme !== 'Political') $order[] = 'Political';
@@ -546,11 +546,11 @@ function dc_choose(&$game, &$players, $pick) {
   dc_count($p);
 }
 
-/** Elect: reach one man's threshold, take the election card. */
+/** Elect: reach one candidate's threshold, take the election card. */
 function dc_elect(&$game, &$players, $side, $mysqli) {
   $t = $game['state']['turn'];
   if ($t['elected']) throw new Exception('You have already won an election this turn.');
-  if ($side !== 'nation' && $side !== 'states') throw new Exception('Name the man: nation or states.');
+  if ($side !== 'nation' && $side !== 'states') throw new Exception('Name the candidate: nation or states.');
   $seat = $t['seat'];
   $e = dc_election($game['state']['e']);
   $theme = $e[$side . '_theme'];
@@ -921,7 +921,7 @@ function dc_bot_turn(&$game, &$players, $mysqli) {
     if (empty($players[$seat]['private_state']['hand'])) break;
     dc_play($game, $players, $players[$seat]['private_state']['hand'][0], $mysqli);
   }
-  // Elect: the man it can reach spending the least plain influence; history breaks a tie.
+  // Elect: the candidate it can reach spending the least plain influence; history breaks a tie.
   $sides = dc_electable($game, $players);
   if ($sides) {
     $pools = dc_pools($game, $players);

@@ -1,10 +1,10 @@
 import { THEME } from './Card.jsx';
 
 /**
- * The election in progress, as a card with two men on it. Each man has a
+ * The election in progress, as a card with two candidates on it. Each has a
  * threshold; influence of his theme, Campaign and plain influence all count
  * toward it (and, for the Washington Globe, Political influence toward
- * anyone). The first paper to reach a threshold on its turn elects that man
+ * anyone). The first paper to reach a threshold on its turn elects that candidate
  * and takes the card as his Patron.
  *
  * "Your reach" is an advisory sum of the pools the server reported; the
@@ -55,7 +55,7 @@ export default function ElectionPanel({ election, pools, myTurn, canElect = [], 
         <h2 className="font-display text-3xl font-bold leading-none text-cream-50">The Election of {election.year}</h2>
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-cream-200/60">
           Era {election.era} · {election.index + 1} of 17 · worth <span className="text-gold-300">★{election.vp}</span> · Patron card +
-          {election.patron_gen} and +{election.patron_themed} of his theme
+          {election.patron_gen} and +{election.patron_themed} of the candidate's theme
         </span>
       </div>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row">

@@ -192,8 +192,8 @@ for i, c in enumerate(cands):
         states=c["states_candidate"], states_theme=c["states_theme"],
         states_threshold=base_t + (0 if hist == "states" else 2),
         historical_winner=hist, patron_gen=1, patron_themed=bonus,
-        card_text="Elect one man: reach his threshold (%s or %s influence count toward him). "
-                  "Gain this card as his Patron: when you play it, +1 influence and +%d of his theme. "
+        card_text="Elect one candidate: reach that candidate's threshold (%s or %s influence count toward that candidate). "
+                  "Gain this card as that candidate's Patron: when you play it, +1 influence and +%d of the candidate's theme. "
                   "Worth %d prestige." % (c["nation_theme"], c["states_theme"], bonus, vp),
     ))
 with open(os.path.join(DOCS, "elections-dc.csv"), "w", newline="", encoding="utf-8-sig") as fh:
