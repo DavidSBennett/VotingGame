@@ -10,7 +10,9 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "docs", "fourth-estate-cards.xlsx")
+import sys
+# An output name may be given (the default file may be open in Excel, which locks it).
+OUT = os.path.join(ROOT, "docs", sys.argv[1] if len(sys.argv) > 1 else "fourth-estate-cards.xlsx")
 
 FONT = "Arial"
 HEAD_FILL = PatternFill("solid", start_color="143138")      # the game's ink
@@ -18,7 +20,9 @@ HEAD_FONT = Font(name=FONT, bold=True, color="F4EAD0", size=10)
 BODY_FONT = Font(name=FONT, size=10)
 TITLE_FONT = Font(name=FONT, bold=True, size=14)
 thin = Side(style="thin", color="B8923A")
-INTS = {"space", "year", "vp", "cost", "gen", "themed", "campaign", "draw", "trash", "gain_upto", "chain", "per_same",
+INTS = {"Prestige", "Prestige per office", "Influence (plain)", "Political influence", "Economic influence",
+        "Social influence", "Campaign influence", "Candidate-theme influence",
+        "space", "year", "vp", "vp_per_office", "cost", "gen", "themed", "campaign", "draw", "trash", "gain_upto", "chain", "per_same",
         "per_office", "defense", "retract", "ongoing_gen", "ongoing_draw", "others_bonus", "released", "copies",
         "nation_threshold", "states_threshold", "patron_themed", "p_gen", "p_draw", "p_trash", "p_trash_draw",
         "p_gain_upto", "p_recover", "p_per_kind", "p_scry", "p_stay_gen", "fa_n"}
@@ -29,6 +33,43 @@ WIDE = {"card_text": 60, "flavor": 50, "power_text": 50, "fa_text": 45, "ability
 def read(name):
     with open(os.path.join(ROOT, "docs", name), encoding="utf-8-sig") as fh:
         return list(csv.DictReader(fh))
+
+
+# Readable columns: influence and prestige each in their own column, next to
+# the cost. The CSV keeps one "themed" number (the card's theme says which);
+# here it is split into one column per theme.
+THEMES = ["Political", "Economic", "Social"]
+
+
+def stories_rows(rows):
+    out = []
+    for r in rows:
+        n = {k: r[k] for k in ("key", "name", "type", "theme", "cost")}
+        n["Prestige"] = r["vp"]
+        n["Influence (plain)"] = r["gen"]
+        for t in THEMES:
+            n[t + " influence"] = r["themed"] if (r["theme"] == t and r["themed"] not in ("", "0")) else "0"
+        n["Campaign influence"] = r["campaign"]
+        for k, v in r.items():
+            if k not in n and k not in ("vp", "gen", "themed", "campaign"):
+                n[k] = v
+        out.append(n)
+    return out
+
+
+def elections_rows(rows):
+    out = []
+    for r in rows:
+        n = {k: r[k] for k in ("space", "year", "era", "card_name")}
+        n["Prestige"] = r["vp"]
+        n["Prestige per office"] = r.get("vp_per_office", "0")
+        n["Influence (plain)"] = r["p_gen"]
+        n["Candidate-theme influence"] = r["patron_themed"]
+        for k, v in r.items():
+            if k not in n and k not in ("vp", "vp_per_office", "p_gen", "patron_themed"):
+                n[k] = v
+        out.append(n)
+    return out
 
 
 def table(ws, rows):
@@ -60,7 +101,8 @@ rm.title = "Read Me"
 lines = [
     ("The Fourth Estate (variant) -- card content", TITLE_FONT),
     ("Exported from docs/deck-dc.csv, docs/elections-dc.csv and docs/papers-dc.csv on the variant branch.", None),
-    ("Those CSV files are what the game reads; this workbook is a copy. Column names are unchanged, so edited rows can be imported back.", None),
+    ("Those CSV files are what the game reads; this workbook is a copy. Influence and prestige are split into readable columns here;", None),
+    ("every other column keeps its CSV name, and the key column identifies each card, so edited rows can be imported back.", None),
     ("", None),
     ("Sheets", Font(name=FONT, bold=True, size=11)),
     ("Stories -- every card kind: stories, media events, starters (Letter, Local Notice), Editorial, Scandal.", None),
@@ -69,8 +111,9 @@ lines = [
     ("Summary -- counts by type, theme and era, as formulas over the Stories sheet.", None),
     ("", None),
     ("Stories columns", Font(name=FONT, bold=True, size=11)),
-    ("cost = price on the exchange; vp = prestige (the score); gen = plain influence; themed = influence of the card's theme;", None),
-    ("campaign = influence for elections only; draw = cards drawn; trash = cards you may destroy; gain_upto = gain a story costing that or less;", None),
+    ("cost = price on the exchange; Prestige = the score; Influence (plain) = spends on anything;", None),
+    ("Political / Economic / Social influence = influence of that theme (a story has at most one); Campaign influence = elections only;", None),
+    ("draw = cards drawn; trash = cards you may destroy; gain_upto = gain a story costing that or less;", None),
     ("chain = +N if you play another story of the theme; per_same = +N per other story of the theme; per_office = +N per election won;", None),
     ("attack = discard or scandal (hits every rival); defense = 1 if it blocks an attack; retract = Retraction (draw a card, destroy a Scandal);", None),
     ("ongoing_gen / ongoing_draw = a media event's bonus to its owner each turn; others_bonus / others_theme = its bonus to every other paper;", None),
@@ -78,8 +121,9 @@ lines = [
     ("", None),
     ("Elections columns", Font(name=FONT, bold=True, size=11)),
     ("nation / states = the two candidates; *_theme = the influence that counts toward him; *_threshold = influence needed to elect him.", None),
-    ("historical_winner = history's choice (2 cheaper); vp = prestige of the card; patron_themed = influence of the elected candidate's theme when played.", None),
-    ("p_* = the card's power when played: p_gen influence, p_draw, p_trash (destroy up to N), p_trash_draw (draw one per card destroyed),", None),
+    ("historical_winner = history's choice (2 cheaper); Prestige = the card's prestige; Prestige per office = prestige for each election card held (1860);", None),
+    ("Influence (plain) = its plain influence when played; Candidate-theme influence = influence of the elected candidate's theme when played.", None),
+    ("p_* = the rest of the card's power when played: p_draw, p_trash (destroy up to N), p_trash_draw (draw one per card destroyed),", None),
     ("p_gain_upto, p_recover (cards from discard to hand), p_per_kind (+N per different kind of card played), p_scry (look at the top N, keep 1),", None),
     ("p_stay_gen (stays in play: +N each turn; none now), p_attack.", None),
     ("fa_kind / fa_n = the First Appearance when the campaign opens: discard, discard_leader, discard_dearest, destroy_cheapest, draw, draw_fewest,", None),
@@ -92,9 +136,9 @@ rm.column_dimensions["A"].width = 150
 
 # ---- the three tables -----------------------------------------------------
 st = wb.create_sheet("Stories")
-scols = table(st, read("deck-dc.csv"))
+scols = table(st, stories_rows(read("deck-dc.csv")))
 el = wb.create_sheet("Elections")
-table(el, read("elections-dc.csv"))
+ecols = table(el, elections_rows(read("elections-dc.csv")))
 pp = wb.create_sheet("Newspapers")
 table(pp, read("papers-dc.csv"))
 
@@ -102,7 +146,7 @@ table(pp, read("papers-dc.csv"))
 sm = wb.create_sheet("Summary")
 n = st.max_row
 col = lambda name: get_column_letter(scols.index(name) + 1)
-T, TH, R, C, V = col("type"), col("theme"), col("released"), col("copies"), col("vp")
+T, TH, R, C, V = col("type"), col("theme"), col("released"), col("copies"), col("Prestige")
 rng = lambda c: "Stories!$%s$2:$%s$%d" % (c, c, n)
 sm["A1"] = "Summary of the Stories sheet (formulas: edit the Stories sheet and these update)"
 sm["A1"].font = TITLE_FONT
@@ -129,7 +173,9 @@ for th in ["Political", "Economic", "Social"]:
     row.append("=SUM(B%d:D%d)" % (r, r))
     sm.append(row)
 sm.append([])
-sm.append(["Elections: total prestige on the 17 cards", "=SUM(Elections!$D$2:$D$18)"])
+EV = get_column_letter(ecols.index("Prestige") + 1)
+sm.append(["Elections: fixed prestige on the 17 cards (1860 is worth 1 per office held, not counted)",
+           "=SUM(Elections!$%s$2:$%s$18)" % (EV, EV)])
 for rrow in sm.iter_rows(min_row=2):
     for cell in rrow:
         cell.font = BODY_FONT
