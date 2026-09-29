@@ -112,7 +112,7 @@ export default function CardModal({ card, onClose, actions = null, onPrev = null
             {card.candidate && <p className="mt-1 font-serif italic text-ink-700">Patron of {card.candidate}</p>}
             <div className="mt-3 flex items-center justify-center gap-4">
               <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-700">{card.cost ? `Cost ◆${card.cost}` : 'No cost'}</span>
-              <PrestigeSeal vp={card.vp} size="lg" />
+              <PrestigeSeal vp={card.vp} size="lg" perOffice={card.vp_per_office} />
               <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-700">prestige</span>
             </div>
 

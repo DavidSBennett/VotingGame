@@ -692,3 +692,14 @@ and 300 random games (133,130 actions, 22.7M invariant checks), 0
 failures; it caught stories being lost when a turn ended mid-choice.
 Parity with the simulator within ~2% on every aggregate.
 
+### 2026-09-29: 1860 is worth prestige per office (the user)
+
+The game ends after the turn 1860 is decided, so Secession Winter's
+"+6 influence" could never be used (the user). Now it has no action and
+is worth 1 prestige for each election card its holder owns, itself
+included (DC's variable-VP cards; `vp_per_office` in elections-dc.csv).
+Simulated (600 games): the paper that wins 1860 holds 6.2 offices on
+average, so the card is worth ~6 instead of a flat 7; the 1860 winner
+wins the game 59% (62% flat), early leaders 46% (45%), themes unchanged.
+Its seal reads "★1/office".
+

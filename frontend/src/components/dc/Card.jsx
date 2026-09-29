@@ -88,11 +88,20 @@ export function effects(card) {
  * The prestige seal: a gilt disc with the card's prestige, the score. Muted
  * at 0; oxblood below 0 (a Scandal). `size` 'sm' on a card, 'lg' in the modal.
  */
-export function PrestigeSeal({ vp, size = 'sm' }) {
+export function PrestigeSeal({ vp, size = 'sm', perOffice = 0 }) {
   const shape =
     size === 'lg'
       ? 'flex h-12 w-12 flex-col items-center justify-center rounded-full border-2 shadow-card'
       : 'flex h-7 w-7 flex-col items-center justify-center rounded-full border shadow-card';
+  if (perOffice) {
+    // Worth prestige per office held (1860): the seal says so.
+    return (
+      <div className={`${shape} border-gold-600 bg-gold-300 text-ink-950`} title={`Prestige: ${perOffice} for each election card you hold`}>
+        <span className={size === 'lg' ? 'text-[10px] leading-none' : 'text-[6px] leading-none'}>★</span>
+        <span className={size === 'lg' ? 'font-display text-base font-bold leading-none' : 'font-display text-[9px] font-bold leading-none'}>{perOffice}/office</span>
+      </div>
+    );
+  }
   const tone =
     vp > 0 ? 'border-gold-600 bg-gold-300 text-ink-950' : vp < 0 ? 'border-oxblood-500 bg-oxblood-700 text-cream-50' : 'border-cream-300 bg-cream-200 text-ink-700/60';
   return (
@@ -175,7 +184,7 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
           >
             {card.cost ? `◆${card.cost}` : '·'}
           </span>
-          {!xs && <PrestigeSeal vp={card.vp} />}
+          {!xs && <PrestigeSeal vp={card.vp} perOffice={card.vp_per_office} />}
           {xs && <span className="font-mono text-[9px] font-bold text-ink-800">★{card.vp}</span>}
         </div>
         <div className="-mt-2 flex min-h-0 flex-1 flex-col items-center px-1.5">

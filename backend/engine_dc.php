@@ -99,14 +99,16 @@ function dc_view($id) {
     return [
       'key' => $id, 'kind' => 'election', 'name' => $e['card_name'], 'candidate' => $e[$side],
       'type' => 'Election', 'theme' => $e[$side . '_theme'], 'cost' => 0, 'vp' => (int) $e['vp'],
+      'vp_per_office' => (int) ($e['vp_per_office'] ?? 0),
       'gen' => (int) $e['p_gen'], 'themed' => (int) $e['patron_themed'], 'campaign' => 0, 'draw' => (int) $e['p_draw'],
       'trash' => (int) $e['p_trash'], 'trash_draw' => (int) $e['p_trash_draw'], 'gain_upto' => (int) $e['p_gain_upto'],
       'recover' => (int) $e['p_recover'], 'per_kind' => (int) $e['p_per_kind'], 'scry' => (int) $e['p_scry'],
       'chain' => 0, 'per_same' => 0, 'per_office' => 0, 'attack' => $e['p_attack'] ?: null,
       'defense' => 0, 'retract' => 0, 'ongoing_gen' => (int) $e['p_stay_gen'], 'ongoing_draw' => 0, 'others_bonus' => 0,
       'others_theme' => null, 'released' => null, 'year' => (int) $e['year'], 'copies' => 1,
-      'card_text' => 'Patron of ' . $e[$side] . ' (' . $e['year'] . '). ' . $e['power_text'] . ' Also +'
-                     . $e['patron_themed'] . ' ' . $e[$side . '_theme'] . '. Worth ' . $e['vp'] . ' prestige.',
+      'card_text' => 'Patron of ' . $e[$side] . ' (' . $e['year'] . '). ' . $e['power_text']
+                     . ((int) ($e['vp_per_office'] ?? 0) ? '' : ' Also +' . $e['patron_themed'] . ' ' . $e[$side . '_theme']
+                        . '. Worth ' . $e['vp'] . ' prestige.'),
       'flavor' => null,
     ];
   }
@@ -278,12 +280,13 @@ function dc_offices($player) {
   return $n;
 }
 
-/** Prestige: every card owned, plus the Argus's bonus per office. */
+/** Prestige: every card owned (1860 counts per office held), plus the Argus's bonus per office. */
 function dc_prestige($player, $argusVp = null) {
   $vp = 0;
+  $offices = dc_offices($player);
   foreach (dc_owned($player) as $id) {
     $c = dc_view($id);
-    if ($c) $vp += (int) $c['vp'];
+    if ($c) $vp += (int) $c['vp'] + (int) ($c['vp_per_office'] ?? 0) * $offices;
   }
   if (($player['public_state']['paper'] ?? null) === 'argus') {
     $vp += ($argusVp ?? (int) (engine_default_config()['argus_vp'])) * dc_offices($player);
@@ -1213,7 +1216,7 @@ function engine_score_player($players, $seat, $game = null) {
     if (!$c) continue;
     $k = $c['type'] === 'Election' ? 'elections' : ($c['type'] === 'Editorial' ? 'editorials'
        : ($c['type'] === 'Media event' ? 'media' : ($c['type'] === 'Scandal' ? 'scandals' : 'stories')));
-    $by[$k] += (int) $c['vp'];
+    $by[$k] += (int) $c['vp'] + (int) ($c['vp_per_office'] ?? 0) * dc_offices($p);
   }
   if (($p['public_state']['paper'] ?? null) === 'argus') $by['argus'] = ($argus ?? 1) * dc_offices($p);
   $total = array_sum($by);

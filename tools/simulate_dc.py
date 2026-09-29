@@ -50,7 +50,7 @@ def load():
     with open(os.path.join(DOCS, "elections-dc.csv"), encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             e = dict(r)
-            for f in ("space", "year", "vp", "nation_threshold", "states_threshold", "patron_themed") + ("p_gen", "p_draw", "p_trash", "p_trash_draw", "p_gain_upto", "p_recover", "p_per_kind", "p_scry", "p_stay_gen", "fa_n"):
+            for f in ("space", "year", "vp", "vp_per_office", "nation_threshold", "states_threshold", "patron_themed") + ("p_gen", "p_draw", "p_trash", "p_trash_draw", "p_gain_upto", "p_recover", "p_per_kind", "p_scry", "p_stay_gen", "fa_n"):
                 e[f] = int(r[f] or 0)
             elections.append(e)
     return cards, elections
@@ -133,6 +133,11 @@ class Player:
         return sum(1 for c in self.owned() if c.startswith("elec#"))
 
     def prestige(self):
+        # An election card may be worth prestige per office held (1860: Secession Winter).
+        per = sum(ELECTIONS[int(c[5:].split(":")[0])].get("vp_per_office", 0) for c in self.owned() if c.startswith("elec#"))
+        return self._prestige() + per * self.offices()
+
+    def _prestige(self):
         bonus = self.argus_vp * self.offices() if self.paper == "argus" else 0     # the machine rewards offices
         vp = sum(card(c)["vp"] for c in self.owned() if card(c)["type"] != "Negative story")
         vp += sum(self.neg_vp if self.neg_vp is not None else card(c)["vp"]

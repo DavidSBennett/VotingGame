@@ -449,6 +449,13 @@ act($g, $P, 'play_all');
 $c1 = dc_card($pol);
 eq(dc_pools($g, $P)['gen'], 1 + (int) $c1['gen'] + 3, '1812: +1 per different kind played (Starter, Political story, Election)');
 
+// 1860: Secession Winter is worth 1 prestige per office held, itself included
+list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
+$P[0]['private_state']['discard'] = array_merge($P[0]['private_state']['discard'], ['elec#0:nation', 'elec#5:nation', 'elec#16:nation']);
+dc_count($P[0]);
+eq($P[0]['public_state']['prestige'], (int) dc_election(0)['vp'] + (int) dc_election(5)['vp'] + 3, '1860: worth one per office (three held)');
+eq(engine_score_player($P, 0, $g)['breakdown']['elections'], (int) dc_election(0)['vp'] + (int) dc_election(5)['vp'] + 3, '1860: counted in the score breakdown');
+
 // ---- First Appearance ---------------------------------------------------------
 list($g, $P) = new_game(3, [], [0 => 'globe', 1 => 'sun', 2 => 'herald']);
 $g['state']['e'] = 3;   // 1808 in progress; deciding it reveals 1812: Impressment (the prestige leader gains a Scandal)
@@ -502,7 +509,7 @@ act($g, $P, 'end_turn');
 eq($g['status'], 'ended', 'end: the game ends after that turn');
 eq($g['ended_reason'], 'board_completed', 'end: reason');
 eq($g['winner_seat'], 0, 'end: the paper with the most prestige wins');
-eq($P[0]['final_score'], (int) $e['vp'] + 1, 'end: final score is prestige (1860 + an Editorial)');
+eq($P[0]['final_score'], 1 + 1, 'end: final score is prestige (1860, one office = 1; an Editorial = 1)');
 eq(engine_available_actions($g, $P, 0), [], 'end: no actions after the end');
 
 // ---- concede -----------------------------------------------------------------
