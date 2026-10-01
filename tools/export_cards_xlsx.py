@@ -28,7 +28,7 @@ INTS = {"Prestige", "Prestige per office", "Influence (plain)", "Political influ
         "per_office", "defense", "retract", "ongoing_gen", "ongoing_draw", "others_bonus", "released", "copies",
         "nation_threshold", "states_threshold", "patron_themed", "p_gen", "p_draw", "p_trash", "p_trash_draw",
         "p_gain_upto", "p_recover", "p_per_kind", "p_scry", "p_stay_gen", "fa_n"}
-WIDE = {"Power": 55, "First Appearance": 45, "card_text": 60, "candidate": 22, "flavor": 50, "power_text": 50, "fa_text": 45, "ability": 55, "name": 30, "card_name": 28,
+WIDE = {"Action 1": 16, "Action 2": 34, "Action 3": 34, "Power": 55, "First Appearance": 45, "card_text": 60, "candidate": 22, "flavor": 50, "power_text": 50, "fa_text": 45, "ability": 55, "name": 30, "card_name": 28,
         "nation": 22, "states": 22, "fa_name": 24}
 
 
@@ -59,11 +59,32 @@ def stories_rows(rows):
     return out
 
 
-# The candidate's power, column by column.
-POWER_COLS = [("Influence (plain)", "p_gen"), ("Candidate-theme influence", "themed"), ("Draw", "p_draw"),
-              ("Destroy", "p_trash"), ("Draw per destroyed", "p_trash_draw"), ("Gain (cost up to)", "p_gain_upto"),
-              ("Recover", "p_recover"), ("Per kind played", "p_per_kind"), ("Look at top", "p_scry"),
-              ("Stays in play", "p_stay_gen"), ("Attack", "p_attack")]
+def plural(n, word):
+    return "%d %s%s" % (n, word, "" if n == 1 else "s")
+
+
+def actions(c):
+    """A candidate card's actions as short phrases. Action 1 is always the draw
+    (blank if the card draws nothing); Actions 2 and 3 are the rest, in order."""
+    n = lambda f: int(c[f] or 0)
+    first = "Draw %s" % plural(n("p_draw"), "card") if n("p_draw") else ""
+    rest = []
+    if n("p_trash"):
+        rest.append("Destroy up to %s%s" % (plural(n("p_trash"), "card"), ", draw 1 for each" if n("p_trash_draw") else ""))
+    if n("p_gain_upto"):
+        rest.append("Gain a story costing %d or less" % n("p_gain_upto"))
+    if n("p_recover"):
+        rest.append("Recover %s from discard" % plural(n("p_recover"), "card"))
+    if n("p_per_kind"):
+        rest.append("+%d influence per kind of card played" % n("p_per_kind"))
+    if n("p_scry"):
+        rest.append("Look at the top %d, keep 1" % n("p_scry"))
+    if n("p_stay_gen"):
+        rest.append("Stays in play: +%d influence each turn" % n("p_stay_gen"))
+    if c["p_attack"]:
+        rest.append("Attack: " + ("each rival discards a card" if c["p_attack"] == "discard" else "each rival gains a Scandal"))
+    assert len(rest) <= 2, (c["key"], rest)
+    return [first] + rest + [""] * (2 - len(rest))
 
 
 def elections_rows(rows, cands):
@@ -78,8 +99,9 @@ def elections_rows(rows, cands):
                  "History's choice": "yes" if r["historical_winner"] == side else "",
                  "theme": c["theme"], "threshold": c["threshold"], "card_name": c["card_name"],
                  "Prestige": c["vp"], "Prestige per office": c["vp_per_office"]}
-            for label, f in POWER_COLS:
-                n[label] = c[f]
+            n["Influence (plain)"] = c["p_gen"]
+            n["Candidate-theme influence"] = c["themed"]
+            n["Action 1"], n["Action 2"], n["Action 3"] = actions(c)
             n["Power"] = c["power_text"]
             n["fa_name"] = r["fa_name"]
             n["First Appearance"] = r["fa_text"]
@@ -141,10 +163,10 @@ lines = [
     ("key = year-side (nation or states); History's choice = yes on the candidate history elected (2 cheaper to elect);", None),
     ("theme = the influence that counts toward him; threshold = influence needed to elect him; card_name = the card his Patron gains;", None),
     ("Prestige = the card's prestige; Prestige per office = prestige for each election card its holder owns (1860);", None),
-    ("the power when played: Influence (plain); Candidate-theme influence (his theme); Draw; Destroy (up to N cards from hand or discard);", None),
-    ("Draw per destroyed (1 = draw a card for each); Gain (cost up to) a story from the exchange; Recover (cards from discard to hand);", None),
-    ("Per kind played (+N per different kind of card played this turn); Look at top (look at the top N of the main deck, keep 1);", None),
-    ("Stays in play (+N each turn; none now); Attack (discard or scandal, every rival); Power = the card's text.", None),
+    ("when played: Influence (plain) = plain influence; Candidate-theme influence = influence of his theme;", None),
+    ("Action 1 = the draw (Draw N cards; blank if none); Action 2 and Action 3 = its other actions: Destroy up to N cards (draw 1 for each),", None),
+    ("Gain a story costing N or less, Recover N cards from discard, +N influence per kind of card played, Look at the top N (keep 1),", None),
+    ("Attack (each rival discards a card / gains a Scandal); Power = the card's full text.", None),
     ("First Appearance = what happens to every paper as that year's campaign opens; fa_kind = which event: discard, discard_leader,", None),
     ("discard_dearest, destroy_cheapest, draw, draw_fewest, scandal, scandal_leader, unscandal, sweep; First Appearance: how many = its number.", None),
 ]
