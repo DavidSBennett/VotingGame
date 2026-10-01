@@ -59,43 +59,33 @@ def stories_rows(rows):
     return out
 
 
-def elections_rows(rows, cands):
-    """One row per election: who ran, history's choice, the First Appearance."""
-    by = {(c["year"], c["side"]): c for c in cands}
-    out = []
-    for r in rows:
-        n = {k: r[k] for k in ("space", "year", "era")}
-        for side in ("nation", "states"):
-            c = by[(r["year"], side)]
-            n[side] = c["candidate"]
-            n[side + " card"] = c["card_name"]
-        n["historical_winner"] = r["historical_winner"]
-        n["fa_name"] = r["fa_name"]
-        n["First Appearance"] = r["fa_text"]
-        n["fa_kind"] = r["fa_kind"]
-        n["First Appearance: how many"] = r["fa_n"]
-        out.append(n)
-    return out
-
-
-# The candidate's power, column by column (the CSV's p_* names in brackets).
+# The candidate's power, column by column.
 POWER_COLS = [("Influence (plain)", "p_gen"), ("Candidate-theme influence", "themed"), ("Draw", "p_draw"),
               ("Destroy", "p_trash"), ("Draw per destroyed", "p_trash_draw"), ("Gain (cost up to)", "p_gain_upto"),
               ("Recover", "p_recover"), ("Per kind played", "p_per_kind"), ("Look at top", "p_scry"),
               ("Stays in play", "p_stay_gen"), ("Attack", "p_attack")]
 
 
-def candidates_rows(rows):
-    """One row per candidate: his card, its prestige and its power in readable columns."""
+def elections_rows(rows, cands):
+    """One row per candidate's card (34): the election, the candidate, his card's
+    prestige and power in readable columns, then the election's First Appearance."""
+    by = {(c["year"], c["side"]): c for c in cands}
     out = []
     for r in rows:
-        n = {k: r[k] for k in ("key", "year", "side", "candidate", "theme", "threshold", "card_name")}
-        n["Prestige"] = r["vp"]
-        n["Prestige per office"] = r["vp_per_office"]
-        for label, f in POWER_COLS:
-            n[label] = r[f]
-        n["Power"] = r["power_text"]
-        out.append(n)
+        for side in ("nation", "states"):
+            c = by[(r["year"], side)]
+            n = {"key": c["key"], "year": r["year"], "era": r["era"], "side": side, "candidate": c["candidate"],
+                 "History's choice": "yes" if r["historical_winner"] == side else "",
+                 "theme": c["theme"], "threshold": c["threshold"], "card_name": c["card_name"],
+                 "Prestige": c["vp"], "Prestige per office": c["vp_per_office"]}
+            for label, f in POWER_COLS:
+                n[label] = c[f]
+            n["Power"] = c["power_text"]
+            n["fa_name"] = r["fa_name"]
+            n["First Appearance"] = r["fa_text"]
+            n["fa_kind"] = r["fa_kind"]
+            n["First Appearance: how many"] = r["fa_n"]
+            out.append(n)
     return out
 
 
@@ -133,8 +123,8 @@ lines = [
     ("", None),
     ("Sheets", Font(name=FONT, bold=True, size=11)),
     ("Stories -- every card kind: stories, media events, starters (Letter, Local Notice), Editorial, Scandal.", None),
-    ("Elections -- the 17 elections: the two candidates, history's choice, and the First Appearance event when the campaign opens.", None),
-    ("Candidates -- the 34 candidates, each his own card: theme, threshold, the card's prestige and its power, one column per effect.", None),
+    ("Elections -- 34 election cards, one per candidate (two rows per year): his card's prestige and power, one column per effect,", None),
+    ("             and the First Appearance event that opens that year's campaign (the same on both rows).", None),
     ("Newspapers -- the eight papers (DC's Super Heroes) and their abilities.", None),
     ("Summary -- counts by type, theme and era, as formulas over the Stories sheet.", None),
     ("", None),
@@ -148,17 +138,15 @@ lines = [
     ("released = the election whose campaign releases it into the main deck; year = the event's date; copies = how many exist.", None),
     ("", None),
     ("Elections columns", Font(name=FONT, bold=True, size=11)),
-    ("nation / states = the two candidates (their cards are on the Candidates sheet); historical_winner = history's choice (2 cheaper);", None),
-    ("First Appearance = what happens to every paper as the campaign opens; fa_kind = which event: discard, discard_leader, discard_dearest,", None),
-    ("destroy_cheapest, draw, draw_fewest, scandal, scandal_leader, unscandal, sweep; First Appearance: how many = its number.", None),
-    ("", None),
-    ("Candidates columns", Font(name=FONT, bold=True, size=11)),
-    ("key = year-side; theme = the influence that counts toward him; threshold = influence needed to elect him; card_name = his card;", None),
+    ("key = year-side (nation or states); History's choice = yes on the candidate history elected (2 cheaper to elect);", None),
+    ("theme = the influence that counts toward him; threshold = influence needed to elect him; card_name = the card his Patron gains;", None),
     ("Prestige = the card's prestige; Prestige per office = prestige for each election card its holder owns (1860);", None),
     ("the power when played: Influence (plain); Candidate-theme influence (his theme); Draw; Destroy (up to N cards from hand or discard);", None),
     ("Draw per destroyed (1 = draw a card for each); Gain (cost up to) a story from the exchange; Recover (cards from discard to hand);", None),
     ("Per kind played (+N per different kind of card played this turn); Look at top (look at the top N of the main deck, keep 1);", None),
     ("Stays in play (+N each turn; none now); Attack (discard or scandal, every rival); Power = the card's text.", None),
+    ("First Appearance = what happens to every paper as that year's campaign opens; fa_kind = which event: discard, discard_leader,", None),
+    ("discard_dearest, destroy_cheapest, draw, draw_fewest, scandal, scandal_leader, unscandal, sweep; First Appearance: how many = its number.", None),
 ]
 for text, font in lines:
     rm.append([text])
@@ -169,9 +157,14 @@ rm.column_dimensions["A"].width = 150
 st = wb.create_sheet("Stories")
 scols = table(st, stories_rows(read("deck-dc.csv")))
 el = wb.create_sheet("Elections")
-table(el, elections_rows(read("elections-dc.csv"), read("candidates-dc.csv")))
-ca = wb.create_sheet("Candidates")
-ccols = table(ca, candidates_rows(read("candidates-dc.csv")))
+ccols = table(el, elections_rows(read("elections-dc.csv"), read("candidates-dc.csv")))
+# Shade every other year, so each election's two candidate cards read as a pair.
+BAND = PatternFill("solid", start_color="F3EAD3")
+for row in el.iter_rows(min_row=2):
+    if (row[0].row - 2) // 2 % 2:
+        for cell in row:
+            cell.fill = BAND
+el.freeze_panes = "F2"     # key, year, era, side and candidate stay in view
 pp = wb.create_sheet("Newspapers")
 table(pp, read("papers-dc.csv"))
 
@@ -207,8 +200,8 @@ for th in ["Political", "Economic", "Social"]:
     sm.append(row)
 sm.append([])
 EV = get_column_letter(ccols.index("Prestige") + 1)
-sm.append(["Candidates: fixed prestige on all 34 cards (1860 is also worth 1 per office held)",
-           "=SUM(Candidates!$%s$2:$%s$35)" % (EV, EV)])
+sm.append(["Elections: fixed prestige on all 34 cards (1860 is also worth 1 per office held)",
+           "=SUM(Elections!$%s$2:$%s$35)" % (EV, EV)])
 for rrow in sm.iter_rows(min_row=2):
     for cell in rrow:
         cell.font = BODY_FONT
