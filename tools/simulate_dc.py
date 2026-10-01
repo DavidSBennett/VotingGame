@@ -46,16 +46,35 @@ def load():
             c["theme"] = r["theme"] or None
             c["released"] = int(r["released"]) if r["released"] else None
             cards[c["key"]] = c
+    # One card per candidate (docs/candidates-dc.csv): his name, theme, threshold, and
+    # the card his Patron gains -- its own name, power and prestige.
+    candidates = {}
+    with open(os.path.join(DOCS, "candidates-dc.csv"), encoding="utf-8-sig") as fh:
+        for r in csv.DictReader(fh):
+            c = dict(r)
+            for f in CANDIDATE_INTS:
+                c[f] = int(r[f] or 0)
+            candidates[(c["year"], c["side"])] = c
+    # The 17 elections (docs/elections-dc.csv): the order, the era, history's
+    # choice and the First Appearance; each carries its two candidates.
     elections = []
     with open(os.path.join(DOCS, "elections-dc.csv"), encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             e = dict(r)
-            for f in ("space", "year", "vp", "vp_per_office", "nation_threshold", "states_threshold", "patron_themed") + ("p_gen", "p_draw", "p_trash", "p_trash_draw", "p_gain_upto", "p_recover", "p_per_kind", "p_scry", "p_stay_gen", "fa_n"):
+            for f in ("space", "year", "fa_n"):
                 e[f] = int(r[f] or 0)
+            e["cards"] = {}
+            for side in ("nation", "states"):
+                c = candidates[(e["year"], side)]
+                e[side], e[side + "_theme"], e[side + "_threshold"] = c["candidate"], c["theme"], c["threshold"]
+                e["cards"][side] = c
             elections.append(e)
+    assert len(candidates) == 2 * len(elections)
     return cards, elections
 
 
+CANDIDATE_INTS = ("year", "threshold", "vp", "vp_per_office", "themed", "p_gen", "p_draw", "p_trash", "p_trash_draw",
+                  "p_gain_upto", "p_recover", "p_per_kind", "p_scry", "p_stay_gen")
 CARDS, ELECTIONS = load()
 with open(os.path.join(DOCS, "papers-dc.csv"), encoding="utf-8-sig") as fh:
     PAPERS = {r["key"]: r for r in csv.DictReader(fh)}      # the Super Heroes: one per player
@@ -70,13 +89,15 @@ def card(cid):
     if cid.startswith("elec#"):
         i, side = cid[5:].split(":")
         e = ELECTIONS[int(i)]
-        # The election card's power (docs/elections-dc.csv, p_*): DC's Super-Villains.
+        # The candidate's card (docs/candidates-dc.csv): DC's Super-Villains, one per candidate.
+        k = e["cards"][side]
         c = dict(key=cid, name="%s %s" % (e["year"], e[side]), type="Election", theme=e[side + "_theme"],
-                 vp=e["vp"], themed=e["patron_themed"], cost=0, others_theme="", released=None,
+                 vp=k["vp"], themed=k["themed"], cost=0, others_theme="", released=None,
                  **{f: 0 for f in INT if f not in ("vp", "themed", "cost")})
-        c.update(gen=e["p_gen"], draw=e["p_draw"], trash=e["p_trash"], gain_upto=e["p_gain_upto"],
-                 trash_draw=e["p_trash_draw"], recover=e["p_recover"], per_kind=e["p_per_kind"],
-                 scry=e["p_scry"], ongoing_gen=e["p_stay_gen"], attack=e["p_attack"] or "")
+        c.update(gen=k["p_gen"], draw=k["p_draw"], trash=k["p_trash"], gain_upto=k["p_gain_upto"],
+                 trash_draw=k["p_trash_draw"], recover=k["p_recover"], per_kind=k["p_per_kind"],
+                 scry=k["p_scry"], ongoing_gen=k["p_stay_gen"], attack=k["p_attack"] or "",
+                 vp_per_office=k["vp_per_office"])
         return c
     return CARDS[cid.split("#")[0]]
 
@@ -84,7 +105,8 @@ def card(cid):
 DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=60, unhistorical_extra=None,
                 threshold_add=0,
                 papers=True,                # each paper plays a newspaper character (DC's Super Heroes)
-                election_powers=True,       # election cards' powers and First Appearance (else the old +1 / themed)
+                election_powers=True,
+                power_choice=0.5,           # bots weigh a candidate's power (value) against influence spent (x this); 0: cheaper wins       # election cards' powers and First Appearance (else the old +1 / themed)
                 retract_min_cost=None,      # test: every Political story costing this or more has Retraction 1
                 intelligencer="all",      # 'all': never gains Scandals; 'first': ignores the first each round
                 intelligencer_draw=False,    # ... and draws a card when it does
@@ -134,7 +156,7 @@ class Player:
 
     def prestige(self):
         # An election card may be worth prestige per office held (1860: Secession Winter).
-        per = sum(ELECTIONS[int(c[5:].split(":")[0])].get("vp_per_office", 0) for c in self.owned() if c.startswith("elec#"))
+        per = sum(card(c)["vp_per_office"] for c in self.owned() if c.startswith("elec#"))
         return self._prestige() + per * self.offices()
 
     def _prestige(self):
@@ -340,6 +362,10 @@ class Game:
             if themed[th] + campaign + extra + gen >= need:
                 spend_gen = max(0, need - themed[th] - campaign - extra)
                 rank = (spend_gen, side != e["historical_winner"])
+                if self.cfg["power_choice"]:
+                    # Weigh what each candidate's card does against the plain influence he costs.
+                    rank = (self.cfg["power_choice"] * spend_gen - power_value(card("elec#%d:%s" % (self.e, side))),
+                            side != e["historical_winner"])
                 if best is None or rank < best[0]:
                     best = (rank, side, th, need)
         if best and bot.will_elect(self, p, best[1]):
@@ -545,6 +571,12 @@ def value(c):
     elif c["attack"] == "discard":
         v += 1.0
     return v
+
+
+def power_value(c):
+    """An election card's worth to the paper electing him (its prestige and power)."""
+    return (value(c) + 1.2 * c.get("recover", 0) + 0.8 * c.get("scry", 0) + 1.5 * c.get("per_kind", 0)
+            + 0.5 * c["trash"] * c.get("trash_draw", 0) + 0.3 * c.get("vp_per_office", 0) * 6)
 
 
 class Bot:

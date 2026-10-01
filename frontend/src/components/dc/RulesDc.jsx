@@ -20,7 +20,8 @@ function Body() {
           only on stories of that theme or on electing a candidate of that theme; <span className="font-semibold">Campaign</span> only on elections.
         </li>
         <li>
-          <span className="font-semibold">Elect</span> (once a turn): reach either candidate's threshold and take the election card as that candidate's Patron. It goes
+          <span className="font-semibold">Elect</span> (once a turn): reach either candidate's threshold and take his card as his Patron. Each candidate has his own
+          card, with its own power and prestige, so whom you elect changes what you gain. It goes
           into your deck, pays its bonus whenever you play it, and is worth its prestige. History's choice is 2 cheaper; the other candidate rewrites
           history.
         </li>

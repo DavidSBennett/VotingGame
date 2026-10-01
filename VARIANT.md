@@ -703,3 +703,47 @@ average, so the card is worth ~6 instead of a flat 7; the 1860 winner
 wins the game 59% (62% flat), early leaders 46% (45%), themes unchanged.
 Its seal reads "★1/office".
 
+
+### 2026-09-30: each candidate is his own card (the user)
+
+"Make the candidates different cards." An election had one card and one
+power, whichever candidate was elected. Now each of the 34 candidates has
+his own card: its name, prestige and power. Choosing whom to elect
+changes what you gain: Adams 1796 is +2 and draw 1, Jefferson 1796 draws 2.
+
+- Content: `docs/candidates-dc.csv`, one row per candidate (theme,
+  threshold, card name, prestige, power). `docs/elections-dc.csv` keeps
+  only the order, the era, history's choice and the First Appearance,
+  which still belongs to the election.
+- First draft: history's choice keeps the power the election card had
+  (it was themed on him), except Taylor 1848 (+4, attack: discard). His
+  rival gets a power of about the same strength in the same vocabulary:
+  influence, draw, destroy, gain, recover, per kind, look at the top 3,
+  attack. Douglas 1860 is worth 2 plus 1 per office; Lincoln is worth 0
+  plus 1 per office, but he costs 2 less. The user will edit these.
+- Bots used to elect whoever cost the least plain influence. Now they
+  weigh each card's worth against that cost (`power_choice` 0.5).
+
+Simulated (900 games, 3 balanced papers; noise is about ±2-3 points):
+
+| | shared card | own cards, cheapest | own cards, weighed |
+|---|---|---|---|
+| early election leader wins | 46.5% | 47.9% | 48.6% |
+| 1860 winner wins | 53.8% | 57.8% | 53.7% |
+| history rewritten | 23.7% | 23.3% | 29.8% |
+| themes head to head (P/E/S) | 28/33/39 | 30/32/38 | 29/34/38 |
+| papers (range) | 30-41% | 29-40% | 28-40% |
+
+Balance is unchanged, and the choice matters: history is rewritten 30% of
+the time instead of 24%. Rivals elected most often: Clinton 1812 (+2,
+draw 2) 80%, Jackson 1824 81%, Scott 1852 (+5, draw 1) 74%. Least often:
+Pinckney 1808 1%, Jefferson 1796 2%, Adams 1800 2%. The paper that elects
+Douglas in 1860 wins 67% of the time (Lincoln 55%).
+
+Engine: `dc_view` reads the candidate's card; the election in the public
+state carries both cards (`nation.card`, `states.card`); the bots weigh
+the cards the same way. `tools/engine_test.php`: 3,101 rule checks, 0
+failures. Parity with the simulator: history rewritten 0.29 vs 0.30.
+UI: each candidate's box on the election panel shows his card (its
+prestige seal and power); clicking it opens the card. The workbook has
+an Elections sheet and a Candidates sheet (one column per effect).

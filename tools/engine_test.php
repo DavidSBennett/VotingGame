@@ -204,7 +204,7 @@ eq($g['state']['turn']['spent']['gen'], $need - 3, 'elect: then plain');
 eq($g['state']['e'], 1, 'elect: the next election is in progress');
 ok(in_array('elec#0:' . $side, $P[0]['private_state']['discard'], true), 'elect: the election card goes to the discard pile');
 eq($P[0]['public_state']['elections'], 1, 'elect: counted');
-eq($P[0]['public_state']['prestige'], (int) $e['vp'], 'elect: its prestige counts');
+eq($P[0]['public_state']['prestige'], (int) $e['cards'][$side]['vp'], 'elect: its prestige counts');
 ok(throws(function () use (&$g, &$P, $side) { act($g, $P, 'elect', ['side' => $side]); }) !== false, 'elect: once a turn');
 check_invariants($g, $P, 'elect');
 $rel = find_card(function ($c) { return (int) $c['released'] === 1800; });
@@ -320,7 +320,7 @@ list($g, $P) = new_game(2, [], [0 => 'argus', 1 => 'globe']);
 $P[0]['private_state']['discard'][] = 'elec#0:nation';
 $P[0]['private_state']['discard'][] = 'elec#1:states';
 dc_count($P[0]);
-eq($P[0]['public_state']['prestige'], (int) dc_election(0)['vp'] + (int) dc_election(1)['vp'] + 2, 'Argus: +1 prestige per election won');
+eq($P[0]['public_state']['prestige'], (int) dc_election(0)['cards']['nation']['vp'] + (int) dc_election(1)['cards']['states']['vp'] + 2, 'Argus: +1 prestige per election won');
 
 // ---- media events ----------------------------------------------------------
 $media = find_card(function ($c) { return $c['type'] === 'Media event' && (int) $c['released'] === 1796; });
@@ -385,7 +385,19 @@ function give_office(&$game, &$players, $idx, $side) {
 }
 $v = dc_view('elec#1:states');
 eq([$v['name'], $v['gen'], $v['draw'], $v['trash']], ['The Revolution of 1800', 2, 2, 1], 'office 1800: +2, draw 2, destroy 1');
-eq(dc_view('elec#6:nation')['trash_draw'], 1, 'office 1820: draws for each destroyed');
+eq(dc_view('elec#6:states')['trash_draw'], 1, 'office 1820: draws for each destroyed');
+
+// Each candidate is his own card: the two sides of an election do different things.
+$a = dc_view('elec#0:nation'); $b = dc_view('elec#0:states');
+eq([$a['name'], $a['gen'], $a['draw']], ['The Federalist Administration', 2, 1], 'candidates: Adams 1796 is +2, draw 1');
+eq([$b['name'], $b['gen'], $b['draw']], ['The Republican Societies', 0, 2], 'candidates: Jefferson 1796 draws 2');
+eq([$a['candidate'], $b['candidate'], $a['side'], $b['side']], ['John Adams', 'Thomas Jefferson', 'nation', 'states'], 'candidates: named and sided');
+eq(dc_view('elec#1:nation')['attack'], 'discard', 'candidates: Adams 1800 attacks');
+eq([dc_view('elec#16:states')['vp'], dc_view('elec#16:states')['vp_per_office']], [2, 1], 'candidates: Douglas 1860 is worth 2 plus 1 per office');
+list($g, $P) = new_game(2);
+$pub = engine_public_state($g, $P, 0);
+eq([$pub['election']['nation']['card']['name'], $pub['election']['states']['card']['name']], ['The Federalist Administration', 'The Republican Societies'], 'candidates: the election shows both cards');
+eq([$pub['elections'][16]['nation_vp'], $pub['elections'][16]['states_vp']], [0, 2], 'candidates: the strip shows each card\'s prestige');
 
 list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
 give_hand($g, $P, ['notice#0.0', 'notice#0.1']);
@@ -453,8 +465,8 @@ eq(dc_pools($g, $P)['gen'], 1 + (int) $c1['gen'] + 3, '1812: +1 per different ki
 list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
 $P[0]['private_state']['discard'] = array_merge($P[0]['private_state']['discard'], ['elec#0:nation', 'elec#5:nation', 'elec#16:nation']);
 dc_count($P[0]);
-eq($P[0]['public_state']['prestige'], (int) dc_election(0)['vp'] + (int) dc_election(5)['vp'] + 3, '1860: worth one per office (three held)');
-eq(engine_score_player($P, 0, $g)['breakdown']['elections'], (int) dc_election(0)['vp'] + (int) dc_election(5)['vp'] + 3, '1860: counted in the score breakdown');
+eq($P[0]['public_state']['prestige'], (int) dc_election(0)['cards']['nation']['vp'] + (int) dc_election(5)['cards']['nation']['vp'] + 3, '1860: worth one per office (three held)');
+eq(engine_score_player($P, 0, $g)['breakdown']['elections'], (int) dc_election(0)['cards']['nation']['vp'] + (int) dc_election(5)['cards']['nation']['vp'] + 3, '1860: counted in the score breakdown');
 
 // ---- First Appearance ---------------------------------------------------------
 list($g, $P) = new_game(3, [], [0 => 'globe', 1 => 'sun', 2 => 'herald']);
@@ -509,7 +521,7 @@ act($g, $P, 'end_turn');
 eq($g['status'], 'ended', 'end: the game ends after that turn');
 eq($g['ended_reason'], 'board_completed', 'end: reason');
 eq($g['winner_seat'], 0, 'end: the paper with the most prestige wins');
-eq($P[0]['final_score'], 1 + 1, 'end: final score is prestige (1860, one office = 1; an Editorial = 1)');
+eq($P[0]['final_score'], 2 + 1 + 1, 'end: final score is prestige (Douglas 1860: 2, plus one office = 1; an Editorial = 1)');
 eq(engine_available_actions($g, $P, 0), [], 'end: no actions after the end');
 
 // ---- concede -----------------------------------------------------------------

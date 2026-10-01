@@ -1,0 +1,35 @@
+﻿key,year,side,candidate,theme,threshold,card_name,vp,vp_per_office,themed,p_gen,p_draw,p_trash,p_trash_draw,p_gain_upto,p_recover,p_per_kind,p_scry,p_stay_gen,p_attack,power_text
+1796-nation,1796,nation,John Adams,Political,8,The Federalist Administration,3,0,2,2,1,0,0,0,0,0,0,0,,"+2 influence, draw a card."
+1796-states,1796,states,Thomas Jefferson,Social,10,The Republican Societies,3,0,2,0,2,0,0,0,0,0,0,0,,Draw 2 cards.
+1800-nation,1800,nation,John Adams,Social,10,The Alien and Sedition Acts,3,0,2,2,0,0,0,0,0,0,0,0,discard,+2 influence. Attack: each rival paper discards a card at random.
+1800-states,1800,states,Thomas Jefferson,Political,8,The Revolution of 1800,3,0,2,2,2,1,0,0,0,0,0,0,,"+2 influence, draw 2 cards, then you may destroy a card in your hand or discard pile."
+1804-nation,1804,nation,Thomas Jefferson,Political,9,The Louisiana Purchase,3,0,2,2,0,0,0,4,0,0,0,0,,+2 influence. Gain a story costing 4 or less from the exchange.
+1804-states,1804,states,Charles C. Pinckney,Economic,11,Federalist Commerce,3,0,2,3,0,1,0,0,0,0,0,0,,"+3 influence, then you may destroy a card in your hand or discard pile."
+1808-nation,1808,nation,James Madison,Political,9,The Embargo,3,0,2,4,0,0,0,0,0,0,0,0,,+4 influence.
+1808-states,1808,states,Charles C. Pinckney,Economic,11,Free Trade and Sailors' Rights,3,0,2,0,0,0,0,5,0,0,0,0,,Gain a story costing 5 or less from the exchange.
+1812-nation,1812,nation,James Madison,Social,10,Mr. Madison's War,4,0,2,0,0,0,0,0,0,1,0,0,,+1 influence for each different kind of card you play this turn.
+1812-states,1812,states,DeWitt Clinton,Political,12,The Peace Ticket,4,0,2,2,2,0,0,0,0,0,0,0,,"+2 influence, draw 2 cards."
+1816-nation,1816,nation,James Monroe,Economic,10,The Era of Good Feelings,4,0,2,0,3,0,0,0,0,0,0,0,,Draw 3 cards.
+1816-states,1816,states,Rufus King,Social,12,The Last Federalist,4,0,2,2,0,0,0,0,1,0,0,0,,+2 influence. Put a card from your discard pile into your hand.
+1820-nation,1820,nation,John Quincy Adams,Social,13,An Antislavery Diary,4,0,3,1,0,0,0,0,0,0,3,0,,"+1 influence. Look at the top 3 stories of the main deck; put one into your hand, the rest on the bottom."
+1820-states,1820,states,James Monroe,Political,11,The Missouri Compromise,4,0,3,0,0,2,1,0,0,0,0,0,,Destroy up to 2 cards in your hand or discard pile; draw a card for each.
+1824-nation,1824,nation,John Quincy Adams,Social,11,The Corrupt Bargain,4,0,3,0,0,0,0,0,2,0,0,0,,Put up to 2 cards from your discard pile into your hand.
+1824-states,1824,states,Andrew Jackson,Political,13,The People's Choice,4,0,3,4,1,0,0,0,0,0,0,0,,"+4 influence, draw a card."
+1828-nation,1828,nation,John Quincy Adams,Economic,14,The American System,5,0,3,0,1,0,0,5,0,0,0,0,,Gain a story costing 5 or less from the exchange. Draw a card.
+1828-states,1828,states,Andrew Jackson,Social,12,Jacksonian Democracy,5,0,3,3,1,0,0,0,0,0,0,0,,"+3 influence, draw a card."
+1832-nation,1832,nation,Henry Clay,Economic,14,The Bank Recharter,5,0,3,3,0,0,0,4,0,0,0,0,,+3 influence. Gain a story costing 4 or less from the exchange.
+1832-states,1832,states,Andrew Jackson,Social,12,The Bank War,5,0,3,0,1,0,0,6,0,0,0,0,,Gain a story costing 6 or less from the exchange. Draw a card.
+1836-nation,1836,nation,William Henry Harrison,Political,15,The Whig Coalition,5,0,3,2,0,0,0,0,0,1,0,0,,"+2 influence, and +1 for each different kind of card you play this turn."
+1836-states,1836,states,Martin Van Buren,Economic,13,The Specie Circular,5,0,3,3,2,0,0,0,0,0,0,0,,"+3 influence, draw 2 cards."
+1840-nation,1840,nation,William Henry Harrison,Social,13,Log Cabin and Hard Cider,5,0,3,4,0,0,0,0,0,0,0,0,,+4 influence.
+1840-states,1840,states,Martin Van Buren,Economic,15,The Independent Treasury,5,0,3,2,0,2,1,0,0,0,0,0,,+2 influence. Destroy up to 2 cards in your hand or discard pile; draw a card for each.
+1844-nation,1844,nation,Henry Clay,Economic,16,The Raleigh Letter,6,0,4,3,0,0,0,0,1,0,0,0,,+3 influence. Put a card from your discard pile into your hand.
+1844-states,1844,states,James K. Polk,Social,14,Manifest Destiny,6,0,4,2,0,0,0,0,0,0,3,0,,"+2 influence. Look at the top 3 stories of the main deck; put one into your hand, the rest on the bottom."
+1848-nation,1848,nation,Zachary Taylor,Social,14,Old Rough and Ready,6,0,4,4,0,0,0,0,0,0,0,0,discard,+4 influence. Attack: each rival paper discards a card at random.
+1848-states,1848,states,Lewis Cass,Political,16,Popular Sovereignty,6,0,4,0,1,0,0,0,0,1,0,0,,+1 influence for each different kind of card you play this turn. Draw a card.
+1852-nation,1852,nation,Winfield Scott,Political,17,Old Fuss and Feathers,6,0,4,5,1,0,0,0,0,0,0,0,,"+5 influence, draw a card."
+1852-states,1852,states,Franklin Pierce,Economic,15,The Compromise of 1850,6,0,4,0,0,3,1,0,0,0,0,0,,Destroy up to 3 cards in your hand or discard pile; draw a card for each.
+1856-nation,1856,nation,John C. Fremont,Economic,17,"Free Soil, Free Men, Fremont",6,0,4,3,2,1,0,0,0,0,0,0,,"+3 influence, draw 2 cards, then you may destroy a card in your hand or discard pile."
+1856-states,1856,states,James Buchanan,Political,15,Bleeding Kansas,6,0,4,5,0,0,0,0,0,0,0,0,scandal,+5 influence. Attack: each rival paper gains a Scandal.
+1860-nation,1860,nation,Abraham Lincoln,Political,16,A House Divided,0,1,4,0,0,0,0,0,0,0,0,0,,"The last election: the game ends after this turn. Worth 1 prestige for each election card you hold, this one included."
+1860-states,1860,states,Stephen A. Douglas,Economic,18,The Little Giant,2,1,4,0,0,0,0,0,0,0,0,0,,"The last election: the game ends after this turn. Worth 2 prestige, plus 1 for each election card you hold, this one included."

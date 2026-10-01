@@ -88,27 +88,28 @@ function engine_is_current($game) {
 /**
  * Everything the rules need about one card instance. Starters, Editorials
  * and Scandals are 'kind#n'; stories are their key; an election won is
- * 'elec#<index>:<side>' and is synthesised from the election card.
+ * 'elec#<index>:<side>' and is synthesised from that candidate's card.
  */
 function dc_view($id) {
   $id = (string) $id;
   if (strpos($id, 'elec#') === 0) {
-    // An election won: DC's Super-Villain. Its power is p_* in docs/elections-dc.csv.
+    // An election won: DC's Super-Villain, one card per candidate (docs/candidates-dc.csv).
     list($i, $side) = explode(':', substr($id, 5));
     $e = dc_election((int) $i);
+    $k = $e['cards'][$side];
     return [
-      'key' => $id, 'kind' => 'election', 'name' => $e['card_name'], 'candidate' => $e[$side],
-      'type' => 'Election', 'theme' => $e[$side . '_theme'], 'cost' => 0, 'vp' => (int) $e['vp'],
-      'vp_per_office' => (int) ($e['vp_per_office'] ?? 0),
-      'gen' => (int) $e['p_gen'], 'themed' => (int) $e['patron_themed'], 'campaign' => 0, 'draw' => (int) $e['p_draw'],
-      'trash' => (int) $e['p_trash'], 'trash_draw' => (int) $e['p_trash_draw'], 'gain_upto' => (int) $e['p_gain_upto'],
-      'recover' => (int) $e['p_recover'], 'per_kind' => (int) $e['p_per_kind'], 'scry' => (int) $e['p_scry'],
-      'chain' => 0, 'per_same' => 0, 'per_office' => 0, 'attack' => $e['p_attack'] ?: null,
-      'defense' => 0, 'retract' => 0, 'ongoing_gen' => (int) $e['p_stay_gen'], 'ongoing_draw' => 0, 'others_bonus' => 0,
+      'key' => $id, 'kind' => 'election', 'name' => $k['card_name'], 'candidate' => $e[$side], 'side' => $side,
+      'type' => 'Election', 'theme' => $e[$side . '_theme'], 'cost' => 0, 'vp' => (int) $k['vp'],
+      'vp_per_office' => (int) $k['vp_per_office'],
+      'gen' => (int) $k['p_gen'], 'themed' => (int) $k['themed'], 'campaign' => 0, 'draw' => (int) $k['p_draw'],
+      'trash' => (int) $k['p_trash'], 'trash_draw' => (int) $k['p_trash_draw'], 'gain_upto' => (int) $k['p_gain_upto'],
+      'recover' => (int) $k['p_recover'], 'per_kind' => (int) $k['p_per_kind'], 'scry' => (int) $k['p_scry'],
+      'chain' => 0, 'per_same' => 0, 'per_office' => 0, 'attack' => $k['p_attack'] ?: null,
+      'defense' => 0, 'retract' => 0, 'ongoing_gen' => (int) $k['p_stay_gen'], 'ongoing_draw' => 0, 'others_bonus' => 0,
       'others_theme' => null, 'released' => null, 'year' => (int) $e['year'], 'copies' => 1,
-      'card_text' => 'Patron of ' . $e[$side] . ' (' . $e['year'] . '). ' . $e['power_text']
-                     . ((int) ($e['vp_per_office'] ?? 0) ? '' : ' Also +' . $e['patron_themed'] . ' ' . $e[$side . '_theme']
-                        . '. Worth ' . $e['vp'] . ' prestige.'),
+      'card_text' => 'Patron of ' . $e[$side] . ' (' . $e['year'] . '). ' . $k['power_text']
+                     . ((int) $k['vp_per_office'] ? '' : ' Also +' . $k['themed'] . ' ' . $e[$side . '_theme']
+                        . '. Worth ' . $k['vp'] . ' prestige.'),
       'flavor' => null,
     ];
   }
@@ -1021,6 +1022,12 @@ function dc_bot_value($c) {
   return $v;
 }
 
+/** power_value() in the simulator: what a candidate's card is worth to the paper electing him. */
+function dc_bot_power_value($c) {
+  return dc_bot_value($c) + 1.2 * $c['recover'] + 0.8 * $c['scry'] + 1.5 * $c['per_kind']
+       + 0.5 * $c['trash'] * $c['trash_draw'] + 0.3 * $c['vp_per_office'] * 6;
+}
+
 /** Bot.score: the value, bent by the bot's style; near the end only prestige counts. */
 function dc_bot_score($game, $style, $id) {
   $c = ($id === 'editorial') ? dc_card('editorial') : dc_view($id);
@@ -1099,7 +1106,8 @@ function dc_bot_turn(&$game, &$players, $mysqli) {
     if (empty($players[$seat]['private_state']['hand'])) break;
     dc_play($game, $players, $players[$seat]['private_state']['hand'][0], $mysqli);
   }
-  // Elect: the candidate it can reach spending the least plain influence; history breaks a tie.
+  // Elect: weigh each candidate's card against the plain influence he costs (power_choice);
+  // history breaks a tie.
   $sides = dc_electable($game, $players);
   if ($sides) {
     $pools = dc_pools($game, $players);
@@ -1111,7 +1119,8 @@ function dc_bot_turn(&$game, &$players, $mysqli) {
       foreach (dc_elect_order($players[$seat], $e[$side . '_theme']) as $k) {
         if ($k !== 'gen') $other += max(0, $pools[$k]);
       }
-      $rank = [max(0, $need - $other), $side !== $e['historical_winner'] ? 1 : 0];
+      $rank = [0.5 * max(0, $need - $other) - dc_bot_power_value(dc_view('elec#' . (int) $game['state']['e'] . ':' . $side)),
+               $side !== $e['historical_winner'] ? 1 : 0];
       if ($best === null || $rank < $best[0]) $best = [$rank, $side];
     }
     dc_elect($game, $players, $best[1], $mysqli);
@@ -1277,12 +1286,13 @@ function engine_public_state($game, $players, $viewerSeat = null) {
   if ($current && $status === 'active' && ($state['e'] ?? 99) < count(dc_elections())) {
     $e = dc_election($state['e']);
     $election = [
-      'index' => (int) $state['e'], 'year' => (int) $e['year'], 'era' => $e['era'], 'vp' => (int) $e['vp'],
+      'index' => (int) $state['e'], 'year' => (int) $e['year'], 'era' => $e['era'],
       'historical_winner' => $e['historical_winner'],
-      'nation' => ['name' => $e['nation'], 'theme' => $e['nation_theme'], 'threshold' => (int) $e['nation_threshold']],
-      'states' => ['name' => $e['states'], 'theme' => $e['states_theme'], 'threshold' => (int) $e['states_threshold']],
-      'patron_themed' => (int) $e['patron_themed'], 'card_name' => $e['card_name'],
-      'power_text' => $e['power_text'], 'fa_name' => $e['fa_name'], 'fa_text' => $e['fa_text'],
+      'nation' => ['name' => $e['nation'], 'theme' => $e['nation_theme'], 'threshold' => (int) $e['nation_threshold'],
+                   'card' => dc_view('elec#' . (int) $state['e'] . ':nation')],
+      'states' => ['name' => $e['states'], 'theme' => $e['states_theme'], 'threshold' => (int) $e['states_threshold'],
+                   'card' => dc_view('elec#' . (int) $state['e'] . ':states')],
+      'fa_name' => $e['fa_name'], 'fa_text' => $e['fa_text'],
     ];
   }
 
@@ -1328,8 +1338,9 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     'election' => $election,
     'elections_total' => count(dc_elections()),
     'elections' => array_map(function ($e) {
-      return ['year' => (int) $e['year'], 'era' => $e['era'], 'vp' => (int) $e['vp'],
-              'nation' => $e['nation'], 'states' => $e['states'], 'historical_winner' => $e['historical_winner']];
+      return ['year' => (int) $e['year'], 'era' => $e['era'],
+              'nation' => $e['nation'], 'states' => $e['states'], 'historical_winner' => $e['historical_winner'],
+              'nation_vp' => (int) $e['cards']['nation']['vp'], 'states_vp' => (int) $e['cards']['states']['vp']];
     }, dc_elections()),
     'history' => $state['history'] ?? [],
     'exchange' => dc_views($state['exchange'] ?? []),

@@ -33,7 +33,7 @@ export default function ElectionStrip({ elections, history, current, players }) 
                 <div className="truncate font-mono text-[8px] uppercase tracking-[0.1em] text-cream-200/50">{paperOf(h.seat)}</div>
               </>
             ) : (
-              <div className="truncate font-serif text-[11px] italic text-cream-200/50">{now ? 'in progress' : `★${e.vp}`}</div>
+              <div className="truncate font-serif text-[11px] italic text-cream-200/50">{now ? 'in progress' : `★${e.nation_vp} · ★${e.states_vp}`}</div>
             )}
           </div>
         );

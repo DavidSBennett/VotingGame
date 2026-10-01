@@ -1,16 +1,18 @@
-import { THEME } from './Card.jsx';
+import { THEME, PrestigeSeal } from './Card.jsx';
 
 /**
  * The election in progress, as a card with two candidates on it. Each has a
  * threshold; influence of his theme, Campaign and plain influence all count
  * toward it (and, for the Washington Globe, Political influence toward
  * anyone). The first paper to reach a threshold on its turn elects that candidate
- * and takes the card as his Patron.
+ * and takes his card as his Patron. Each candidate has his own card (its
+ * name, power and prestige), so choosing whom to elect changes what you gain;
+ * clicking it opens the card.
  *
  * "Your reach" is an advisory sum of the pools the server reported; the
  * Elect button appears only when the server lists the side as electable.
  */
-export default function ElectionPanel({ election, pools, myTurn, canElect = [], onElect, busy, globe, lastFa = null }) {
+export default function ElectionPanel({ election, pools, myTurn, canElect = [], onElect, busy, globe, lastFa = null, open = null }) {
   if (!election) return null;
   const reach = (theme) => {
     if (!pools) return null;
@@ -36,6 +38,20 @@ export default function ElectionPanel({ election, pools, myTurn, canElect = [], 
             needs <span className="text-base text-gold-300">{c.threshold}</span>
           </span>
         </div>
+        {c.card && (
+          <button
+            type="button"
+            onClick={open ? () => open([election.nation.card, election.states.card], key === 'nation' ? 0 : 1, 'election') : undefined}
+            className="mt-1 flex items-start gap-2 border-t border-gold-500/20 pt-1 text-left"
+            title="The card his Patron gains"
+          >
+            <PrestigeSeal vp={c.card.vp} perOffice={c.card.vp_per_office || 0} />
+            <span className="font-serif text-[13px] leading-snug text-cream-100">
+              <span className="label mr-1.5 text-gold-400">{c.card.name}</span>
+              {c.card.card_text ? c.card.card_text.replace(/^Patron of .*?\(\d{4}\)\.\s*/, '') : ''}
+            </span>
+          </button>
+        )}
         {myTurn && (
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className={r >= c.threshold ? 'font-mono text-[10px] uppercase tracking-[0.12em] text-gold-300' : 'font-mono text-[10px] uppercase tracking-[0.12em] text-cream-200/50'}>
@@ -56,19 +72,14 @@ export default function ElectionPanel({ election, pools, myTurn, canElect = [], 
       <div className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-0.5 text-center">
         <h2 className="font-display text-2xl font-bold leading-none text-cream-50">The Election of {election.year}</h2>
         <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-cream-200/60">
-          Era {election.era} · {election.index + 1} of 17 · worth <span className="text-gold-300">★{election.vp}</span> · Patron card +
-          {election.patron_gen} and +{election.patron_themed} of the candidate's theme
+          Era {election.era} · {election.index + 1} of 17 · each candidate brings his own card
         </span>
       </div>
       <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
         {side('nation')}
         {side('states')}
       </div>
-      <div className="mt-1.5 grid gap-1 text-center sm:grid-cols-2">
-        <p className="font-serif text-[13px] leading-snug text-cream-100" title="What this card does in your deck once you win it">
-          <span className="label mr-1.5 text-gold-400">{election.card_name}</span>
-          {election.power_text}
-        </p>
+      <div className="mt-1.5 text-center">
         {election.fa_name && (
           <p
             className={
