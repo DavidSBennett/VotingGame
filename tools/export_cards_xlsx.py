@@ -28,7 +28,7 @@ INTS = {"Prestige", "Prestige per office", "Influence (plain)", "Political influ
         "per_office", "defense", "retract", "ongoing_gen", "ongoing_draw", "others_bonus", "released", "copies",
         "nation_threshold", "states_threshold", "patron_themed", "p_gen", "p_draw", "p_trash", "p_trash_draw",
         "p_gain_upto", "p_recover", "p_per_kind", "p_scry", "p_stay_gen", "fa_n"}
-WIDE = {"Action 1": 16, "Action 2": 34, "Action 3": 34, "Power": 55, "First Appearance": 45, "card_text": 60, "candidate": 22, "flavor": 50, "power_text": 50, "fa_text": 45, "ability": 55, "name": 30, "card_name": 28,
+WIDE = {"prompt": 110, "subject": 50, "Action 1": 16, "Action 2": 34, "Action 3": 34, "Power": 55, "First Appearance": 45, "card_text": 60, "candidate": 22, "flavor": 50, "power_text": 50, "fa_text": 45, "ability": 55, "name": 30, "card_name": 28,
         "nation": 22, "states": 22, "fa_name": 24}
 
 
@@ -148,6 +148,8 @@ lines = [
     ("Elections -- 34 election cards, one per candidate (two rows per year): his card's prestige and power, one column per effect,", None),
     ("             and the First Appearance event that opens that year's campaign (the same on both rows).", None),
     ("Newspapers -- the eight papers (DC's Super Heroes) and their abilities.", None),
+    ("Art prompts -- one image-generation prompt per card (144): woodcut to 1819, wood engraving 1820-1835, lithograph 1836-1860.", None),
+    ("             Save each image as frontend/public/art/<file>; the card shows it when it is there. Edit the subject in tools/build_art_prompts.py.", None),
     ("Summary -- counts by type, theme and era, as formulas over the Stories sheet.", None),
     ("", None),
     ("Stories columns", Font(name=FONT, bold=True, size=11)),
@@ -189,6 +191,8 @@ for row in el.iter_rows(min_row=2):
 el.freeze_panes = "F2"     # key, year, era, side and candidate stay in view
 pp = wb.create_sheet("Newspapers")
 table(pp, read("papers-dc.csv"))
+ap = wb.create_sheet("Art prompts")
+table(ap, read("art-prompts.csv"))
 
 # ---- Summary: formulas over the Stories sheet -------------------------------
 sm = wb.create_sheet("Summary")

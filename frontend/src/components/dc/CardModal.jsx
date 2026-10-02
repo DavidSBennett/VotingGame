@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import CornerOrnament from './CornerOrnament.jsx';
 import FleuronDivider from './FleuronDivider.jsx';
 import { Abilities, PrestigeSeal, typeStyle } from './Card.jsx';
@@ -15,6 +15,33 @@ import { Abilities, PrestigeSeal, typeStyle } from './Card.jsx';
  *              server allows; the parent decides
  *   onPrev / onNext / position   paging through the row it came from
  */
+/**
+ * The card's artwork, if there is one: frontend/public/art/<key>.png, made
+ * from the prompt in docs/art-prompts.csv (a story by its kind, a candidate
+ * card as <year>-<side>). Nothing is shown until an image exists.
+ */
+export function artFile(card) {
+  if (card.kind === 'election') return `${card.year}-${card.side}.png`;
+  return `${card.kind || String(card.key).split('#')[0]}.png`;
+}
+
+function CardArt({ card }) {
+  const file = artFile(card);
+  const [missing, setMissing] = useState(null);
+  if (missing === file) return null;
+  return (
+    <div className="mx-auto mb-4 max-w-sm border border-gold-700/60 p-1 shadow-card">
+      <img
+        key={file}
+        src={`${import.meta.env.BASE_URL}art/${file}`}
+        alt=""
+        onError={() => setMissing(file)}
+        className="block aspect-[4/3] w-full object-cover"
+      />
+    </div>
+  );
+}
+
 export default function CardModal({ card, onClose, actions = null, onPrev = null, onNext = null, position = null }) {
   useEffect(() => {
     function handleKey(e) {
@@ -104,6 +131,7 @@ export default function CardModal({ card, onClose, actions = null, onPrev = null
           <div className={`absolute inset-x-0 top-0 h-1.5 ${t.stripe}`} />
 
           <div className="px-10 pb-8 pt-12 text-center">
+            <CardArt card={card} />
             <p className={`font-mono text-[10px] uppercase tracking-[0.25em] ${t.eyebrow}`}>
               {t.label}
               {card.year ? ` · ${card.year}` : ''}

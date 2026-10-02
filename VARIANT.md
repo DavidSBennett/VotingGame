@@ -747,3 +747,17 @@ failures. Parity with the simulator: history rewritten 0.29 vs 0.30.
 UI: each candidate's box on the election panel shows his card (its
 prestige seal and power); clicking it opens the card. The workbook has
 an Elections sheet and a Candidates sheet (one column per effect).
+
+### 2026-10-02: card artwork prompts (the user)
+
+The user asked for artwork that follows the printing of each period,
+from woodblock to lithograph, made with an image model. Every card now has
+a prompt in `docs/art-prompts.csv` (built by `tools/build_art_prompts.py`,
+also on the workbook's "Art prompts" sheet): 144 prompts, one per story
+kind, starter, Editorial, Scandal and candidate card. Each prompt is the
+style of the card's own year plus a subject written for that card:
+woodcut to 1819 (66 cards), wood engraving 1820-1835 (27), lithograph
+1836-1860 (51). Monochrome, 4:3, no lettering. Cards about enslaved and
+Native people ask for dignified figures and no caricature, since period
+prints often caricatured them. Images go in `frontend/public/art/<file>`.
+The card modal shows a card's image when it exists.
