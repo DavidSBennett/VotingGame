@@ -440,17 +440,20 @@ function json_col($raw, $default = []) {
 
 /**
  * Which rules engine a game plays. Chosen when the game is created and
- * kept in vg_games.config: 'dc' is the DC-style deck-builder
- * (engine_dc.php, VARIANT.md revision 4); anything else is the newsroom
- * game (engine.php). The two define the same function names, so a request
- * loads exactly one of them, once it knows which game it serves.
+ * kept in vg_games.config: '2024' is the 2024 game (engine_2024.php,
+ * VARIANT.md revision 5); 'dc' the DC-style deck-builder on 1796-1860
+ * (engine_dc.php, revision 4); anything else the newsroom game
+ * (engine.php). They define the same function names, so a request loads
+ * exactly one of them, once it knows which game it serves.
  */
 function vg_engine_of_config($config) {
-  return (is_array($config) && ($config['engine'] ?? '') === 'dc') ? 'dc' : 'newsroom';
+  $e = is_array($config) ? ($config['engine'] ?? '') : '';
+  return ($e === '2024' || $e === 'dc') ? $e : 'newsroom';
 }
 
 function vg_require_engine($which) {
-  require_once __DIR__ . ($which === 'dc' ? '/engine_dc.php' : '/engine.php');
+  $file = ['2024' => '/engine_2024.php', 'dc' => '/engine_dc.php'][$which] ?? '/engine.php';
+  require_once __DIR__ . $file;
 }
 
 /** Load the engine the stored game was created with. */

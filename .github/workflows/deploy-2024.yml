@@ -50,6 +50,11 @@ jobs:
       - name: Check backend/cards_dc.php matches the content spreadsheets
         run: python3 -X utf8 tools/export_cards_php.py --check
 
+      # The 2024 game's cards come from docs/deck-2024.csv and
+      # docs/states-2024.csv (tools/export_cards_2024_php.py).
+      - name: Check backend/cards_2024.php matches the 2024 spreadsheets
+        run: python3 -X utf8 tools/export_cards_2024_php.py --check
+
       - name: Install & build frontend
         working-directory: frontend
         run: |

@@ -21,14 +21,16 @@ $playerName = trim((string) ($body['player_name'] ?? ''));
 if ($playerName === '') error('A player name is required', 400);
 if (mb_strlen($playerName) > 40) $playerName = mb_substr($playerName, 0, 40);
 
-// Which rules engine: the DC-style deck-builder (engine_dc.php) unless the
-// request asks for the old newsroom game ("engine": "newsroom").
-$engineName = ((string) ($body['engine'] ?? '')) === 'newsroom' ? 'newsroom' : 'dc';
+// Which rules engine: the 2024 game (engine_2024.php) unless the request
+// asks for the variant's DC game ("engine": "dc") or the old newsroom game
+// ("engine": "newsroom").
+$engineName = (string) ($body['engine'] ?? '');
+if ($engineName !== 'dc' && $engineName !== 'newsroom') $engineName = '2024';
 vg_require_engine($engineName);
 
-// The host's newspaper (DC game), chosen in the lobby; blank = dealt at start.
+// The host's outlet (the 2024 and DC games), chosen in the lobby; blank = dealt at start.
 $paper = (string) ($body['paper'] ?? '');
-if ($engineName !== 'dc' || $paper === '') $paper = null;
+if ($engineName === 'newsroom' || $paper === '') $paper = null;
 if ($paper !== null && !isset(dc_papers()[$paper])) error('Unknown newspaper: ' . $paper, 400);
 $hostState = json_encode($paper !== null ? ['paper' => $paper] : new stdClass());
 
@@ -56,7 +58,7 @@ if (isset($body['config']) && is_array($body['config'])) {
   }
 }
 $config['bots'] = $bots;
-if ($engineName === 'dc') $config['engine'] = 'dc';
+if ($engineName !== 'newsroom') $config['engine'] = $engineName;
 $level = (string) ($body['bot_level'] ?? 'easy');
 if (!in_array($level, ['easy', 'hard'], true)) error('bot_level must be easy or hard', 400);
 $config['bot_level'] = $level;

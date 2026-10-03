@@ -35,11 +35,11 @@ while ($r = $res->fetch_assoc()) {
   // A game running under an older engine can no longer be played, so it
   // is not "in progress" in any sense a player cares about. Leave it out.
   $cfg = json_col($r['config']);
-  // The lobby plays the DC-style game now; the newsroom game's tables
-  // are no longer listed. 9 is engine_dc.php's ENGINE_STATE_VERSION (the
-  // two engines cannot be loaded in one request).
-  if (vg_engine_of_config($cfg) !== 'dc') continue;
-  if ($r['status'] === 'active' && (int) ($cfg['engine_version'] ?? 0) !== 9) continue;
+  // The lobby plays the 2024 game now; other games' tables are no longer
+  // listed. 24 is engine_2024.php's ENGINE_STATE_VERSION (the engines
+  // cannot be loaded in one request).
+  if (vg_engine_of_config($cfg) !== '2024') continue;
+  if ($r['status'] === 'active' && (int) ($cfg['engine_version'] ?? 0) !== 24) continue;
   $games[] = [
     'game_id'     => (int) $r['game_id'],
     'join_code'   => $r['join_code'],

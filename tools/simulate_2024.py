@@ -135,7 +135,7 @@ class Player:
         self.strategy, _, self.paper = strategy.partition("@")    # "balanced@globe"
         self.paper = self.paper or None
         self.deck = ["letter#%d.%d" % (seat, i) for i in range(7)] + ["notice#%d.%d" % (seat, i) for i in range(3)]
-        self.hand, self.discard, self.locations = [], [], []
+        self.hand, self.discard, self.locations, self.held = [], [], [], []
         self.staked = []            # (card, side), face down
         self.last_stake = -99       # the turn of the last stake
         self.stats = dict(turns=0, called=0, bought=0, states_bought=0, attacks=0, scandals=0, trashed=0,
@@ -143,7 +143,7 @@ class Player:
                           stake_vp=0)
 
     def owned(self):
-        return self.deck + self.hand + self.discard + self.locations
+        return self.deck + self.hand + self.discard + self.locations + self.held
 
     def states(self):
         return [c for c in self.owned() if c.startswith("st#")]
@@ -397,16 +397,18 @@ class Game:
             p.discard.append(pick)
             p.stats["bought"] += 1
             self.check_270()            # after the card is in the deck, so the state counts
-        if (p.paper == "herald" and pool["gen"] >= self.cfg["herald_cost"] and self.main
-                and not self.main[-1].startswith("st#") and bot.scoop(self, p)):   # a scoop is a story, not a state
-            pool["gen"] -= self.cfg["herald_cost"]
-            p.hand.append(self.main.pop())
+        top = next((i for i in range(len(self.main) - 1, -1, -1) if not self.main[i].startswith("st#")), None)
+        if p.paper == "herald" and pool["gen"] >= self.cfg["herald_cost"] and top is not None and bot.scoop(self, p):
+            pool["gen"] -= self.cfg["herald_cost"]     # the scoop: the topmost story (states are passed over)
+            p.held.append(self.main.pop(top))
             p.stats["bought"] += 1
         self.refill()
 
         for cid in played:
             (p.locations if card(cid)["type"] == "Media event" else p.discard).append(cid)
         self.draw(p, self.cfg["hand"])
+        p.hand += p.held                # the Herald's scoop joins the next hand
+        p.held = []
         self.news_cycle()
 
     def news_cycle(self):

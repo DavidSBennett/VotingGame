@@ -45,9 +45,9 @@ try {
     throw new Exception('That table is full');
   }
 
-  // The guest's newspaper (DC game): one no other seat has taken.
+  // The guest's outlet (the 2024 and DC games): one no other seat has taken.
   $paper = (string) ($body['paper'] ?? '');
-  if (vg_engine_of_config($game['config']) !== 'dc' || $paper === '') $paper = null;
+  if (vg_engine_of_config($game['config']) === 'newsroom' || $paper === '') $paper = null;
   if ($paper !== null) {
     if (!isset(dc_papers()[$paper])) throw new Exception('Unknown newspaper: ' . $paper);
     foreach ($players as $p) {

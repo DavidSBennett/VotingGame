@@ -5,6 +5,7 @@
  * ?variant=v1     restrict to one rules edition (default: all)
  * ?engine=dc      only the DC-style game's scores (prestige); its rows carry
  *                 the paper's newspaper and the elections it won
+ * ?engine=2024    only the 2024 game's scores (the prestige staked on the winner)
  * ?limit=25       rows to return (default 25, max 200)
  *
  * Reads vg_scores, which is written once per seat at game end and is
@@ -21,6 +22,8 @@ $limit = max(1, min(200, $limit));
 $variant = isset($_GET['variant']) ? (string) $_GET['variant'] : '';
 // The DC game's score breakdown has a 'prestige' field; the newsroom game's does not.
 $dcOnly = (($_GET['engine'] ?? '') === 'dc') ? " AND detail LIKE '%\"prestige\"%'" : '';
+// The 2024 game's breakdown has 'stakes_won'.
+if (($_GET['engine'] ?? '') === '2024') $dcOnly = " AND detail LIKE '%\"stakes_won\"%'";
 // Games played by the test scripts (tools/smoke_*.py, the UI preview) are not
 // on the board.
 $dcOnly .= " AND player_name NOT LIKE 'smoke%' AND player_name <> 'UI preview'";
