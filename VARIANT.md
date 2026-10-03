@@ -944,3 +944,23 @@ behind). No new rules; the bots learn the decisions:
 5% at 3 and 9% at 4 outlets (no clock: no one will finish); some stakes
 now land on the loser (2.5 of 2.7 win at 3). Seats 37/32/31 (3), 26/26/
 24/24 (4). Harris 44-51%.
+
+### 2026-10-03: content, engine and screen (the user)
+
+- **Story cards**: the 65 slots' mechanics kept; each is now a dated 2024
+  news story (`docs/stories-2024.csv`, merged by `build_deck_2024.py`),
+  Republican cards stories that helped Trump, Democratic ones stories that
+  helped Biden or Harris; negative stories attacks on the other side; media
+  events 2024 media changes. The 10 calendar steps run from November 2022
+  to Election Day (`docs/calendar-2024.csv`).
+- **Outlets**: NewsNation (Crossover), the AP (Race Calls), the New York
+  Times (Paper of Record), the Wall Street Journal (Business Desk),
+  Politico (The Scoop), the New York Post (Tabloid), Fox News (Prime Time),
+  CNN (Debate Stage) (`docs/outlets-2024.csv`).
+- **State cards**: each half named for that side's 2024 base in the state,
+  or "Upset in ..." (`docs/state-cards-2024.csv`); flavor = the result.
+- **Engine** `backend/engine_2024.php` (tests: 1,575 rule checks and
+  random games, 0 failures; parity with the simulator within noise) and
+  **screen** `frontend/src/views/Shell2024.jsx`: race bar, map, big state,
+  exchange with a buy per side, the press and Stake, outlets, stake pile,
+  the final count. New tables play the 2024 game.

@@ -21,9 +21,26 @@ export const THEME = {
   Social: { chip: 'bg-emerald-700 text-cream-50', text: 'text-emerald-300', ring: 'ring-emerald-500', band: 'bg-emerald-700' },
 };
 
+/** The two parties' inks (the 2024 game): Republican oxblood, Democratic federal blue. */
+export const PARTY = {
+  rep: { chip: 'bg-oxblood-700 text-cream-50', text: 'text-oxblood-300', label: 'Rep', name: 'Republican' },
+  dem: { chip: 'bg-federal-700 text-cream-50', text: 'text-federal-300', label: 'Dem', name: 'Democratic' },
+};
+
 /** The stripe colour, the eyebrow colour on paper, and the label for a card's type. */
 export function typeStyle(card) {
+  const s = baseTypeStyle(card);
+  // 2024 stories lean to a party: say so on the eyebrow.
+  if (card.lean && card.type !== 'State') return { ...s, label: s.label + (card.lean === 'rep' ? ' · Rep' : ' · Dem') };
+  return s;
+}
+
+function baseTypeStyle(card) {
   switch (card.type) {
+    case 'State':
+      if (card.side === 'trump') return { stripe: 'bg-oxblood-500', eyebrow: 'text-oxblood-700', label: `${card.abbr} · ${card.ev} EV · Trump` };
+      if (card.side === 'harris') return { stripe: 'bg-federal-500', eyebrow: 'text-federal-700', label: `${card.abbr} · ${card.ev} EV · Harris` };
+      return { stripe: 'bg-gold-500', eyebrow: 'text-gold-700', label: `${card.abbr} · ${card.ev} electoral votes` };
     case 'Political story':
       return { stripe: 'bg-federal-700', eyebrow: 'text-federal-700', label: 'Political' };
     case 'Economic story':
@@ -62,16 +79,25 @@ export function effects(card) {
     if (card.ongoing_gen) own.push(`+${card.ongoing_gen}`);
     if (card.ongoing_draw) own.push(`draw ${card.ongoing_draw}`);
     out.push([`each turn ${own.join(', ')}`, plain]);
-    out.push([`others +${card.others_bonus}${card.others_theme ? ' ' + card.others_theme : ''}`, note]);
+    const others = card.lean ? PARTY[card.lean].label : card.others_theme;
+    out.push([`others +${card.others_bonus}${others ? ' ' + others : ''}`, note]);
+    return out;
+  }
+  if (card.type === 'State' && !card.side && card.sides) {
+    // A state on the exchange: buy it for either side.
+    out.push([`Trump ◆${card.sides.trump.cost}`, PARTY.rep.chip]);
+    out.push([`Harris ◆${card.sides.harris.cost}`, PARTY.dem.chip]);
     return out;
   }
   if (card.gen) out.push([`+${card.gen}`, plain]);
-  if (card.themed && card.theme) out.push([`+${card.themed} ${card.theme}`, themeChip(card.theme)]);
+  if (card.themed && card.lean) out.push([`+${card.themed} ${PARTY[card.lean].label}`, PARTY[card.lean].chip]);
+  else if (card.themed && card.theme) out.push([`+${card.themed} ${card.theme}`, themeChip(card.theme)]);
   if (card.campaign) out.push([`+${card.campaign} Campaign`, 'bg-gold-300 text-ink-950']);
+  if (card.per_office && card.lean) out.push([`+${card.per_office} per 3 states`, note]);
   if (card.draw) out.push([`draw ${card.draw}`, note]);
-  if (card.per_same) out.push([`+${card.per_same} per ${card.theme}`, note]);
+  if (card.per_same) out.push([`+${card.per_same} per ${card.theme || card.story_kind}`, note]);
   if (card.chain) out.push([`chain +${card.chain}`, note]);
-  if (card.per_office) out.push([`+${card.per_office} per office`, note]);
+  if (card.per_office && !card.lean) out.push([`+${card.per_office} per office`, note]);
   if (card.per_kind) out.push([`+${card.per_kind} per kind`, note]);
   if (card.retract) out.push(['Retraction', note]);
   if (card.trash) out.push([card.trash > 1 ? `destroy ${card.trash}${card.trash_draw ? ', draw each' : ''}` : card.trash_draw ? 'destroy, draw' : 'destroy', note]);

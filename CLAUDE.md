@@ -16,50 +16,57 @@ this branch changes since; keep it up to date.
 - Nothing here should touch https://voting.thehistorians.org (the real
   game) or https://fourthestate.thehistorians.org (the variant).
 
-## What the variant plays
+## What this branch plays
 
-A DC Deck-Building (Heroes Unite) style game (VARIANT.md revision 4 and
-after; `docs/BUILD-PLAN-DC.md`). New tables play it; the older newsroom
-game (`backend/engine.php`, `backend/game_data.php`, `tools/simulate.py`,
-`tools/smoke_play.py`) is still on the server for API use
-(`"engine": "newsroom"`), but the site no longer draws it.
+The 2024 game (VARIANT.md revision 5; the rulebook is the "Board Game
+Rules" doc): news outlets claim the 51 contests of the 2024 electoral
+college for Trump or Harris, stake cards face down on a candidate, and
+the game ends when a side reaches 270; only stakes on the winner score.
+New tables play it (`"engine": "2024"`, the default). The variant's DC game
+(`engine_dc.php`) and the newsroom game (`engine.php`) stay on the server
+for old tables and API use; the lobby no longer opens them.
 
 ## How it is built
 
-- Content is three spreadsheets: `docs/deck-dc.csv` (stories, starters,
-  Editorial, Scandal), `docs/elections-dc.csv`, `docs/papers-dc.csv` (the
-  newspapers). After editing one, run `py -X utf8 tools/export_cards_php.py`
-  to regenerate `backend/cards_dc.php` (never edit it by hand); the deploy
-  fails if they disagree (`--check`).
-- `backend/engine_dc.php` is the rules engine (server-authoritative PHP).
+- Content is five spreadsheets: `docs/states-2024.csv` (built by
+  `tools/build_states_2024.py`; half names in `docs/state-cards-2024.csv`),
+  `docs/deck-2024.csv` (built by `tools/build_deck_2024.py` from the
+  mechanics slots and `docs/stories-2024.csv`), `docs/outlets-2024.csv`,
+  and `docs/calendar-2024.csv`. After editing, run
+  `py -X utf8 tools/export_cards_2024_php.py` to regenerate
+  `backend/cards_2024.php` (never edit it by hand); the deploy fails if they
+  disagree (`--check`).
+- `backend/engine_2024.php` is the rules engine (server-authoritative PHP).
   `lib.php` loads the engine a game was created with
-  (`vg_require_engine_for_game`); the two engines share function names, so
-  a request loads exactly one.
-- `tools/simulate_dc.py` plays the same rules thousands of times. Change a
+  (`vg_require_engine_for_game`); the engines share function names, so a
+  request loads exactly one.
+- `tools/simulate_2024.py` plays the same rules thousands of times. Change a
   rule in the simulator first, report the numbers, then mirror it in
-  `engine_dc.php`. `tools/parity_dc.py` checks the engine's bots against
+  `engine_2024.php`. `tools/parity_2024.py` checks the engine's bots against
   the simulator's.
 - PHP 8.3 is installed locally (winget `PHP.PHP.8.3`, php.ini with mbstring,
-  2026-09-28). Before pushing: `php -l` every changed backend file and
-  `php tools/engine_test.php` (rule tests + random games with invariants).
-  Escape apostrophes in single-quoted PHP strings.
-- After deploying: `py -X utf8 tools/smoke_dc.py --games 3` plays live games
-  through the endpoints and checks invariants after every action.
+  2026-09-28; on the PowerShell PATH). Before pushing: `php -l` every changed
+  backend file and `php tools/engine_test_2024.php` (rule tests + random
+  games with invariants). Escape apostrophes in single-quoted PHP strings.
+- After deploying: `py -X utf8 tools/smoke_2024.py --games 3` plays live
+  games through the endpoints and checks invariants after every action.
 - Frontend: `frontend/` (Vite + React + Tailwind; literal class strings
-  only). The game screen is `views/DcShell.jsx` + `components/dc/`.
+  only). The game screen is `views/Shell2024.jsx` + `components/e24/` (it
+  reuses the card tile, modal and prompts in `components/dc/`).
   `npm run build` in `frontend/` to check it compiles; `npm run dev`
   (`.claude/launch.json`: "frontend") talks to the live 2024 site.
-- `docs/DESIGN.md` records the main game's design; `docs/design-doc.md` +
-  `tools/build_design_doc.py` build the Word design document.
 
 ## Language
 
-Each player is a **paper** with a **newspaper** (its ability). Papers take
-turns: **play** stories for **influence** (plain, or Political / Economic /
-Social, or Campaign), **elect** a man by reaching his **threshold** (the
-paper becomes his **Patron** and gains the election card), and **buy**
-stories off the **exchange**. **Negative stories** attack rivals and give
-**Scandals**; **media events** stay in play. The score is **prestige** (★).
+Each player is an **outlet** (with an ability). Outlets take turns: either
+**stake** (one card face down on Trump or Harris, in place of the turn) or
+**play** cards for **neutral**, **Republican**, **Democratic** or
+**Campaign** currency, **call** the **big state** up (the elections deck:
+the ten biggest states), and **buy** stories and **states** (for a side)
+off the **exchange**. A state counts toward **270** once **claimed**.
+**Negative stories** attack rivals and give **Scandals**; **media events**
+stay in play. The score is **prestige** (★, 1-12) on the cards staked on
+the winner.
 
 ## Working style
 

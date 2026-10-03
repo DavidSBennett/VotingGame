@@ -72,6 +72,7 @@ while ($r = $res->fetch_assoc()) {
     'created_at'    => $r['created_at'],
     'paper'         => $detail['paper'] ?? null,
     'elections_won' => isset($detail['elections_won']) ? (int) $detail['elections_won'] : null,
+    'ev_claimed'    => isset($detail['ev_claimed']) ? (int) $detail['ev_claimed'] : null,
   ];
 }
 $stmt->close();

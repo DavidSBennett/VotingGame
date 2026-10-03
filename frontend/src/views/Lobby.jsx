@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { createGame, joinGame, listOpenGames } from '../api/client.js';
 import HighScores from '../components/HighScores.jsx';
-import RulesDc from '../components/dc/RulesDc.jsx';
+import Rules24 from '../components/e24/Rules24.jsx';
 
 /**
- * Choose a newspaper (DC's Super Heroes): each has an ability of its own.
- * `taken` greys out papers another seat already has; null = dealt at start.
+ * Choose an outlet: each has an ability of its own. `taken` greys out
+ * outlets another seat already has; null = dealt at start.
  */
 function PaperPicker({ papers, value, onChange, taken = [] }) {
   if (!papers.length) return null;
@@ -17,7 +17,7 @@ function PaperPicker({ papers, value, onChange, taken = [] }) {
         className={value === null ? 'border border-gold-300 bg-ink-800 px-2 py-1.5 text-left' : 'border border-gold-500/30 px-2 py-1.5 text-left hover:border-gold-300'}
       >
         <div className="font-display text-base text-cream-50">Deal me one</div>
-        <div className="font-serif text-[11px] italic text-cream-200/60">A paper at random when the presses start.</div>
+        <div className="font-serif text-[11px] italic text-cream-200/60">An outlet at random when the game starts.</div>
       </button>
       {papers.map((pp) => {
         const off = taken.includes(pp.key);
@@ -38,7 +38,7 @@ function PaperPicker({ papers, value, onChange, taken = [] }) {
           >
             <div className="font-display text-base leading-tight text-cream-50">
               {pp.name}
-              <span className="ml-1 font-mono text-[8px] uppercase tracking-[0.15em] text-gold-500">{pp.leans}</span>
+              <span className="ml-1 font-mono text-[8px] uppercase tracking-[0.15em] text-gold-500">{pp.ability_name}</span>
               {off && <span className="ml-1 font-mono text-[8px] uppercase tracking-[0.15em] text-cream-200/60">taken</span>}
             </div>
             <div className="font-serif text-[11px] leading-snug text-cream-200/70">{pp.ability}</div>
@@ -117,7 +117,7 @@ export default function Lobby({ onSeated }) {
 
   const guard = () => {
     if (!playerName.trim()) {
-      setError('Sign your name first — every paper needs an editor.');
+      setError('Sign your name first — every outlet needs an editor.');
       return false;
     }
     return true;
@@ -143,7 +143,7 @@ export default function Lobby({ onSeated }) {
           max_players: 1,
           bots: rivals,
           bot_level: level,
-          engine: 'dc',
+          engine: '2024',
           paper: paper || undefined,
         }),
       );
@@ -174,14 +174,14 @@ export default function Lobby({ onSeated }) {
       {/* Title page */}
       <header className="text-center animate-fade">
         <div className="mx-auto mb-4 inline-block border border-oxblood-500 bg-oxblood-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-oxblood-300">
-          2024 · a copy of the variant · not the real game
+          2024 edition · in development
         </div>
         <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-gold-500">
-          A card game of the partisan press · 1796–1860
+          A card game of the press and the electoral college · 2024
         </div>
         <h1 className="mt-3 font-display text-6xl font-bold leading-none text-cream-50 sm:text-7xl">The Fourth Estate</h1>
         <p className="mx-auto mt-4 max-w-2xl font-display text-xl italic text-gold-300">
-          Buy the news, run the stories, make the presidents. Seventeen elections; the most honoured paper wins.
+          Claim the states, stake your bets, and decide when the race reaches 270. Only what you staked on the winner scores.
         </p>
         <div className="mx-auto mt-6 flex max-w-xs items-center gap-3">
           <span className="h-px flex-1 bg-gold-500/50" />
@@ -199,7 +199,7 @@ export default function Lobby({ onSeated }) {
       <div className="mt-10 grid gap-6 md:grid-cols-2">
         {/* Open a table */}
         <section className="panel p-6 animate-rise">
-          <div className="label">Solo · against rival papers</div>
+          <div className="label">Solo · against rival outlets</div>
           <h2 className="mt-1 font-display text-3xl font-semibold text-cream-50">Open a table</h2>
 
           <label className="mt-5 block" htmlFor="name">
@@ -215,7 +215,7 @@ export default function Lobby({ onSeated }) {
           </label>
 
           <div className="mt-5">
-            <span className="label text-cream-200/60">Rival papers</span>
+            <span className="label text-cream-200/60">Rival outlets</span>
             <div className="mt-2 inline-flex border border-gold-500/50">
               {[1, 2, 3, 4].map((n) => (
                 <button
@@ -233,7 +233,7 @@ export default function Lobby({ onSeated }) {
               ))}
             </div>
             <p className="mt-2 font-serif text-sm italic text-cream-200/50">
-              {rivals === 1 ? 'Head to head — the balanced setting.' : `A crowded field of ${rivals + 1} papers.`}
+              {rivals === 1 ? 'Head to head.' : `A field of ${rivals + 1} outlets.`}
             </p>
           </div>
 
@@ -259,17 +259,17 @@ export default function Lobby({ onSeated }) {
               ))}
             </div>
             <p className="mt-2 font-serif text-sm italic text-cream-200/50">
-              Both levels play the balanced rival the game was tuned against, for now.
+              Both levels play the same rival for now: it stakes, triggers 270 when the finish pays it, and blocks when it would not.
             </p>
           </div>
 
           <div className="mt-5">
-            <span className="label text-cream-200/60">Your newspaper</span>
+            <span className="label text-cream-200/60">Your outlet</span>
             <PaperPicker papers={papers} value={paper} onChange={setPaper} />
           </div>
 
           <button type="button" onClick={doCreate} disabled={busy} className="btn-solid mt-6 w-full">
-            Start the presses
+            Open the newsroom
           </button>
         </section>
 
@@ -296,7 +296,7 @@ export default function Lobby({ onSeated }) {
           </div>
 
           <div className="mt-5">
-            <span className="label text-cream-200/60">Your newspaper at that table</span>
+            <span className="label text-cream-200/60">Your outlet at that table</span>
             <PaperPicker
               papers={papers}
               value={joinPaper}
@@ -346,7 +346,7 @@ export default function Lobby({ onSeated }) {
 
       {showRules && (
         <div className="mt-6 animate-rise">
-          <RulesDc inline />
+          <Rules24 inline />
         </div>
       )}
 

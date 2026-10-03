@@ -1,10 +1,12 @@
 import { usePolledState } from '../hooks/usePolledState.js';
 import { downloadExport } from '../api/client.js';
 import DcShell from './DcShell.jsx';
+import Shell2024 from './Shell2024.jsx';
 
 /**
- * The seat's screen: polls the public state and hands it to DcShell, the
- * screen of the DC-style game (backend/engine_dc.php).
+ * The seat's screen: polls the public state and hands it to Shell2024, the
+ * screen of the 2024 game (backend/engine_2024.php), or to DcShell for a
+ * table started under the DC-style game (backend/engine_dc.php).
  *
  * A table started under the older newsroom rules (backend/engine.php)
  * still exists on the server and can be exported, but this site no longer
@@ -31,6 +33,10 @@ export default function GameShell({ seat, onLeave }) {
         </button>
       </div>
     );
+  }
+
+  if (state.engine === '2024') {
+    return <Shell2024 seat={seat} state={state} events={events} error={error} refresh={refresh} onLeave={onLeave} />;
   }
 
   // The DC game's state says engine 'dc' and carries an `election`
