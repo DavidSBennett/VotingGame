@@ -21,9 +21,16 @@
  * for him, or a Republican story); DEMOCRATIC only on Harris (or a
  * Democratic story); CAMPAIGN only on calling a big state.
  *
+ * CURRENCY COUNTS FROM THE HAND (the user, 2026-10-03): every card's
+ * currency (neutral, party, Campaign, per 3 states) counts as soon as it is
+ * in the hand on the outlet's turn -- at the start, and when drawn -- once
+ * a turn, even if the card later leaves the hand. Playing a card only USES
+ * ITS ABILITY (draw, destroy, gain, attack, Retraction, chain, compounding,
+ * a media event into play); a card with none is never played.
+ *
  * On its turn an outlet either STAKES -- sets one card from its hand aside,
  * face down, on Trump or Harris, discards the rest and draws 5 -- or plays:
- *   - PLAYS cards from its hand, one at a time, making currency;
+ *   - USES the abilities of cards in its hand, one at a time;
  *   - may CALL the big state up, once: the ten biggest states, shuffled,
  *     one at a time. Either side's threshold claims it for that side, and
  *     the outlet gains that side's card. Each call moves the calendar on a
@@ -36,7 +43,7 @@
  *     goes to the bottom of the main deck (the news cycle).
  * Flipping a state costs 1 more per 6 points of its 2024 margin. A state
  * counts for its side once claimed. When a side reaches 270 the round is
- * played out and the game ends. The score is the prestige (1-12) of the
+ * played out and the game ends. The score is the wealth (-1 to 12) of the
  * cards an outlet staked on the winner; nothing else scores.
  * Negative stories attack every rival (discard at random, or a Scandal); a
  * Defense card in hand is used automatically; an attack that hits gives +1
@@ -411,6 +418,7 @@ function e24_new_turn($seat) {
     'counts' => ['Political' => 0, 'Economic' => 0, 'Social' => 0],
     'called' => null, 'bought' => [], 'hits' => 0, 'attacks' => 0, 'staked' => false,
     'used' => ['sun' => false, 'herald' => false], 'star_done' => false, 'pending' => null, 'queue' => [],
+    'counted' => [],     // cards whose currency counts this turn (they have been in the hand)
   ];
 }
 
@@ -435,6 +443,39 @@ function e24_start_turn(&$game, &$players, $seat, $mysqli) {
   }
   $game['state']['turn'] = $t;
   $game['state']['turns'] = 1 + (int) $game['state']['turns'];
+  e24_count_hand($game, $players);
+}
+
+/** A card's currency while it is in the hand: [pool => amount]. */
+function e24_hand_currency($game, $player, $c) {
+  $out = ['gen' => (int) $c['gen'], 'campaign' => (int) $c['campaign']];
+  if ($c['lean']) {
+    $out[$c['lean']] = (int) $c['themed'];
+    if ((int) $c['per_office']) {
+      $out[$c['lean']] += (int) $c['per_office'] * intdiv(e24_states_held($player), (int) $game['config']['office_div']);
+    }
+  }
+  return $out;
+}
+
+/** Count the currency of every card in the hand of the outlet on turn that has not been counted yet. */
+function e24_count_hand(&$game, &$players) {
+  if (empty($game['state']['turn']) || $game['state']['turn']['staked']) return;
+  $t = &$game['state']['turn'];
+  $seat = $t['seat'];
+  if (!isset($t['counted'])) $t['counted'] = [];
+  foreach ($players[$seat]['private_state']['hand'] as $id) {
+    if (in_array($id, $t['counted'], true)) continue;
+    $t['counted'][] = $id;
+    foreach (e24_hand_currency($game, $players[$seat], e24_view($id)) as $k => $v) $t['base'][$k] += $v;
+  }
+  unset($t);
+}
+
+/** Does playing this card do anything? (Currency alone counts from the hand.) */
+function e24_has_ability($c) {
+  return (int) $c['draw'] || (int) $c['trash'] || (int) $c['gain_upto'] || $c['attack'] || (int) $c['retract']
+      || (int) $c['chain'] || (int) $c['per_same'] || $c['type'] === 'Media event';
 }
 
 /** Currency available right now: what was made (with every bonus) less what was spent. */
@@ -496,8 +537,13 @@ function e24_play(&$game, &$players, $cardId, $mysqli) {
   $p = &$players[$seat];
   $at = array_search($cardId, $p['private_state']['hand'], true);
   if ($at === false) throw new Exception('That card is not in your hand.');
-  array_splice($p['private_state']['hand'], $at, 1);
   $c = e24_view($cardId);
+  if (!e24_has_ability($c)) throw new Exception($c['name'] . ' has no ability to use: its currency already counts from your hand.');
+  unset($p, $t);
+  e24_count_hand($game, $players);            // its currency counts whether or not it is played
+  $t = &$game['state']['turn'];
+  $p = &$players[$seat];
+  array_splice($p['private_state']['hand'], $at, 1);
   $t['played'][] = $cardId;
   $p['private_state']['played'][] = $cardId;
   $paper = $p['public_state']['paper'] ?? null;
@@ -511,12 +557,6 @@ function e24_play(&$game, &$players, $cardId, $mysqli) {
       $t['star_done'] = true;
       e24_draw($game, $p, (int) $game['config']['north_star_draw']);
     }
-  }
-  $t['base']['gen'] += (int) $c['gen'];
-  if ($c['lean']) $t['base'][$c['lean']] += (int) $c['themed'];
-  $t['base']['campaign'] += (int) $c['campaign'];
-  if ((int) $c['per_office'] && $c['lean']) {
-    $t['base'][$c['lean']] += (int) $c['per_office'] * intdiv(e24_states_held($players[$seat]), (int) $game['config']['office_div']);
   }
   if ((int) $c['draw']) e24_draw($game, $p, (int) $c['draw']);
   for ($i = 0; $i < (int) $c['retract']; $i++) e24_retract($game, $p);
@@ -542,6 +582,7 @@ function e24_play(&$game, &$players, $cardId, $mysqli) {
         $players[$seat]['player_name']);
     }
   }
+  e24_count_hand($game, $players);            // cards drawn count at once
   e24_count($players[$seat]);
 }
 
@@ -653,6 +694,7 @@ function e24_choose(&$game, &$players, $pick) {
   if ($done) e24_next_prompt($game, $players);
   e24_count($p);
   unset($p);
+  e24_count_hand($game, $players);
 }
 
 /** Call the big state up for a side (once a turn). */
@@ -788,6 +830,7 @@ function e24_use_paper(&$game, &$players, $mysqli) {
         $game['state']['turn']['used']['sun'] = true;
         e24_draw($game, $p, (int) $game['config']['sun_draw']);
         unset($p);
+        e24_count_hand($game, $players);
         return;
       }
     }
@@ -924,11 +967,11 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
     case 'play_all':
       $n = 0;
       if ($game['state']['turn']['staked']) throw new Exception('You staked this turn.');
-      while (!empty($players[$seat]['private_state']['hand']) && !$game['state']['turn']['pending']) {
-        e24_play($game, $players, $players[$seat]['private_state']['hand'][0], $mysqli);
+      while (!$game['state']['turn']['pending'] && ($next = e24_first_usable($players[$seat])) !== null) {
+        e24_play($game, $players, $next, $mysqli);
         $n++;
       }
-      $msg = $name . ' played ' . $n . ' ' . ($n === 1 ? 'card' : 'cards') . '.';
+      $msg = $name . ' used ' . $n . ' ' . ($n === 1 ? 'ability' : 'abilities') . '.';
       break;
     case 'choose':
       $pick = $params['card'] ?? null;
@@ -1200,8 +1243,9 @@ function e24_bot_turn(&$game, &$players, $mysqli) {
       e24_choose($game, $players, $pick);
       continue;
     }
-    if (empty($players[$seat]['private_state']['hand'])) break;
-    e24_play($game, $players, $players[$seat]['private_state']['hand'][0], $mysqli);
+    $next = e24_first_usable($players[$seat]);
+    if ($next === null) break;
+    e24_play($game, $players, $next, $mysqli);
   }
   // Call the big state up: weigh each side's card against the neutral it costs.
   $sides = e24_callable($game, $players);
@@ -1237,6 +1281,18 @@ function e24_bot_turn(&$game, &$players, $mysqli) {
     e24_use_paper($game, $players, $mysqli);
   }
   e24_end_turn($game, $players, $mysqli);
+}
+
+/** Cards in the hand with an ability to use. */
+function e24_usable($player) {
+  $out = [];
+  foreach ($player['private_state']['hand'] as $id) if (e24_has_ability(e24_view($id))) $out[] = $id;
+  return $out;
+}
+
+function e24_first_usable($player) {
+  $u = e24_usable($player);
+  return $u ? $u[0] : null;
 }
 
 /** Sides the outlet on turn can call the big state for right now. */
@@ -1340,7 +1396,7 @@ function engine_score_player($players, $seat, $game = null) {
     ? (int) ($game['config']['argus_vp'] ?? 1) * (int) ($p['public_state']['called'] ?? 0) : 0;
   $total = $won + $argus;
   return ['total' => $total, 'breakdown' => [
-    'prestige' => $total, 'stakes_won' => $won, 'stakes_lost' => $lost, 'argus' => $argus, 'stakes' => $stakes,
+    'prestige' => $total, 'wealth' => $total, 'stakes_won' => $won, 'stakes_lost' => $lost, 'argus' => $argus, 'stakes' => $stakes,
     'winner_side' => $w,
     'paper' => $p['public_state']['paper'] ?? null,
     'called' => (int) ($p['public_state']['called'] ?? 0),
@@ -1496,8 +1552,8 @@ function engine_available_actions($game, $players, $seat) {
   if ($paper === 'herald' && !$t['used']['herald'] && e24_top_story($game) !== null
       && max(0, e24_pools($game, $players)['gen']) >= (int) $game['config']['herald_cost']) $paperOk = true;
   return [
-    'play' => array_values($players[$seat]['private_state']['hand']),
-    'play_all' => !empty($players[$seat]['private_state']['hand']),
+    'play' => e24_usable($players[$seat]),
+    'play_all' => !empty(e24_usable($players[$seat])),
     'call' => e24_callable($game, $players),
     'buy' => e24_affordable($game, $players),
     'stake' => $fresh ? array_values($players[$seat]['private_state']['hand']) : [],
@@ -1526,7 +1582,7 @@ function e24_big_text($game) {
 
 function e24_turn_text($game, $players, $t, $made) {
   $name = $players[$t['seat']]['player_name'];
-  $parts = [count($t['played']) . ' ' . (count($t['played']) === 1 ? 'card' : 'cards') . ' played (' . $made . ' currency)'];
+  $parts = [$made . ' currency, ' . count($t['played']) . ' ' . (count($t['played']) === 1 ? 'ability' : 'abilities') . ' used'];
   if ($t['called']) {
     $h = end($game['state']['history']);
     $parts[] = 'called ' . $h['state'] . ' for ' . e24_side_name($h['side']);

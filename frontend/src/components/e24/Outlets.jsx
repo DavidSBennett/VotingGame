@@ -67,7 +67,7 @@ export function StakePile({ staked, race }) {
   return (
     <div>
       <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-cream-200/60">
-        On Trump <span className="text-oxblood-300">★{sum('trump')}</span> · on Harris <span className="text-federal-300">★{sum('harris')}</span>
+        On Trump <span className="text-oxblood-300">${sum('trump')}</span> · on Harris <span className="text-federal-300">${sum('harris')}</span>
         {race && race.final ? ` · ${race.winner_side === 'trump' ? 'Trump' : 'Harris'} has won` : ''}
       </p>
       <ul className="mt-1 space-y-0.5">
@@ -75,7 +75,7 @@ export function StakePile({ staked, race }) {
           <li key={i} className="flex items-baseline justify-between gap-2 font-serif text-[12px] text-cream-100">
             <span>{s.card.name}</span>
             <span className={s.side === 'trump' ? 'font-mono text-[10px] text-oxblood-300' : 'font-mono text-[10px] text-federal-300'}>
-              ★{s.card.vp} on {s.side === 'trump' ? 'Trump' : 'Harris'}
+              ${s.card.vp} on {s.side === 'trump' ? 'Trump' : 'Harris'}
             </span>
           </li>
         ))}

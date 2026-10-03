@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchHighScores } from '../api/client.js';
 
 /**
- * The circulation board: the best calls on record, by the prestige staked on
+ * The circulation board: the best calls on record, by the wealth staked on
  * the winner. Reads vg_scores (which survives an admin purge of finished
  * games), only the 2024 game's rows. `papers` (from the lobby list) turns
  * an outlet key into its name.
@@ -34,7 +34,7 @@ export default function HighScores({ papers = [] }) {
               <th className="py-2 font-medium">#</th>
               <th className="py-2 font-medium">Editor</th>
               <th className="hidden py-2 font-medium md:table-cell">Outlet</th>
-              <th className="py-2 text-right font-medium">Prestige</th>
+              <th className="py-2 text-right font-medium">Wealth</th>
               <th className="hidden py-2 text-right font-medium sm:table-cell">EV claimed</th>
               <th className="hidden py-2 text-right font-medium sm:table-cell">Outlets</th>
             </tr>
@@ -48,7 +48,7 @@ export default function HighScores({ papers = [] }) {
                   {s.won && <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.2em] text-gold-300">won</span>}
                 </td>
                 <td className="hidden py-1.5 font-serif text-[13px] italic text-gold-400 md:table-cell">{paperName(s.paper)}</td>
-                <td className="py-1.5 text-right text-gold-300">★{s.score}</td>
+                <td className="py-1.5 text-right text-gold-300">${s.score}</td>
                 <td className="hidden py-1.5 text-right sm:table-cell">{s.ev_claimed ?? '—'}</td>
                 <td className="hidden py-1.5 text-right sm:table-cell">{s.players_count}</td>
               </tr>

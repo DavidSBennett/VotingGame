@@ -81,7 +81,7 @@ export default function BigState({ big, bigTotal, pools, myTurn, canCall = [], o
           {big.state} <span className="font-mono text-lg text-gold-300">{big.ev}</span>
         </h2>
         <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-cream-200/60">
-          big state {big.index + 1} of {bigTotal} · {big.tier} · 2024: {big.winner_2024 === 'trump' ? 'Trump' : 'Harris'} by {Math.abs(big.margin).toFixed(1)} · prestige {big.vp}
+          big state {big.index + 1} of {bigTotal} · {big.tier} · 2024: {big.winner_2024 === 'trump' ? 'Trump' : 'Harris'} by {Math.abs(big.margin).toFixed(1)} · wealth {big.vp}
         </span>
       </div>
       <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">

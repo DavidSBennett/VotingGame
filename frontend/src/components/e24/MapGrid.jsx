@@ -2,7 +2,7 @@
  * The map: every contest as a tile, biggest first, coloured by the side
  * it has been claimed for (oxblood Trump, federal blue Harris) or left
  * open. The big ten carry a gilt edge (the elections deck); the one up
- * now is ringed. Hover a tile for its votes, prestige, both prices and
+ * now is ringed. Hover a tile for its votes, wealth, both prices and
  * the 2024 result.
  *
  *   map       the server's 51 { key, abbr, state, ev, vp, deck, side, seat, ... }
@@ -28,7 +28,7 @@ export default function MapGrid({ map, bigKey, players }) {
         const big = s.deck === 'elections';
         const up = s.key === bigKey;
         const tip =
-          `${s.state}: ${s.ev} electoral votes, prestige ${s.vp}. ` +
+          `${s.state}: ${s.ev} electoral votes, wealth ${s.vp}. ` +
           `Trump ${s.trump_cost} / Harris ${s.harris_cost}. ` +
           `2024: ${s.winner_2024 === 'trump' ? 'Trump' : 'Harris'} by ${Math.abs(s.margin).toFixed(1)}.` +
           (s.side ? ` Claimed for ${s.side === 'trump' ? 'Trump' : 'Harris'} by ${nameOf(s.seat)} (${s.how === 'call' ? 'called' : 'bought'}).` : big ? ' In the elections deck.' : ' In the main deck.');

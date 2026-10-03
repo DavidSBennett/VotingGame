@@ -3,7 +3,7 @@
  * (Historians_(Board_Game)/board/frontend/src/components/Card.jsx): a thin
  * w-28 paper tile with a gold-700 border and an inset gilt hairline, the
  * title in display type, and a small lift on hover. Cost at the top left,
- * prestige at the top right, a thin theme stripe, the type and title and
+ * wealth at the top right, a thin theme stripe, the type and title and
  * the abilities centered.
  *
  * Clicking a card opens it in the CardModal (with Play / Buy / Choose when
@@ -111,7 +111,7 @@ export function effects(card) {
 }
 
 /**
- * The prestige seal: a gilt disc with the card's prestige, the score. Muted
+ * The wealth seal: a gilt disc with the card's wealth, the score. Muted
  * at 0; oxblood below 0 (a Scandal). `size` 'sm' on a card, 'lg' in the modal.
  */
 export function PrestigeSeal({ vp, size = 'sm', perOffice = 0 }) {
@@ -122,8 +122,8 @@ export function PrestigeSeal({ vp, size = 'sm', perOffice = 0 }) {
   if (perOffice) {
     // Worth prestige per office held (1860): the seal says so.
     return (
-      <div className={`${shape} border-gold-600 bg-gold-300 text-ink-950`} title={`Prestige: ${perOffice} for each election card you hold`}>
-        <span className={size === 'lg' ? 'text-[10px] leading-none' : 'text-[6px] leading-none'}>★</span>
+      <div className={`${shape} border-gold-600 bg-gold-300 text-ink-950`} title={`Wealth: ${perOffice} for each election card you hold`}>
+        <span className={size === 'lg' ? 'text-[10px] leading-none' : 'text-[6px] leading-none'}>$</span>
         <span className={size === 'lg' ? 'font-display text-base font-bold leading-none' : 'font-display text-[9px] font-bold leading-none'}>{perOffice}/office</span>
       </div>
     );
@@ -131,8 +131,8 @@ export function PrestigeSeal({ vp, size = 'sm', perOffice = 0 }) {
   const tone =
     vp > 0 ? 'border-gold-600 bg-gold-300 text-ink-950' : vp < 0 ? 'border-oxblood-500 bg-oxblood-700 text-cream-50' : 'border-cream-300 bg-cream-200 text-ink-700/60';
   return (
-    <div className={`${shape} ${tone}`} title={`Prestige ${vp}: the score`}>
-      <span className={size === 'lg' ? 'text-[10px] leading-none' : 'text-[6px] leading-none'}>★</span>
+    <div className={`${shape} ${tone}`} title={`Wealth ${vp}: what it scores if staked on the winner`}>
+      <span className={size === 'lg' ? 'text-[10px] leading-none' : 'text-[6px] leading-none'}>$</span>
       <span className={size === 'lg' ? 'font-display text-xl font-bold leading-none' : 'font-display text-[13px] font-bold leading-none'}>{vp}</span>
     </div>
   );
@@ -202,7 +202,7 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
       >
         <div className="pointer-events-none absolute inset-1 border border-gold-500/20" />
         <div className={`h-1 w-full shrink-0 ${t.stripe}`} />
-        {/* Cost at the top left; the prestige seal at the top right. */}
+        {/* Cost at the top left; the wealth seal at the top right. */}
         <div className="flex items-start justify-between px-1.5 pt-1">
           <span
             title="Cost"
@@ -211,7 +211,7 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
             {card.cost ? `◆${card.cost}` : '·'}
           </span>
           {!xs && <PrestigeSeal vp={card.vp} perOffice={card.vp_per_office} />}
-          {xs && <span className="font-mono text-[9px] font-bold text-ink-800">★{card.vp}</span>}
+          {xs && <span className="font-mono text-[9px] font-bold text-ink-800">${card.vp}</span>}
         </div>
         <div className="-mt-2 flex min-h-0 flex-1 flex-col items-center px-1.5">
           <p className={`font-mono text-[7px] uppercase tracking-[0.18em] ${t.eyebrow}`}>{t.label}</p>

@@ -4,7 +4,7 @@ import Card from '../dc/Card.jsx';
  * Stake: in place of your whole turn, set one card from your hand aside,
  * face down, on Trump or Harris. The rest of your hand is discarded and you
  * draw five. When a side reaches 270, every card staked on it scores its
- * prestige; cards staked on the other side score nothing. Rivals see that
+ * wealth; cards staked on the other side score nothing. Rivals see that
  * you staked, never which card or on whom.
  */
 export default function StakeModal({ hand, act, busy, onClose }) {
@@ -14,7 +14,7 @@ export default function StakeModal({ hand, act, busy, onClose }) {
         <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink-950/60">In place of your turn</div>
         <h3 className="mt-1 font-display text-3xl font-bold text-ink-950">Stake a card</h3>
         <p className="mx-auto mt-1 max-w-xl font-serif italic text-ink-950/70">
-          Face down, on the candidate you think will reach 270. It scores its prestige if you are right, nothing if you are wrong, and leaves
+          Face down, on the candidate you think will reach 270. It scores its wealth if you are right, nothing if you are wrong, and leaves
           your deck either way. The rest of your hand is discarded.
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-3">

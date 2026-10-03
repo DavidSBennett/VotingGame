@@ -182,20 +182,43 @@ eq($P[0]['public_state']['paper'], 'globe', 'setup: a chosen paper is kept');
 eq(e24_tally($g), ['trump' => 0, 'harris' => 0], 'setup: no votes claimed');
 check_invariants($g, $P, 'setup');
 
-// ---- play, currencies ------------------------------------------------------
+// ---- currency from the hand; playing uses abilities -------------------------
+/** A fresh turn's hand: these cards only, and their currency counted. */
+function fresh_hand(&$game, &$players, $cards) {
+  give_hand($game, $players, $cards);
+  $game['state']['turn']['base'] = ['gen' => 0, 'rep' => 0, 'dem' => 0, 'campaign' => 0];
+  $game['state']['turn']['counted'] = [];
+  e24_count_hand($game, $players);
+}
 list($g, $P) = new_game(2);
-give_hand($g, $P, ['letter#0.0', 'letter#0.1', 'notice#0.0']);
-act($g, $P, 'play_all');
-eq(e24_pools($g, $P)['gen'], 2, 'play: two Letters make 2 neutral');
+$want = 0;
+foreach ($P[0]['private_state']['hand'] as $id) $want += (int) e24_view($id)['gen'];
+eq(e24_pools($g, $P)['gen'], $want, 'hand: the opening hand counts at once');
+fresh_hand($g, $P, ['letter#0.0', 'letter#0.1', 'notice#0.0']);
+eq(e24_pools($g, $P)['gen'], 2, 'hand: two Letters in hand make 2 neutral, unplayed');
+eq(engine_available_actions($g, $P, 0)['play'], [], 'hand: Letters have no ability to use');
+ok(throws(function () use (&$g, &$P) { act($g, $P, 'play', ['card' => 'letter#0.0']); }) !== false, 'hand: playing a Letter is refused');
 ok(throws(function () use (&$g, &$P) { act($g, $P, 'play', ['card' => 'letter#1.0']); }) !== false, 'play: a card not in hand is refused');
 ok(throws(function () use (&$g, &$P) { engine_apply_action($g, $P, 1, 'end_turn', [], null); }) !== false, 'turn: an outlet not on turn is refused');
 
-$repStory = find_card(function ($c) { return $c['lean'] === 'rep' && (int) $c['themed'] > 0 && (int) $c['step'] === 0 && $c['type'] !== 'Negative story' && !(int) $c['trash'] && !(int) $c['gain_upto'] && !(int) $c['draw'] && !(int) $c['retract']; });
+$repStory = find_card(function ($c) { return $c['lean'] === 'rep' && (int) $c['themed'] > 0 && (int) $c['step'] === 0 && !(int) $c['per_office'] && $c['type'] !== 'Media event'; });
 list($g, $P) = new_game(2);
-give_hand($g, $P, [$repStory]);
-act($g, $P, 'play', ['card' => $repStory]);
-eq(e24_pools($g, $P)['rep'], (int) e24_card($repStory)['themed'], 'play: a Republican story pays Republican');
+fresh_hand($g, $P, [$repStory]);
+eq(e24_pools($g, $P)['rep'], (int) e24_card($repStory)['themed'], 'hand: a Republican story pays Republican from the hand');
 eq(e24_pools($g, $P)['dem'], 0, '... and no Democratic');
+
+$drawer = find_card(function ($c) { return (int) $c['draw'] > 0 && (int) $c['step'] === 0 && !(int) $c['trash'] && !$c['attack'] && !(int) $c['chain']; });
+list($g, $P) = new_game(2);
+fresh_hand($g, $P, [$drawer]);
+$before = e24_pools($g, $P);
+foreach (['deck', 'discard'] as $z) {                          // the next draw is a Letter (+1)
+  $P[0]['private_state'][$z] = array_values(array_diff($P[0]['private_state'][$z], ['letter#0.0']));
+}
+$P[0]['private_state']['deck'][] = 'letter#0.0';
+e24_count($P[0]);
+act($g, $P, 'play', ['card' => $drawer]);
+eq(e24_pools($g, $P)['gen'], $before['gen'] + 1, 'ability: a drawn Letter counts at once; the played card is not counted twice');
+check_invariants($g, $P, 'draw ability');
 
 // ---- buying a story ---------------------------------------------------------
 $demStory = find_card(function ($c) { return $c['lean'] === 'dem' && (int) $c['step'] === 0 && (int) $c['cost'] >= 3; });
@@ -287,8 +310,8 @@ $mine = engine_public_state($g, $P, 0)['you']['staked'];
 eq([count($mine), $mine[0]['side']], [1, 'harris'], 'stake: the staker sees it');
 check_invariants($g, $P, 'stake');
 list($g, $P) = new_game(2);
-give_hand($g, $P, ['letter#0.0', 'letter#0.1']);
-act($g, $P, 'play', ['card' => 'letter#0.0']);
+give_hand($g, $P, [$drawer, 'letter#0.1']);
+act($g, $P, 'play', ['card' => $drawer]);
 ok(throws(function () use (&$g, &$P) { act($g, $P, 'stake', ['card' => 'letter#0.1', 'side' => 'trump']); }) !== false, 'stake: not after playing');
 eq(engine_available_actions($g, $P, 0)['stake'], [], 'stake: not offered after playing');
 

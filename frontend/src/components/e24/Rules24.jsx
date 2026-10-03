@@ -20,14 +20,21 @@ function Body() {
         <span className="font-semibold">Campaign</span> spends only on calling a big state.
       </p>
 
-      <H>Your turn: play, or stake</H>
+      <H>Your hand pays at once</H>
+      <p>
+        Every card's currency counts the moment it is in your hand on your turn: at the start, and whenever you draw. You never play a
+        card for money. <span className="font-semibold">Using</span> a card plays only its ability (draw, destroy, gain, attack, Retraction,
+        a chain, compounding, a media event into play); a card with no ability simply pays from your hand.
+      </p>
+
+      <H>Your turn: use and spend, or stake</H>
       <ul className="list-none space-y-1 pl-0">
         <li>
           <span className="font-semibold">Stake</span> instead of playing: set one card from your hand aside, face down, on Trump or Harris.
           Discard the rest and draw five. Rivals see that you staked, never what or on whom.
         </li>
         <li>
-          Or <span className="font-semibold">play</span> the cards in your hand for currency, then:
+          Or <span className="font-semibold">use</span> the abilities of the cards in your hand, and spend your currency:
         </li>
         <li>
           <span className="font-semibold">Call</span> the big state up (once a turn): the ten biggest states come up one at a time. Reach either
@@ -53,8 +60,8 @@ function Body() {
       <H>The end, and the score</H>
       <p>
         A state counts for its side once claimed. When a side reaches 270, the round is played out (later outlets get one more turn, often
-        a stake), then every outlet reveals its stakes. A card staked on the winner scores its <span className="font-semibold">prestige</span> (★,
-        1 to 12: California 12); on the loser, nothing. Cards left in your deck never score. So claim the state that ends the race only when
+        a stake), then every outlet reveals its stakes. A card staked on the winner scores its <span className="font-semibold">wealth</span> ($,
+        1 to 12: California 12; a staked Letter or Local Notice costs 1); on the loser, nothing. Cards left in your deck never score. So claim the state that ends the race only when
         the end pays you, and buy for the side behind when it does not.
       </p>
 

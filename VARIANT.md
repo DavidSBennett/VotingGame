@@ -964,3 +964,25 @@ now land on the loser (2.5 of 2.7 win at 3). Seats 37/32/31 (3), 26/26/
   **screen** `frontend/src/views/Shell2024.jsx`: race bar, map, big state,
   exchange with a buy per side, the press and Stake, outlets, stake pile,
   the final count. New tables play the 2024 game.
+
+### 2026-10-03: wealth, starters at -1, currency from the hand (the user)
+
+- **Prestige is now "wealth"** wherever a player sees it (card text, the
+  outlets, the screen, the board, the rulebook); the seal shows $. The
+  data column stays `vp`.
+- **Staked starters cost 1**: Letters to the Editor and Local Notices are
+  worth -1 wealth.
+- **Currency counts from the hand**: every card's currency (neutral, party,
+  Campaign, per 3 states) counts as soon as it is in the hand on its
+  owner's turn -- at the start, and when drawn -- once a turn, even if the
+  card later leaves the hand. Playing a card only uses its ability (draw,
+  destroy, gain, attack, Retraction, chain, compounding, a media event into
+  play); cards with no ability are never played. The screen's turn panel is
+  now "your desk": the four currencies at once, a Use button on each card
+  with an ability, "counts in hand" on the rest.
+- Engine tests: 1,756 rule checks and 200 random games, 0 failures. The
+  bots play every ability, so the rule changes little for them; engine
+  games now run ~5-8% shorter than the simulator's (which still counts
+  currency at play) with the same outcomes (seat wins, Harris 47-50%,
+  history rewritten 24%), and fewer attack plays per game (bots buy the
+  same negative stories but hold them fewer turns).

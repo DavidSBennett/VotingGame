@@ -729,14 +729,14 @@ def shape(games, seed, config=None, seats=(2, 3, 4)):
         r = run_matchup(["balanced"] * n, games, config, seed)
         st = [x for s in r["stats"] for x in s]
         print("  %d outlets: seat wins %s   ended %s" % (n, " / ".join(pct(w / games) for w in r["wins"]), r["ended"]))
-        print("    rounds %.1f, winning score %.1f prestige (mean %.1f); per outlet: %.1f big states called, "
+        print("    rounds %.1f, winning score %.1f wealth (mean %.1f); per outlet: %.1f big states called, "
               "%.1f states bought, %.1f stories bought"
               % (mean(r["rounds"]), mean([max(v) for v in zip(*r["vp"])]), mean([x for v in r["vp"] for x in v]),
                  mean([x["called"] for x in st]), mean([x["states_bought"] for x in st]),
                  mean([x["bought"] - x["states_bought"] for x in st])))
         print("    states claimed %s of the EVs; history rewritten %s; Harris wins %s; early leader wins %s"
               % (pct(r["claimed"]), pct(r["unhistorical"]), pct(r["harris"]), pct(r["early_lead"])))
-        print("    stakes per outlet %.2f (on the winner %.2f; states %.2f), %.1f prestige staked; turns %.1f"
+        print("    stakes per outlet %.2f (on the winner %.2f; states %.2f), %.1f wealth staked; turns %.1f"
               % (mean([x["stakes"] for x in st]), mean([x["stake_won"] for x in st]),
                  mean([x["stake_states"] for x in st]), mean([x["stake_vp"] for x in st]),
                  mean([x["turns"] for x in st])))

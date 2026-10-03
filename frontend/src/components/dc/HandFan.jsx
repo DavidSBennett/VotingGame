@@ -16,7 +16,8 @@ const MIN_PITCH = 40;
 const LIFT = 14;
 export const ROW_H = 176 + LIFT + 8;   // the card's h-44 plus room for the lift
 
-export default function HandFan({ children }) {
+/** `footerH`: room under each card for a footer (a button row), in px. */
+export default function HandFan({ children, footerH = 0 }) {
   const items = Children.toArray(children);
   const n = items.length;
   const ref = useRef(null);
@@ -43,7 +44,7 @@ export default function HandFan({ children }) {
   const offset = Math.max(0, (width - used) / 2);
 
   return (
-    <div ref={ref} style={{ position: 'relative', height: ROW_H, width: '100%' }}>
+    <div ref={ref} style={{ position: 'relative', height: ROW_H + footerH, width: '100%' }}>
       {items.map((child, i) => {
         const isActive = i === active;
         return (

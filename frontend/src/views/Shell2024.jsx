@@ -87,7 +87,7 @@ export default function Shell2024({ seat, state, events, error, refresh, onLeave
     if (modal.source === 'hand' && (av.play || []).includes(modalCard.key)) {
       modalActions = (
         <button type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); act('play', { card: modalCard.key }); }}>
-          Play this card
+          Use this card's ability
         </button>
       );
     } else if (modal.source === 'exchange' && modalCard.type === 'State') {

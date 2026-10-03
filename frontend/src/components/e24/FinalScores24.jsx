@@ -1,6 +1,6 @@
 /**
  * The final count: who reached 270, and every outlet's stakes revealed --
- * the cards on the winner score their prestige, the rest nothing.
+ * the cards on the winner score their wealth, the rest nothing.
  */
 export default function FinalScores24({ state }) {
   const ranked = [...state.players].sort((a, b) => (b.final_score ?? 0) - (a.final_score ?? 0));
@@ -26,7 +26,7 @@ export default function FinalScores24({ state }) {
                   {p.is_you && <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.2em] text-gold-500">you</span>}
                   {state.winner_seat === p.seat && <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.2em] text-gold-500">★ called it best</span>}
                 </span>
-                <span className="font-mono text-lg text-wood-700">★{p.final_score}</span>
+                <span className="font-mono text-lg text-wood-700">${p.final_score}</span>
               </div>
               <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-950/60">
                 {p.paper ? p.paper.name + ' · ' : ''}claimed {b.ev_claimed ?? p.ev_claimed} EV{b.argus ? ` · Argus +${b.argus}` : ''}
@@ -45,7 +45,7 @@ export default function FinalScores24({ state }) {
                       }
                       title={s.won ? 'On the winner: it scores' : 'On the loser: nothing'}
                     >
-                      {s.card} ★{s.vp} · {name(s.side)}
+                      {s.card} ${s.vp} · {name(s.side)}
                     </li>
                   ))}
                 </ul>

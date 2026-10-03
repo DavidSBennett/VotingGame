@@ -19,6 +19,9 @@ For now the stories keep the variant's mechanics, names and flavor (the
   become 1 / 3 / 4 (one old star was 6 EV, and 12 prestige is 54 EV);
   every card worth no stars -- Letters, Local Notices, negative stories --
   is worth 1. Scandals stay at -1. The old stars are kept in `stars`.
+- Starters (Letters, Local Notices) are worth -1 when staked (the user,
+  2026-10-03), so staking a starter costs you.
+- The score is called WEALTH (the user, 2026-10-03); the column stays `vp`.
 - Each story is a 2024 news story (docs/stories-2024.csv: its key, name,
   date and flavor, and the card slot whose mechanics it carries); the
   starters, Editorial and Scandal get 2024 flavor (STARTER_FLAVOR).
@@ -37,7 +40,8 @@ import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
-PRESTIGE = {0: 1, 1: 1, 2: 3, 3: 4}      # stars -> prestige
+PRESTIGE = {0: 1, 1: 1, 2: 3, 3: 4}      # stars -> wealth
+STARTER_VP = -1                          # a staked Letter or Local Notice
 KEEP = {"Political story": 15, "Economic story": 16, "Social story": 13, "Negative story": 16, "Media event": 5}
 STEPS = 10
 
@@ -66,8 +70,10 @@ def text_2024(r):
     s = re.sub(r"\+(\d+) (Political|Economic|Social)(?= *[,.]| draw)", r"+\g<1> " + party, s)
     s = s.replace("Campaign (elections only)", "Campaign (big states only)")
     s = s.replace("influence", "neutral").replace("rival paper", "rival outlet")
-    s = s.replace("Worth no prestige.", "Worth 1 prestige.")
-    s = s.replace("-1 prestige at the end of the game.", "-1 prestige if staked. Destroy it when you can.")
+    s = s.replace("Worth no prestige.", "Worth 1 wealth.")
+    s = s.replace("-1 prestige at the end of the game.", "-1 wealth if staked. Destroy it when you can.")
+    if r.get("type") == "Starter":
+        s += " -1 wealth if staked."
     return s
 
 
@@ -77,7 +83,9 @@ def main():
     news = stories_2024()
     for r in src:
         r["stars"] = r["vp"]
-        if r["type"] != "Scandal":
+        if r["type"] == "Starter":
+            r["vp"] = STARTER_VP
+        elif r["type"] != "Scandal":
             r["vp"] = PRESTIGE[int(r["vp"])]
     years = sorted({int(r["released"]) for r in src if r["released"]})
     out = []
