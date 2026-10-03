@@ -9,7 +9,8 @@
  * players hitting Join in the same instant cannot land on the same seat.
  */
 require_once __DIR__ . '/lib.php';
-require_once __DIR__ . '/cards_dc.php';
+require_once __DIR__ . '/cards_2024.php';   // the 2024 outlets
+require_once __DIR__ . '/cards_dc.php';     // the variant's newspapers, for its old tables
 
 require_method('POST');
 $body = read_json_body();
@@ -48,11 +49,12 @@ try {
   // The guest's outlet (the 2024 and DC games): one no other seat has taken.
   $paper = (string) ($body['paper'] ?? '');
   if (vg_engine_of_config($game['config']) === 'newsroom' || $paper === '') $paper = null;
+  $outlets = vg_engine_of_config($game['config']) === '2024' ? e24_outlets() : dc_papers();
   if ($paper !== null) {
-    if (!isset(dc_papers()[$paper])) throw new Exception('Unknown newspaper: ' . $paper);
+    if (!isset($outlets[$paper])) throw new Exception('Unknown outlet: ' . $paper);
     foreach ($players as $p) {
       if (($p['public_state']['paper'] ?? null) === $paper) {
-        throw new Exception(dc_papers()[$paper]['name'] . ' is already taken at this table. Choose another paper.');
+        throw new Exception($outlets[$paper]['name'] . ' is already taken at this table. Choose another outlet.');
       }
     }
   }

@@ -73,8 +73,8 @@ def load():
 
 
 CARDS, STATES = load()
-with open(os.path.join(DOCS, "papers-dc.csv"), encoding="utf-8-sig") as fh:
-    PAPERS = {r["key"]: r for r in csv.DictReader(fh)}      # stand-ins for the 2024 outlets
+with open(os.path.join(DOCS, "outlets-2024.csv"), encoding="utf-8-sig") as fh:
+    PAPERS = {r["key"]: r for r in csv.DictReader(fh)}      # the eight 2024 outlets (one ability each)
 assert len(STATES) == 51 and sum(s["ev"] for s in STATES.values()) == 538
 STORIES = [k for k, c in CARDS.items() if c["step"] is not None]
 BIG = [k for k, s in STATES.items() if s["deck"] == "elections"]

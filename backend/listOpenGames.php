@@ -8,7 +8,7 @@
  * "rejoin from another device" both start here).
  */
 require_once __DIR__ . '/engine.php';   // for ENGINE_STATE_VERSION (the newsroom game's)
-require_once __DIR__ . '/cards_dc.php'; // the newspapers
+require_once __DIR__ . '/cards_2024.php'; // the eight outlets
 
 require_method('GET');
 
@@ -70,9 +70,9 @@ if ($ids) {
 foreach ($games as $i => $g) $games[$i]['papers_taken'] = $taken[(int) $g['game_id']] ?? [];
 
 $papers = [];
-foreach (dc_papers() as $k => $p) {
-  $papers[] = ['key' => $k, 'name' => $p['name'], 'ability' => $p['ability'], 'leans' => $p['leans'],
-               'flavor' => $p['flavor'], 'dc_super_hero' => $p['dc_super_hero']];
+foreach (e24_outlets() as $k => $p) {
+  $papers[] = ['key' => $k, 'name' => $p['name'], 'ability' => $p['ability'], 'ability_name' => $p['ability_name'],
+               'flavor' => $p['flavor']];
 }
 
 json(['ok' => true, 'games' => $games, 'papers' => $papers]);

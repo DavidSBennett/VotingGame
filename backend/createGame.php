@@ -31,7 +31,8 @@ vg_require_engine($engineName);
 // The host's outlet (the 2024 and DC games), chosen in the lobby; blank = dealt at start.
 $paper = (string) ($body['paper'] ?? '');
 if ($engineName === 'newsroom' || $paper === '') $paper = null;
-if ($paper !== null && !isset(dc_papers()[$paper])) error('Unknown newspaper: ' . $paper, 400);
+$outlets = ($engineName === '2024') ? e24_outlets() : ($engineName === 'dc' ? dc_papers() : []);
+if ($paper !== null && !isset($outlets[$paper])) error('Unknown outlet: ' . $paper, 400);
 $hostState = json_encode($paper !== null ? ['paper' => $paper] : new stdClass());
 
 $defaults = engine_default_config();

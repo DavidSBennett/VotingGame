@@ -44,8 +44,7 @@
  * ---------------------------------------------------------------------
  */
 
-require_once __DIR__ . '/cards_2024.php';
-require_once __DIR__ . '/cards_dc.php';        // the newspapers (dc_papers), shared with the variant
+require_once __DIR__ . '/cards_2024.php';     // cards, states and the eight outlets (e24_outlets)
 
 define('ENGINE_STATE_VERSION', 24);
 define('E24_SIDES', ['trump', 'harris']);
@@ -234,10 +233,10 @@ function engine_setup(&$game, &$players, $mysqli = null) {
   $taken = [];
   foreach ($players as $seat => $p) {
     $k = $p['public_state']['paper'] ?? null;
-    if ($k && isset(dc_papers()[$k]) && !in_array($k, $taken, true)) $taken[] = $k;
+    if ($k && isset(e24_outlets()[$k]) && !in_array($k, $taken, true)) $taken[] = $k;
     else $players[$seat]['public_state']['paper'] = null;
   }
-  $free = array_values(array_diff(array_keys(dc_papers()), $taken));
+  $free = array_values(array_diff(array_keys(e24_outlets()), $taken));
   shuffle($free);
 
   foreach ($players as $seat => $p) {
@@ -1374,12 +1373,13 @@ function engine_public_state($game, $players, $viewerSeat = null) {
   $seats = [];
   foreach ($players as $seat => $p) {
     $paper = $p['public_state']['paper'] ?? null;
-    $pp = $paper ? (dc_papers()[$paper] ?? null) : null;
+    $pp = $paper ? (e24_outlets()[$paper] ?? null) : null;
     $seats[] = [
       'seat' => (int) $seat, 'player_name' => $p['player_name'], 'is_bot' => (bool) $p['is_bot'],
       'conceded' => (bool) $p['conceded'], 'is_you' => ($viewerSeat !== null && (int) $seat === (int) $viewerSeat),
       'on_turn' => ($status === 'active' && $turn && (int) $turn['seat'] === (int) $seat),
-      'paper' => $pp ? ['key' => $paper, 'name' => $pp['name'], 'ability' => $pp['ability'], 'leans' => $pp['leans']] : null,
+      'paper' => $pp ? ['key' => $paper, 'name' => $pp['name'], 'ability' => $pp['ability'],
+                        'ability_name' => $pp['ability_name'], 'flavor' => $pp['flavor']] : null,
       'stakes' => count($p['private_state']['staked'] ?? []),
       'called' => (int) ($p['public_state']['called'] ?? 0),
       'states_bought' => (int) ($p['public_state']['states_bought'] ?? 0),
