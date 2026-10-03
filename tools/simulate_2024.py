@@ -17,6 +17,9 @@ off the exchange (5 face up) or an Editorial. The calendar moves on a step
 for every few states called, releasing that step's stories. The game ends
 when the last state is called. The score is in electoral votes: a state is
 worth its EVs, and a story's prestige is counted as STORY_EV votes per star.
+Catch-up: each later seat starts with one more Editorial in its deck (the
+second outlet 1, the third 2, the fourth 3). When the last state is
+called, the round is played out.
 
 Content: docs/states-2024.csv (tools/build_states_2024.py), and for now
 the variant's stories, docs/deck-dc.csv, released on 17 calendar steps in
@@ -112,11 +115,15 @@ DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=80,
                 aurora_per=1,
                 retract_draw="always",
                 political_any=False,
-                catchup=1,
+                catchup=0,                  # first-turn influence per seat (replaced by extra_editorials)
                 attack_reward=1,
                 finish_round=True,
                 first_call_round=1,
-                rewrite_mult=1.0)         # no state may be called before this round (the primaries)          # when the last state is called, the round is played out
+                rewrite_mult=1.0,
+                extra_letters=(0, 0, 0, 0),     # catch-up: Letters added to each seat's starting deck
+                first_hand_extra=(0, 0, 0, 0),  # catch-up: extra cards in each seat's first hand
+                extra_editorials=(0, 1, 2, 3),  # catch-up: Editorials added to each seat's starting deck
+                editorial_in_hand=False)        # ... dealt into the first hand rather than shuffled in         # no state may be called before this round (the primaries)          # when the last state is called, the round is played out
 
 
 class Player:
@@ -160,8 +167,15 @@ class Game:
             for p in self.players:
                 p.paper = None
         for p in self.players:
+            p.deck += ["letter#%d.x%d" % (p.seat, i) for i in range(self.cfg["extra_letters"][p.seat])]
+            eds = ["editorial#s%d.%d" % (p.seat, i) for i in range(self.cfg["extra_editorials"][p.seat])]
             self.rng.shuffle(p.deck)
-            self.draw(p, self.cfg["hand"])
+            if self.cfg["editorial_in_hand"]:
+                p.hand += eds
+            else:
+                p.deck += eds
+                self.rng.shuffle(p.deck)
+            self.draw(p, self.cfg["hand"] + self.cfg["first_hand_extra"][p.seat])
         # The state deck, dealt from the end: the safest states first.
         order = sorted(STATES, key=lambda k: STATES[k]["order"])
         if self.cfg["order"] == "tiers":

@@ -124,14 +124,14 @@ def tier(margin):
 
 
 # Thresholds. History's winner: BASE + PER_EV * EV ** EV_POWER. The other
-# side costs more, by how far history has to be rewritten:
-# 1 + |margin| / PER_POINT.
+# side costs more, by how far history has to be rewritten: half of
+# 1 + |margin| / PER_POINT, rounded up (the user halved it, 2026-10-03).
 BASE, PER_EV, EV_POWER, PER_POINT = 1.0, 1.8, 0.5, 5.0
 
 
 def thresholds(ev, margin):
     won = round(BASE + PER_EV * ev ** EV_POWER)
-    lost = won + 1 + math.floor(abs(margin) / PER_POINT)
+    lost = won + math.ceil((1 + math.floor(abs(margin) / PER_POINT)) / 2)
     return won, lost
 
 

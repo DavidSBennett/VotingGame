@@ -776,3 +776,65 @@ The two now change independently. What differs from the variant: the
 deploy workflow (`deploy-2024.yml`, pushes to `2024` only), the site the
 dev server, smoke tests and high scores point at, the lobby label and tab
 title, and the edition recorded on new games and scores ('2024').
+
+## Revision 5 (2026-10-03, the user): the 2024 electoral college
+
+"Entirely rebuild the game rooted in the 2024 election": the 17 elections
+and their candidate pairs become the 51 contests of 2024 (the 50 states
+and D.C.). Chosen by the user:
+
+- **Players** stay media outlets, each with an ability (2024 outlets to
+  come; the eight 1800s papers stand in for now).
+- **All 51 contests**, winner-take-all (Maine to Harris, Nebraska to
+  Trump: still 312-226), from the certified results.
+- **A map line-up**: 4 states face up, dealt from the state deck; an
+  outlet may call as many as it can afford on its turn.
+- **Call it for Trump or Harris**: each side has its own threshold and
+  card. History's winner is cheaper by how far history is rewritten.
+- **Score in electoral votes**: a state is worth its EVs; a story's
+  prestige counts 6 EV per star.
+- **Safe states first, toss-ups last**, shuffled within each tier; the
+  calendar moves on a step every 3 calls, releasing that step's stories.
+- **Neutral beats**: Politics, Economy, Culture (the engine's Political /
+  Economic / Social).
+- **2024 news, dated** (to come): the story deck rewritten for 2024.
+
+Content: `docs/states-2024.csv`, built by `tools/build_states_2024.py`.
+History's side costs 1 + 1.8 x sqrt(EV) (3 EV: 4, California 14); the
+other side half of 1 + |margin| / 5 more, rounded up (toss-ups +1,
+California +3, D.C. +9). Each side is called on its own beat, chosen so
+each candidate's votes fall evenly on the three beats (Trump
+168/185/185, Harris 181/180/177), so no beat belongs to a side. Each
+side's card has a power by the state's size, in two versions of equal
+worth alternating between the sides. Simulator: `tools/simulate_2024.py`
+(for now on the 1796-1860 story deck, its 17 years as calendar steps).
+
+### 2026-10-03: first simulator passes
+
+Balanced bots, 400-2,400 games a line:
+
+- First draft (thresholds 2 + 2.4 x sqrt(EV), full rewrite premium): 25
+  rounds at 3 outlets, history rewritten 0.2% (both sides shared the
+  state's beat), seats 39/31/30.
+- **The round is played out** after the last call: the game had stopped
+  at once, giving the first seat 0.4 more turns. 4 outlets became fair
+  (26/23/28/23); 3 still favoured the first seat.
+- **Each side its own beat**: history rewritten 5% (from 0.2%). A first
+  version gave Harris mostly Politics and Trump mostly Economy and
+  Culture; rebalanced so neither side owns a beat.
+- **Thresholds lowered** to 1 + 1.8 x sqrt(EV): 20 rounds at 3 outlets.
+- **Rewrite premium halved** (the user): rewritten 7-8%; Harris reaches
+  270 in 14-17% of games. (Halving with toss-ups at no premium gave 13%
+  and 28%.)
+- **Catch-up** (the user asked for an extra card): the first seat leads
+  on tempo, a turn ahead in every round, and +1 influence on the first
+  turn swings a seat by ~10 points. Tried at 900-2,400 games: an extra
+  card in the first hand barely helped; an extra Letter in the deck
+  hurt the later seats (it thins the deck). **An Editorial shuffled into
+  the deck, one more per seat (0/1/2/3)**, works best. Over 6,000 games
+  at 3 outlets: 36.8/32.3/30.9 (old +1 influence 40.1/32.1/27.8); 2
+  outlets 52.5/47.5; 4 outlets 25.7/23.0/23.9/27.5. Adopted.
+- Still open: calls squeeze out buying (8-10 stories bought per outlet,
+  ~25 before; stories 20-30% of the score); the early leader wins 52% at
+  3 outlets; among the old papers the Herald wins 51% and the Argus 39%,
+  and at a three-beat table Politics wins 42%.

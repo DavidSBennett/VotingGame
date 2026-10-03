@@ -1,47 +1,47 @@
 ﻿key,abbr,state,ev,trump_pct,harris_pct,margin,winner,tier,order,beat,trump_beat,trump_theme,trump_threshold,trump_gen,trump_themed,trump_draw,trump_trash,trump_text,harris_beat,harris_theme,harris_threshold,harris_gen,harris_themed,harris_draw,harris_trash,harris_text
-dc,DC,District of Columbia,3,6.47,90.28,-83.81,harris,Safe,1,Politics,Culture,Social,21,0,0,1,0,Draw 1 card.,Politics,Political,4,1,0,0,0,+1 influence.
-wy,WY,Wyoming,3,71.6,25.84,45.76,trump,Safe,2,Culture,Culture,Social,4,1,0,0,0,+1 influence.,Economy,Economic,14,0,0,1,0,Draw 1 card.
-wv,WV,West Virginia,4,69.97,28.1,41.87,trump,Safe,3,Economy,Politics,Political,5,1,0,0,0,+1 influence.,Economy,Economic,14,0,0,1,0,Draw 1 card.
-id,ID,Idaho,4,66.87,30.38,36.49,trump,Safe,4,Culture,Culture,Social,5,1,0,0,0,+1 influence.,Economy,Economic,13,0,0,1,0,Draw 1 card.
-nd,ND,North Dakota,3,66.96,30.51,36.45,trump,Safe,5,Economy,Economy,Economic,4,1,0,0,0,+1 influence.,Culture,Social,12,0,0,1,0,Draw 1 card.
-ok,OK,Oklahoma,7,66.16,31.9,34.26,trump,Safe,6,Economy,Economy,Economic,6,2,0,0,0,+2 influence.,Culture,Social,13,1,0,1,0,"+1 influence, draw 1 card."
-vt,VT,Vermont,3,32.32,63.83,-31.51,harris,Safe,7,Politics,Economy,Economic,11,1,0,0,0,+1 influence.,Politics,Political,4,0,0,1,0,Draw 1 card.
-ar,AR,Arkansas,6,64.2,33.56,30.64,trump,Safe,8,Culture,Culture,Social,5,1,0,1,0,"+1 influence, draw 1 card.",Politics,Political,12,2,0,0,0,+2 influence.
-ky,KY,Kentucky,8,64.47,33.94,30.53,trump,Safe,9,Economy,Economy,Economic,6,1,0,1,0,"+1 influence, draw 1 card.",Politics,Political,13,2,0,0,0,+2 influence.
-al,AL,Alabama,9,64.57,34.1,30.47,trump,Safe,10,Culture,Culture,Social,6,2,1,0,0,"+2 influence, +1 Culture.",Economy,Economic,13,0,0,2,0,Draw 2 cards.
-tn,TN,Tennessee,11,64.19,34.47,29.72,trump,Safe,11,Culture,Culture,Social,7,2,1,0,0,"+2 influence, +1 Culture.",Economy,Economic,13,0,0,2,0,Draw 2 cards.
-sd,SD,South Dakota,3,63.43,34.24,29.19,trump,Safe,12,Culture,Culture,Social,4,0,0,1,0,Draw 1 card.,Politics,Political,10,1,0,0,0,+1 influence.
-md,MD,Maryland,10,34.08,62.62,-28.54,harris,Safe,13,Politics,Politics,Political,13,0,0,2,0,Draw 2 cards.,Culture,Social,7,2,1,0,0,"+2 influence, +1 Culture."
-ma,MA,Massachusetts,11,36.02,61.22,-25.2,harris,Safe,14,Politics,Culture,Social,13,2,1,0,0,"+2 influence, +1 Culture.",Politics,Political,7,0,0,2,0,Draw 2 cards.
-hi,HI,Hawaii,4,37.48,60.59,-23.11,harris,Safe,15,Politics,Economy,Economic,10,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
-ms,MS,Mississippi,6,60.89,38.0,22.89,trump,Safe,16,Culture,Culture,Social,5,2,0,0,0,+2 influence.,Politics,Political,10,1,0,1,0,"+1 influence, draw 1 card."
-la,LA,Louisiana,8,60.22,38.21,22.01,trump,Safe,17,Culture,Culture,Social,6,2,0,0,0,+2 influence.,Economy,Economic,11,1,0,1,0,"+1 influence, draw 1 card."
-ut,UT,Utah,6,59.38,37.79,21.59,trump,Safe,18,Culture,Culture,Social,5,2,0,0,0,+2 influence.,Economy,Economic,10,1,0,1,0,"+1 influence, draw 1 card."
-ne,NE,Nebraska,5,59.32,38.86,20.46,trump,Safe,19,Economy,Politics,Political,5,1,0,1,0,"+1 influence, draw 1 card.",Culture,Social,10,2,0,0,0,+2 influence.
-ca,CA,California,54,38.33,58.47,-20.14,harris,Safe,20,Politics,Economy,Economic,19,2,0,2,0,"+2 influence, draw 2 cards.",Politics,Political,14,4,0,1,0,"+4 influence, draw 1 card."
-mt,MT,Montana,4,58.39,38.46,19.93,trump,Safe,21,Culture,Culture,Social,5,1,0,0,0,+1 influence.,Economy,Economic,9,0,0,1,0,Draw 1 card.
-in,IN,Indiana,11,58.58,39.62,18.96,trump,Safe,22,Economy,Economy,Economic,7,2,1,0,0,"+2 influence, +1 Economy.",Culture,Social,11,0,0,2,0,Draw 2 cards.
-mo,MO,Missouri,10,58.49,40.08,18.41,trump,Safe,23,Culture,Culture,Social,7,0,0,2,0,Draw 2 cards.,Politics,Political,11,2,1,0,0,"+2 influence, +1 Politics."
-wa,WA,Washington,12,39.01,57.23,-18.22,harris,Safe,24,Politics,Politics,Political,11,2,1,0,0,"+2 influence, +1 Politics.",Culture,Social,7,0,0,2,0,Draw 2 cards.
-sc,SC,South Carolina,9,58.23,40.36,17.87,trump,Safe,25,Culture,Politics,Political,6,2,1,0,0,"+2 influence, +1 Politics.",Culture,Social,10,0,0,2,0,Draw 2 cards.
-ks,KS,Kansas,6,57.16,41.04,16.12,trump,Safe,26,Economy,Politics,Political,5,2,0,0,0,+2 influence.,Economy,Economic,9,1,0,1,0,"+1 influence, draw 1 card."
-de,DE,Delaware,3,41.79,56.49,-14.7,harris,Likely,27,Economy,Politics,Political,7,1,0,0,0,+1 influence.,Economy,Economic,4,0,0,1,0,Draw 1 card.
-ct,CT,Connecticut,7,41.89,56.4,-14.51,harris,Likely,28,Economy,Politics,Political,9,1,0,1,0,"+1 influence, draw 1 card.",Economy,Economic,6,2,0,0,0,+2 influence.
-or,OR,Oregon,8,40.97,55.27,-14.3,harris,Likely,29,Politics,Economy,Economic,9,2,0,0,0,+2 influence.,Politics,Political,6,1,0,1,0,"+1 influence, draw 1 card."
-ri,RI,Rhode Island,4,41.76,55.54,-13.78,harris,Likely,30,Politics,Economy,Economic,8,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
-tx,TX,Texas,40,56.14,42.46,13.68,trump,Likely,31,Culture,Culture,Social,12,2,0,2,0,"+2 influence, draw 2 cards.",Economy,Economic,15,4,0,1,0,"+4 influence, draw 1 card."
-ia,IA,Iowa,6,55.73,42.52,13.21,trump,Likely,32,Economy,Economy,Economic,5,1,0,1,0,"+1 influence, draw 1 card.",Culture,Social,8,2,0,0,0,+2 influence.
-ak,AK,Alaska,3,54.54,41.41,13.13,trump,Likely,33,Politics,Politics,Political,4,0,0,1,0,Draw 1 card.,Culture,Social,7,1,0,0,0,+1 influence.
-fl,FL,Florida,30,56.09,42.99,13.1,trump,Likely,34,Culture,Politics,Political,11,2,0,2,0,"+2 influence, draw 2 cards.",Culture,Social,14,4,0,1,0,"+4 influence, draw 1 card."
-ny,NY,New York,28,43.31,55.91,-12.6,harris,Likely,35,Politics,Politics,Political,14,2,0,2,0,"+2 influence, draw 2 cards.",Culture,Social,11,4,0,1,0,"+4 influence, draw 1 card."
-oh,OH,Ohio,17,55.14,43.93,11.21,trump,Likely,36,Economy,Economy,Economic,8,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile.",Culture,Social,11,3,0,1,0,"+3 influence, draw 1 card."
-co,CO,Colorado,10,43.14,54.13,-10.99,harris,Likely,37,Politics,Economy,Economic,10,2,1,0,0,"+2 influence, +1 Economy.",Politics,Political,7,0,0,2,0,Draw 2 cards.
-il,IL,Illinois,19,43.47,54.37,-10.9,harris,Likely,38,Economy,Culture,Social,12,3,0,1,0,"+3 influence, draw 1 card.",Economy,Economic,9,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile."
-me,ME,Maine,4,45.46,52.4,-6.94,harris,Lean,39,Politics,Economy,Economic,7,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
-nm,NM,New Mexico,5,45.85,51.85,-6.0,harris,Lean,40,Culture,Politics,Political,7,2,0,0,0,+2 influence.,Culture,Social,5,1,0,1,0,"+1 influence, draw 1 card."
-nj,NJ,New Jersey,14,46.06,51.97,-5.91,harris,Lean,41,Economy,Culture,Social,10,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile.",Economy,Economic,8,3,0,1,0,"+3 influence, draw 1 card."
-va,VA,Virginia,13,46.05,51.83,-5.78,harris,Lean,42,Politics,Culture,Social,9,0,0,2,0,Draw 2 cards.,Politics,Political,7,2,1,0,0,"+2 influence, +1 Politics."
-az,AZ,Arizona,11,52.22,46.69,5.53,trump,Lean,43,Culture,Economy,Economic,7,2,1,0,0,"+2 influence, +1 Economy.",Culture,Social,9,0,0,2,0,Draw 2 cards.
+dc,DC,District of Columbia,3,6.47,90.28,-83.81,harris,Safe,1,Politics,Culture,Social,13,0,0,1,0,Draw 1 card.,Politics,Political,4,1,0,0,0,+1 influence.
+wy,WY,Wyoming,3,71.6,25.84,45.76,trump,Safe,2,Culture,Culture,Social,4,1,0,0,0,+1 influence.,Economy,Economic,9,0,0,1,0,Draw 1 card.
+wv,WV,West Virginia,4,69.97,28.1,41.87,trump,Safe,3,Economy,Politics,Political,5,1,0,0,0,+1 influence.,Economy,Economic,10,0,0,1,0,Draw 1 card.
+id,ID,Idaho,4,66.87,30.38,36.49,trump,Safe,4,Culture,Culture,Social,5,1,0,0,0,+1 influence.,Economy,Economic,9,0,0,1,0,Draw 1 card.
+nd,ND,North Dakota,3,66.96,30.51,36.45,trump,Safe,5,Economy,Economy,Economic,4,1,0,0,0,+1 influence.,Culture,Social,8,0,0,1,0,Draw 1 card.
+ok,OK,Oklahoma,7,66.16,31.9,34.26,trump,Safe,6,Economy,Economy,Economic,6,2,0,0,0,+2 influence.,Culture,Social,10,1,0,1,0,"+1 influence, draw 1 card."
+vt,VT,Vermont,3,32.32,63.83,-31.51,harris,Safe,7,Politics,Economy,Economic,8,1,0,0,0,+1 influence.,Politics,Political,4,0,0,1,0,Draw 1 card.
+ar,AR,Arkansas,6,64.2,33.56,30.64,trump,Safe,8,Culture,Culture,Social,5,1,0,1,0,"+1 influence, draw 1 card.",Politics,Political,9,2,0,0,0,+2 influence.
+ky,KY,Kentucky,8,64.47,33.94,30.53,trump,Safe,9,Economy,Economy,Economic,6,1,0,1,0,"+1 influence, draw 1 card.",Politics,Political,10,2,0,0,0,+2 influence.
+al,AL,Alabama,9,64.57,34.1,30.47,trump,Safe,10,Culture,Culture,Social,6,2,1,0,0,"+2 influence, +1 Culture.",Economy,Economic,10,0,0,2,0,Draw 2 cards.
+tn,TN,Tennessee,11,64.19,34.47,29.72,trump,Safe,11,Culture,Culture,Social,7,2,1,0,0,"+2 influence, +1 Culture.",Economy,Economic,10,0,0,2,0,Draw 2 cards.
+sd,SD,South Dakota,3,63.43,34.24,29.19,trump,Safe,12,Culture,Culture,Social,4,0,0,1,0,Draw 1 card.,Politics,Political,7,1,0,0,0,+1 influence.
+md,MD,Maryland,10,34.08,62.62,-28.54,harris,Safe,13,Politics,Politics,Political,10,0,0,2,0,Draw 2 cards.,Culture,Social,7,2,1,0,0,"+2 influence, +1 Culture."
+ma,MA,Massachusetts,11,36.02,61.22,-25.2,harris,Safe,14,Politics,Culture,Social,10,2,1,0,0,"+2 influence, +1 Culture.",Politics,Political,7,0,0,2,0,Draw 2 cards.
+hi,HI,Hawaii,4,37.48,60.59,-23.11,harris,Safe,15,Politics,Economy,Economic,8,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
+ms,MS,Mississippi,6,60.89,38.0,22.89,trump,Safe,16,Culture,Culture,Social,5,2,0,0,0,+2 influence.,Politics,Political,8,1,0,1,0,"+1 influence, draw 1 card."
+la,LA,Louisiana,8,60.22,38.21,22.01,trump,Safe,17,Culture,Culture,Social,6,2,0,0,0,+2 influence.,Economy,Economic,9,1,0,1,0,"+1 influence, draw 1 card."
+ut,UT,Utah,6,59.38,37.79,21.59,trump,Safe,18,Culture,Culture,Social,5,2,0,0,0,+2 influence.,Economy,Economic,8,1,0,1,0,"+1 influence, draw 1 card."
+ne,NE,Nebraska,5,59.32,38.86,20.46,trump,Safe,19,Economy,Politics,Political,5,1,0,1,0,"+1 influence, draw 1 card.",Culture,Social,8,2,0,0,0,+2 influence.
+ca,CA,California,54,38.33,58.47,-20.14,harris,Safe,20,Politics,Economy,Economic,17,2,0,2,0,"+2 influence, draw 2 cards.",Politics,Political,14,4,0,1,0,"+4 influence, draw 1 card."
+mt,MT,Montana,4,58.39,38.46,19.93,trump,Safe,21,Culture,Culture,Social,5,1,0,0,0,+1 influence.,Economy,Economic,7,0,0,1,0,Draw 1 card.
+in,IN,Indiana,11,58.58,39.62,18.96,trump,Safe,22,Economy,Economy,Economic,7,2,1,0,0,"+2 influence, +1 Economy.",Culture,Social,9,0,0,2,0,Draw 2 cards.
+mo,MO,Missouri,10,58.49,40.08,18.41,trump,Safe,23,Culture,Culture,Social,7,0,0,2,0,Draw 2 cards.,Politics,Political,9,2,1,0,0,"+2 influence, +1 Politics."
+wa,WA,Washington,12,39.01,57.23,-18.22,harris,Safe,24,Politics,Politics,Political,9,2,1,0,0,"+2 influence, +1 Politics.",Culture,Social,7,0,0,2,0,Draw 2 cards.
+sc,SC,South Carolina,9,58.23,40.36,17.87,trump,Safe,25,Culture,Politics,Political,6,2,1,0,0,"+2 influence, +1 Politics.",Culture,Social,8,0,0,2,0,Draw 2 cards.
+ks,KS,Kansas,6,57.16,41.04,16.12,trump,Safe,26,Economy,Politics,Political,5,2,0,0,0,+2 influence.,Economy,Economic,7,1,0,1,0,"+1 influence, draw 1 card."
+de,DE,Delaware,3,41.79,56.49,-14.7,harris,Likely,27,Economy,Politics,Political,6,1,0,0,0,+1 influence.,Economy,Economic,4,0,0,1,0,Draw 1 card.
+ct,CT,Connecticut,7,41.89,56.4,-14.51,harris,Likely,28,Economy,Politics,Political,8,1,0,1,0,"+1 influence, draw 1 card.",Economy,Economic,6,2,0,0,0,+2 influence.
+or,OR,Oregon,8,40.97,55.27,-14.3,harris,Likely,29,Politics,Economy,Economic,8,2,0,0,0,+2 influence.,Politics,Political,6,1,0,1,0,"+1 influence, draw 1 card."
+ri,RI,Rhode Island,4,41.76,55.54,-13.78,harris,Likely,30,Politics,Economy,Economic,7,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
+tx,TX,Texas,40,56.14,42.46,13.68,trump,Likely,31,Culture,Culture,Social,12,2,0,2,0,"+2 influence, draw 2 cards.",Economy,Economic,14,4,0,1,0,"+4 influence, draw 1 card."
+ia,IA,Iowa,6,55.73,42.52,13.21,trump,Likely,32,Economy,Economy,Economic,5,1,0,1,0,"+1 influence, draw 1 card.",Culture,Social,7,2,0,0,0,+2 influence.
+ak,AK,Alaska,3,54.54,41.41,13.13,trump,Likely,33,Politics,Politics,Political,4,0,0,1,0,Draw 1 card.,Culture,Social,6,1,0,0,0,+1 influence.
+fl,FL,Florida,30,56.09,42.99,13.1,trump,Likely,34,Culture,Politics,Political,11,2,0,2,0,"+2 influence, draw 2 cards.",Culture,Social,13,4,0,1,0,"+4 influence, draw 1 card."
+ny,NY,New York,28,43.31,55.91,-12.6,harris,Likely,35,Politics,Politics,Political,13,2,0,2,0,"+2 influence, draw 2 cards.",Culture,Social,11,4,0,1,0,"+4 influence, draw 1 card."
+oh,OH,Ohio,17,55.14,43.93,11.21,trump,Likely,36,Economy,Economy,Economic,8,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile.",Culture,Social,10,3,0,1,0,"+3 influence, draw 1 card."
+co,CO,Colorado,10,43.14,54.13,-10.99,harris,Likely,37,Politics,Economy,Economic,9,2,1,0,0,"+2 influence, +1 Economy.",Politics,Political,7,0,0,2,0,Draw 2 cards.
+il,IL,Illinois,19,43.47,54.37,-10.9,harris,Likely,38,Economy,Culture,Social,11,3,0,1,0,"+3 influence, draw 1 card.",Economy,Economic,9,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile."
+me,ME,Maine,4,45.46,52.4,-6.94,harris,Lean,39,Politics,Economy,Economic,6,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
+nm,NM,New Mexico,5,45.85,51.85,-6.0,harris,Lean,40,Culture,Politics,Political,6,2,0,0,0,+2 influence.,Culture,Social,5,1,0,1,0,"+1 influence, draw 1 card."
+nj,NJ,New Jersey,14,46.06,51.97,-5.91,harris,Lean,41,Economy,Culture,Social,9,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile.",Economy,Economic,8,3,0,1,0,"+3 influence, draw 1 card."
+va,VA,Virginia,13,46.05,51.83,-5.78,harris,Lean,42,Politics,Culture,Social,8,0,0,2,0,Draw 2 cards.,Politics,Political,7,2,1,0,0,"+2 influence, +1 Politics."
+az,AZ,Arizona,11,52.22,46.69,5.53,trump,Lean,43,Culture,Economy,Economic,7,2,1,0,0,"+2 influence, +1 Economy.",Culture,Social,8,0,0,2,0,Draw 2 cards.
 mn,MN,Minnesota,10,46.68,50.92,-4.24,harris,Lean,44,Economy,Politics,Political,8,2,1,0,0,"+2 influence, +1 Politics.",Economy,Economic,7,0,0,2,0,Draw 2 cards.
 nc,NC,North Carolina,16,50.86,47.65,3.21,trump,Lean,45,Politics,Politics,Political,8,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile.",Economy,Economic,9,3,0,1,0,"+3 influence, draw 1 card."
 nv,NV,Nevada,6,50.59,47.49,3.1,trump,Lean,46,Economy,Economy,Economic,5,2,0,0,0,+2 influence.,Culture,Social,6,1,0,1,0,"+1 influence, draw 1 card."
