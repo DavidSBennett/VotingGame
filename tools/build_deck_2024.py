@@ -19,6 +19,10 @@ For now the stories keep the variant's mechanics, names and flavor (the
   become 1 / 3 / 4 (one old star was 6 EV, and 12 prestige is 54 EV);
   every card worth no stars -- Letters, Local Notices, negative stories --
   is worth 1. Scandals stay at -1. The old stars are kept in `stars`.
+- `card_text` is rewritten for the 2024 rules (text_2024): influence is
+  "neutral", a story's themed influence is its party's currency, Campaign
+  is for big states, per-office counts every 3 states held, and media
+  events give rivals their party's currency.
 
 WARNING: this OVERWRITES docs/deck-2024.csv.
 
@@ -26,12 +30,31 @@ WARNING: this OVERWRITES docs/deck-2024.csv.
 """
 import csv
 import os
+import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
 PRESTIGE = {0: 1, 1: 1, 2: 3, 3: 4}      # stars -> prestige
 KEEP = {"Political story": 15, "Economic story": 16, "Social story": 13, "Negative story": 16, "Media event": 5}
 STEPS = 10
+
+
+PARTY = {"rep": "Republican", "dem": "Democratic"}
+
+
+def text_2024(r):
+    """The card's rules text under the 2024 currencies."""
+    s = r["card_text"]
+    party = PARTY.get(r.get("lean") or "", "")
+    s = re.sub(r"Every other paper gets \+(\d+) (?:\w+ )?influence", r"Every other outlet gets +\g<1> " + party, s)
+    s = re.sub(r"\+(\d+) (Political|Economic|Social) for each election you have won",
+               r"+\g<1> " + party + " for every 3 states you hold", s)
+    s = re.sub(r"\+(\d+) (Political|Economic|Social)(?= *[,.]| draw)", r"+\g<1> " + party, s)
+    s = s.replace("Campaign (elections only)", "Campaign (big states only)")
+    s = s.replace("influence", "neutral").replace("rival paper", "rival outlet")
+    s = s.replace("Worth no prestige.", "Worth 1 prestige.")
+    s = s.replace("-1 prestige at the end of the game.", "-1 prestige if staked. Destroy it when you can.")
+    return s
 
 
 def main():
@@ -45,7 +68,9 @@ def main():
     out = []
     for r in src:
         if not r["released"]:
-            out.append(dict(r, lean="", step=""))
+            row = dict(r, lean="", step="")
+            row["card_text"] = text_2024(row)
+            out.append(row)
     flip = 0
     for kind, k in KEEP.items():
         group = sorted((r for r in src if r["type"] == kind),
@@ -56,7 +81,9 @@ def main():
         for i, r in enumerate(picked):
             lean = ("rep", "dem")[(i + flip) % 2]
             step = years.index(int(r["released"])) * STEPS // len(years)
-            out.append(dict(r, lean=lean, step=step))
+            row = dict(r, lean=lean, step=step)
+            row["card_text"] = text_2024(row)
+            out.append(row)
         flip += k            # alternate which party a kind starts with
     with open(os.path.join(DOCS, "deck-2024.csv"), "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
