@@ -27,7 +27,7 @@ OUT = os.path.join(ROOT, "backend", "cards_2024.php")
 CARD_FIELDS = ["key", "name", "type", "kind", "lean", "cost", "vp", "stars", "gen", "themed", "campaign", "draw",
                "trash", "gain_upto", "chain", "per_same", "per_office", "attack", "defense", "retract",
                "ongoing_gen", "ongoing_draw", "others_bonus", "step", "year", "date", "copies", "card_text", "flavor"]
-STATE_FIELDS = ["key", "abbr", "state", "ev", "vp", "trump_pct", "harris_pct", "margin", "winner", "tier",
+STATE_FIELDS = ["key", "abbr", "state", "ev", "vp", "trump_name", "harris_name", "flavor", "trump_pct", "harris_pct", "margin", "winner", "tier",
                 "order", "deck"]
 for _side in sim.SIDES:
     STATE_FIELDS += ["%s_%s" % (_side, f) for f in ("threshold", "gen", "party", "draw", "trash", "text")]

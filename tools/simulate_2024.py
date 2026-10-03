@@ -91,7 +91,7 @@ def card(cid):
         c = dict(key=cid, name=s["state"], type="State", kind=None, lean=PARTY.get(side), vp=int(s["vp"]), cost=0,
                  others_theme="", step=None, attack="", **{f: 0 for f in INT if f not in ("vp", "cost")})
         if side:
-            c.update(name="%s for %s" % (s["state"], side.title()), gen=s[side + "_gen"],
+            c.update(name=s[side + "_name"], gen=s[side + "_gen"],
                      themed=s[side + "_party"], draw=s[side + "_draw"], trash=s[side + "_trash"],
                      cost=s[side + "_threshold"])
         return c

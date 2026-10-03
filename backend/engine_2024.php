@@ -129,7 +129,9 @@ function e24_view($id) {
     }
     $v = [
       'key' => $id, 'kind' => 'state', 'type' => 'State', 'state' => $s['key'], 'abbr' => $s['abbr'],
-      'name' => $side ? $s['state'] . ' for ' . e24_side_name($side) : $s['state'],
+      // A claimed half is named for that side's 2024 base in the state ("Central Pennsylvania").
+      'name' => $side ? $s[$side . '_name'] : $s['state'],
+      'half_names' => ['trump' => $s['trump_name'], 'harris' => $s['harris_name']],
       'state_name' => $s['state'], 'side' => $side, 'lean' => $side ? e24_party($side) : null, 'story_kind' => null,
       'ev' => (int) $s['ev'], 'vp' => (int) $s['vp'], 'tier' => $s['tier'], 'margin' => (float) $s['margin'],
       'winner_2024' => $s['winner'], 'big' => $s['deck'] === 'elections', 'sides' => $sides,
@@ -142,8 +144,7 @@ function e24_view($id) {
         ? $s['state'] . ', ' . (int) $s['ev'] . ' electoral votes, for ' . e24_side_name($side) . '. ' . $s[$side . '_text']
         : $s['state'] . ', ' . (int) $s['ev'] . ' electoral votes. Buy it for Trump (' . $s['trump_threshold']
           . ': ' . $s['trump_text'] . ') or for Harris (' . $s['harris_threshold'] . ': ' . $s['harris_text'] . ')',
-      'flavor' => '2024: ' . ($s['winner'] === 'trump' ? 'Trump' : 'Harris') . ' by '
-                  . number_format(abs((float) $s['margin']), 1) . ' points.',
+      'flavor' => $s['flavor'],
     ];
     return $v;
   }

@@ -180,7 +180,19 @@ ORDER = {"Safe": 0, "Likely": 1, "Lean": 2, "Toss-up": 3}
 ELECTIONS = 10
 
 
+# Each half's name (docs/state-cards-2024.csv): where that side's 2024 vote
+# came from in the state, or "Upset in ..." where it had no real base.
+def card_names():
+    with open(os.path.join(DOCS, "state-cards-2024.csv"), encoding="utf-8") as fh:
+        return {r["key"]: r for r in csv.DictReader(fh)}
+
+
+def flavor(state, ev, t, h):
+    return "%s, %d electoral votes. 2024: Trump %.1f%%, Harris %.1f%%." % (state, ev, t, h)
+
+
 def main():
+    names = card_names()
     big_keys = {r[0] for r in sorted(RESULTS, key=lambda r: -r[2])[:ELECTIONS]}
     assert sorted((r[2] for r in RESULTS), reverse=True)[ELECTIONS - 1] > sorted(
         (r[2] for r in RESULTS), reverse=True)[ELECTIONS]
@@ -194,7 +206,9 @@ def main():
         mine, theirs = (a, b) if i % 2 == 0 else (b, a)
         side_power = {winner: mine, ("harris" if winner == "trump" else "trump"): theirs}
         row = dict(key=abbr.lower(), abbr=abbr, state=state, ev=ev, trump_pct=t, harris_pct=h, margin=margin,
-                   winner=winner, tier=tier(margin), deck="elections" if big else "main", vp=prestige(ev))
+                   winner=winner, tier=tier(margin), deck="elections" if big else "main", vp=prestige(ev),
+                   trump_name=names[abbr.lower()]["trump_name"], harris_name=names[abbr.lower()]["harris_name"],
+                   flavor=flavor(state, ev, t, h))
         for side in ("trump", "harris"):
             p = side_power[side]
             row[side + "_threshold"] = won if side == winner else lost
@@ -208,7 +222,7 @@ def main():
     rows.sort(key=lambda r: (ORDER[r["tier"]], -abs(r["margin"])))
     for n, r in enumerate(rows, 1):
         r["order"] = n
-    fields = ["key", "abbr", "state", "ev", "vp", "trump_pct", "harris_pct", "margin", "winner", "tier", "order", "deck"]
+    fields = ["key", "abbr", "state", "ev", "vp", "trump_name", "harris_name", "flavor", "trump_pct", "harris_pct", "margin", "winner", "tier", "order", "deck"]
     for side in ("trump", "harris"):
         fields += [side + "_threshold"] + ["%s_%s" % (side, f) for f in POWER_FIELDS] + [side + "_text", side + "_worth"]
     fields.append("best_story")
@@ -230,6 +244,7 @@ def main():
               % (r["abbr"], r["ev"], r["vp"], r["trump_threshold"], r["harris_threshold"], r["best_story"],
                  r["trump_worth"], r["harris_worth"], s, r[s + "_text"]))
         assert min(r["trump_worth"], r["harris_worth"]) > r["best_story"], r["abbr"]
+    assert set(names) == {r["key"] for r in rows}, "docs/state-cards-2024.csv must name every state"
     assert len(rows) == 51 and sum(r["ev"] for r in rows) == 538 and ev == {"trump": 312, "harris": 226}
 
 
