@@ -923,3 +923,24 @@ mostly states, nearly all on the winner; winning score ~17 prestige.
 Staking earlier or later than the rest, backing one side always, attacking
 more or never: all within noise of fair at 3 outlets. The stand-in Argus
 (+1 prestige per big state) wins 50%.
+
+### 2026-10-03: the tension -- trigger or stall (the user)
+
+"The tension of the game should be rooted in players wanting to trigger
+the end game when it's advantageous to them, and others wanting to stall
+the game." Chosen: **no clock** (only 270 ends the game); the trigger is
+**crossing 270**; the stall is **blocking** (buying states for the side
+behind). No new rules; the bots learn the decisions:
+
+- A bot claims the state that takes a side to 270 only if it expects to
+  top the table: its own stakes on that side against each rival's staked
+  card count (sides hidden: half, at the mean prestige staked), plus one
+  sure stake for each rival still to play this round.
+- While the side ahead is within 60 of 270 and its finishing would not
+  pay, a state for the side behind is worth +2 to the bot (a block).
+
+400 games, naive bots vs these: rounds 16.5 -> 18.1 (2 outlets), 13.9 ->
+18.2 (3), 13.0 -> 19.8 (4); games that never reach 270 (80 rounds) 1% ->
+5% at 3 and 9% at 4 outlets (no clock: no one will finish); some stakes
+now land on the loser (2.5 of 2.7 win at 3). Seats 37/32/31 (3), 26/26/
+24/24 (4). Harris 44-51%.

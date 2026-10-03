@@ -118,6 +118,7 @@ DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=80,
                 attack_reward=1,
                 finish_round=True,          # when a candidate reaches 270, the round is played out
                 win_at=270,
+                smart_end=True,             # bots cross 270 only when it pays them, and block when it would not
                 news_cycle=True,            # each turn the oldest exchange card goes to the bottom of the main deck
                 extra_editorials=(0, 0, 0, 0),  # catch-up: Editorials in each seat's starting deck (none needed now)
                 stake=True,
@@ -184,6 +185,7 @@ class Game:
         self.editorials = CARDS["editorial"]["copies"]
         self.scandals = CARDS["scandal"]["copies"]
         self.ended, self.rounds = None, 0
+        self.trigger = self.current = None
         self.log = []                   # (state, seat, side, round, 'call' / 'buy')
 
     def release(self, step):
@@ -234,10 +236,12 @@ class Game:
     def check_270(self):
         if not self.ended and self.winner():
             self.ended = "270"
+            self.trigger = self.current
 
     # ---- one turn ---------------------------------------------------------
     def turn(self, p):
         bot = BOTS[p.strategy]
+        self.current = p.seat
         p.stats["turns"] += 1
         if self.cfg["stake"] and p.hand:
             pick = bot.stake(self, p)
@@ -330,7 +334,8 @@ class Game:
             best = None
             for side in SIDES:
                 need = STATES[key][side + "_threshold"]
-                if self.affordable(p, pool, side, need, campaign=True):
+                if (self.affordable(p, pool, side, need, campaign=True)
+                        and bot.will_claim(self, p, key, side)):
                     rank = (bot.side_rank(self, p, "st#%s:%s" % (key, side), self.neutral_needed(p, pool, side, need, True)),
                             self.rng.random())          # ties: neither side by list order
                     if best is None or rank > best[0]:
@@ -357,7 +362,7 @@ class Game:
                 if x.startswith("st#"):
                     for side in SIDES:
                         cid = x + ":" + side
-                        if self.affordable(p, pool, side, card(cid)["cost"]):
+                        if self.affordable(p, pool, side, card(cid)["cost"]) and bot.will_claim(self, p, x[3:], side):
                             options.append(cid)
                 else:
                     c = card(x)
@@ -527,6 +532,46 @@ class Bot:
         w = {s: sum(card(c)["vp"] for c, side in p.staked if side == s) for s in SIDES}
         return max(SIDES, key=lambda s: w[s]) if any(w.values()) else None
 
+    def end_now_pays(self, game, p, side):
+        """If `side` reached 270 now: would this outlet top the table? It
+        knows its own stakes; of a rival it sees only how many cards it has
+        staked (guessing each at the mean prestige staked so far, on this
+        side half the time), and that rivals still to play this round get
+        one more stake, on a sure thing."""
+        mine = sum(card(c)["vp"] for c, s in p.staked if s == side)
+        staked = [card(c)["vp"] for q in game.players for c, _ in q.staked]
+        avg = statistics.mean(staked) if staked else 3.0
+        best_other = 0.0
+        for q in game.players:
+            if q is p:
+                continue
+            est = 0.5 * avg * len(q.staked)
+            if q.seat > p.seat:
+                est += max([card(c)["vp"] for c in q.hand] + [avg])   # its last turn: a stake on the winner
+            best_other = max(best_other, est)
+        return mine >= best_other
+
+    def will_claim(self, game, p, key, side):
+        """Claim a state only if it does not end the game against this
+        outlet's interest (it may still claim for the other side: a block)."""
+        if not game.cfg["smart_end"]:
+            return True
+        ev, _ = game.tally()
+        if ev[side] + STATES[key]["ev"] < game.cfg["win_at"]:
+            return True
+        return self.end_now_pays(game, p, side)
+
+    def blocking(self, game, p, cid):
+        """A state for the side behind is worth more while the side ahead is
+        near 270 and this outlet would not gain from its finishing."""
+        if not game.cfg["smart_end"]:
+            return 0.0
+        ev, _ = game.tally()
+        lead = max(SIDES, key=lambda s: ev[s])
+        if state_side(cid) == lead or ev[lead] < game.cfg["win_at"] - 60:
+            return 0.0
+        return 0.0 if self.end_now_pays(game, p, lead) else 2.0
+
     def score(self, game, p, cid):
         c = card(cid)
         v = value(c)
@@ -540,6 +585,7 @@ class Bot:
             side = state_side(cid)
             if side == self.leaning(game, p):
                 v += 1.0                    # it helps the candidate this outlet has bet on
+            v += self.blocking(game, p, cid)
             v -= 0.15 * (c["cost"] - STATES[state_key(cid)][STATES[state_key(cid)]["winner"] + "_threshold"])
         return v
 
