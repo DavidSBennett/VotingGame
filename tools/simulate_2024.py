@@ -8,17 +8,17 @@ spends on anything; Republican only on Trump (calling or buying a state
 for him, or a Republican story), Democratic only on Harris (or a
 Democratic story); Campaign only on calling a big state. THE ELECTIONS
 DECK: the ten biggest states, shuffled, one up at a time; an outlet may
-call it once a turn, for Trump or Harris (history's winner is cheaper),
+call it once a turn, for Trump or Harris (flipping a state costs 1 more per
+6 points of its 2024 margin, so the swing states cost the same either way),
 and gains that side's card. Each call moves the calendar on a step,
-releasing that step's stories; the game ends when the tenth is called (the
-round is played out). THE MAIN DECK: the other 41 states (all from the
+releasing that step's stories. THE MAIN DECK: the other 41 states (all from the
 start) and 65 stories; 5 lie face up on the exchange. A state is bought
 for a side at that side's threshold and is the strongest card at its
 price. STAKE: instead of playing its hand, an outlet may spend its turn
-setting one card from its hand aside, face down, on Trump or Harris. At
-the end the candidate with the most electoral votes wins (states count
-for the side they were called or bought for; states nobody took go as in
-2024). The score is in electoral votes: each state you hold is worth its
+setting one card from its hand aside, face down, on Trump or Harris. A
+state counts only once an outlet has called or bought it for a side; the
+game ends when either candidate reaches 270 (the round is played out),
+and that candidate wins. The score is in electoral votes: each state you hold is worth its
 EVs, a story's prestige counts STORY_EV per star, and a staked card scores
 only if its candidate won -- its own worth plus the stake bonus.
 
@@ -117,12 +117,15 @@ DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=80,
                 herald_cost=2,
                 aurora_per=1,
                 attack_reward=1,
-                finish_round=True,          # when the last big state is called, the round is played out
+                finish_round=True,          # when a candidate reaches 270, the round is played out
+                win_at=270,
+                news_cycle=True,            # each turn the oldest exchange card goes to the bottom of the main deck
                 extra_editorials=(0, 1, 2, 3),  # catch-up: Editorials in each seat's starting deck
                 stake=True,
                 stake_bonus=12,             # EV for a staked card on the winner, on top of its own worth
+                stake_mult=1.0,             # ... and its own worth counts this many times
                 stake_turn_value=None,      # bots: what a played turn is worth (None: learn it as they go)
-                unclaimed="history")        # states nobody took: 'history' (as in 2024) / 'none'
+                unclaimed="none")           # states nobody took: 'none' (count for nobody) / 'history' (as in 2024)
 
 
 class Player:
@@ -153,7 +156,7 @@ class Player:
             ev += cfg["argus_ev"] * sum(1 for c in self.states() if state_key(c) in BIG)
         for cid, side in self.staked:
             if side == winner:
-                ev += self.card_ev(cid, cfg) + cfg["stake_bonus"]
+                ev += cfg["stake_mult"] * self.card_ev(cid, cfg) + cfg["stake_bonus"]
         return ev
 
 
@@ -230,9 +233,12 @@ class Game:
 
     def winner(self):
         ev, _ = self.tally()
-        if ev["trump"] == ev["harris"]:
-            return None
-        return max(SIDES, key=lambda s: ev[s])
+        won = [s for s in SIDES if ev[s] >= self.cfg["win_at"]]
+        return won[0] if won else None
+
+    def check_270(self):
+        if not self.ended and self.winner():
+            self.ended = "270"
 
     # ---- one turn ---------------------------------------------------------
     def turn(self, p):
@@ -335,7 +341,8 @@ class Game:
             for side in SIDES:
                 need = STATES[key][side + "_threshold"]
                 if self.affordable(p, pool, side, need, campaign=True):
-                    rank = bot.side_rank(self, p, "st#%s:%s" % (key, side), self.neutral_needed(p, pool, side, need, True))
+                    rank = (bot.side_rank(self, p, "st#%s:%s" % (key, side), self.neutral_needed(p, pool, side, need, True)),
+                            self.rng.random())          # ties: neither side by list order
                     if best is None or rank > best[0]:
                         best = (rank, side, need)
             if best:
@@ -347,9 +354,8 @@ class Game:
                 p.stats["unhistorical"] += side != STATES[key]["winner"]
                 self.log.append((key, p.seat, side, self.rounds, "call"))
                 self.e += 1
-                if self.e >= len(self.big):
-                    self.ended = "elections called"
-                else:
+                self.check_270()
+                if self.e < len(self.big):
                     self.step += 1
                     self.release(self.step)
                     self.refill()
@@ -395,6 +401,7 @@ class Game:
                     self.exchange.remove(pick)
             p.discard.append(pick)
             p.stats["bought"] += 1
+            self.check_270()            # after the card is in the deck, so the state counts
         if (p.paper == "herald" and pool["gen"] >= self.cfg["herald_cost"] and self.main
                 and not self.main[-1].startswith("st#") and bot.scoop(self, p)):   # a scoop is a story, not a state
             pool["gen"] -= self.cfg["herald_cost"]
@@ -405,6 +412,15 @@ class Game:
         for cid in played:
             (p.locations if card(cid)["type"] == "Media event" else p.discard).append(cid)
         self.draw(p, self.cfg["hand"])
+        self.news_cycle()
+
+    def news_cycle(self):
+        """The oldest card on the exchange slides to the bottom of the main
+        deck and a fresh one is dealt, so stale stories do not block the
+        states behind them."""
+        if self.cfg["news_cycle"] and self.exchange and self.main:
+            self.main.insert(0, self.exchange.pop(0))
+            self.refill()
 
     # ---- paying for a side -------------------------------------------------
     def partisan(self, p, pool, side):
@@ -544,7 +560,7 @@ class Bot:
             v = self.score(game, p, x)
             if pool is not None and x.startswith("st#"):
                 v -= game.cfg["power_choice"] * 0.3 * game.neutral_needed(p, pool, state_side(x), card(x)["cost"])
-            return (v, card(x)["cost"] if x != "editorial" else 3)
+            return (v, card(x)["cost"] if x != "editorial" else 3, game.rng.random())
         best = max(options, key=key)
         if buying and self.score(game, p, best) < self.min_value:
             return None
@@ -571,7 +587,7 @@ class Bot:
         best = None
         for cid in p.hand:
             worth = p.card_ev(cid, game.cfg)
-            gain = prob * (worth + game.cfg["stake_bonus"]) - worth       # it scored anyway if kept
+            gain = prob * (game.cfg["stake_mult"] * worth + game.cfg["stake_bonus"]) - worth   # it scored anyway if kept
             gain -= 0.3 * value(card(cid)) * max(0, len(game.big) - game.e - 1)   # its future plays
             if best is None or gain > best[0]:
                 best = (gain, cid)
@@ -625,7 +641,8 @@ def run_matchup(strategies, games, config=None, seed=0):
             vp[p.seat].append(scores[p.seat])
             st = dict(p.stats)
             st["stake_won"] = sum(1 for c, side in p.staked if side == w)
-            st["stake_ev"] = sum(p.card_ev(c, g.cfg) + g.cfg["stake_bonus"] for c, side in p.staked if side == w)
+            st["stake_ev"] = sum(g.cfg["stake_mult"] * p.card_ev(c, g.cfg) + g.cfg["stake_bonus"]
+                                 for c, side in p.staked if side == w)
             stats[p.seat].append(st)
             if scores[p.seat] > 0:
                 story_share.append(1 - p.stats["ev"] / scores[p.seat])

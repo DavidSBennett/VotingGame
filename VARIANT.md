@@ -871,3 +871,27 @@ every bot stakes Trump and every stake pays (3.4 stakes per outlet).
 Counting unclaimed states for nobody: Harris 20%. Seats at 4 outlets
 8/15/39/38 (the Editorial catch-up is too much in a short game); early
 leader wins 62% at 3.
+
+### 2026-10-03: the race to 270 (the user)
+
+- **Flipping costs by margin**: the other side costs 1 more per full 6
+  points of 2024 margin. The seven swing states, and NH, MN, VA and NJ
+  (as close), cost the same either way; Texas 12 / 14, California 14 /
+  17, D.C. 4 / 17.
+- **States count only when claimed**: a state counts for a side once an
+  outlet calls or buys it for that side; unclaimed states count for
+  nobody. **The game ends when a candidate reaches 270** (the round is
+  played out); that candidate wins the stakes.
+- Found: games stalled (a third or more, even without Stake) when the
+  exchange filled with negative stories nobody wanted and the states
+  behind them never came up. **The news cycle** (proposed, not yet
+  approved): at the end of every turn the oldest exchange card goes to the
+  bottom of the main deck. With it, 3 outlets, no Stake: 18 rounds, 9%
+  stalled (39% without it).
+- A bug: a bought state that crossed 270 was counted a moment too late.
+
+3 outlets, 300 games: with the 12-EV stake bonus, 12 rounds, 1% stalled,
+Harris wins 29%, 2.3 stakes per outlet -- **and every stake wins**: bots
+stake only once the race is decided. Staked card worth x2 (no bonus):
+17 rounds, Harris 20%, every stake wins too. Seats 26/36/38: the
+Editorial catch-up now overshoots.
