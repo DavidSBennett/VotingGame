@@ -895,3 +895,31 @@ Harris wins 29%, 2.3 stakes per outlet -- **and every stake wins**: bots
 stake only once the race is decided. Staked card worth x2 (no bonus):
 17 rounds, Harris 20%, every stake wins too. Seats 26/36/38: the
 Editorial catch-up now overshoots.
+
+### 2026-10-03: only the stake pile scores; prestige 1-12 (the user)
+
+- **Stakes are flat**: a staked card scores its prestige if its candidate
+  reaches 270, nothing otherwise; no bonus.
+- **Only the stake pile scores.** Cards in decks score nothing; states
+  still count toward 270 for their side, staked or not.
+- **Every card has prestige, 1-12**, relative to California's 12: a state
+  is 12 x EV / 54, rounded, at least 1 (Texas 9, Florida 7, New York 6,
+  Pennsylvania 4, 3-6 EV states 1). Stories 1 / 3 / 4 for the old 1 / 2 /
+  3 stars; Letters, Local Notices, negative stories and Editorials 1;
+  Scandals -1. State powers recomputed so each still beats the best story
+  at its price with prestige counted (`build_states_2024.py` now measures
+  docs/deck-2024.csv itself).
+- Bots stake their highest-prestige card when its expected prestige (x
+  the chance the side ahead wins) passes a bar falling from 6 to 2 as a
+  side nears 270, never two turns running; after 270, always. Without the
+  floor every bot staked every turn near the end and no one finished the
+  race (a table can stall the race on purpose -- a rules question).
+- **The catch-up is off**: with no extra Editorials the seats are 49/51,
+  37/31/32 and 25/24/24/28 (900 games); 0/1/1/1 gave 28/36/35.
+
+600 games: games end at 270 (99.5%) in 14.5 rounds at 3 outlets (12.8
+at 4); Harris wins 50-53%; history rewritten 22%; ~2.3 stakes per outlet,
+mostly states, nearly all on the winner; winning score ~17 prestige.
+Staking earlier or later than the rest, backing one side always, attacking
+more or never: all within noise of fair at 3 outlets. The stand-in Argus
+(+1 prestige per big state) wins 50%.

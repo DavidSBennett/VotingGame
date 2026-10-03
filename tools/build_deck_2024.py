@@ -14,6 +14,11 @@ For now the stories keep the variant's mechanics, names and flavor (the
   rules that count kinds (compounding, chains, per office).
 - `step`: the calendar step (0-9) the story is released on, from its year
   (the variant's 17 election years spread over the 10 big-state calls).
+- `vp` is PRESTIGE on the game's 1-12 scale (the user, 2026-10-03: every
+  card has a prestige value; California, the biggest state, is 12): stars
+  become 1 / 3 / 4 (one old star was 6 EV, and 12 prestige is 54 EV);
+  every card worth no stars -- Letters, Local Notices, negative stories --
+  is worth 1. Scandals stay at -1. The old stars are kept in `stars`.
 
 WARNING: this OVERWRITES docs/deck-2024.csv.
 
@@ -24,13 +29,18 @@ import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
+PRESTIGE = {0: 1, 1: 1, 2: 3, 3: 4}      # stars -> prestige
 KEEP = {"Political story": 15, "Economic story": 16, "Social story": 13, "Negative story": 16, "Media event": 5}
 STEPS = 10
 
 
 def main():
     src = list(csv.DictReader(open(os.path.join(DOCS, "deck-dc.csv"), encoding="utf-8-sig")))
-    fields = list(src[0].keys()) + ["lean", "step"]
+    fields = list(src[0].keys()) + ["stars", "lean", "step"]
+    for r in src:
+        r["stars"] = r["vp"]
+        if r["type"] != "Scandal":
+            r["vp"] = PRESTIGE[int(r["vp"])]
     years = sorted({int(r["released"]) for r in src if r["released"]})
     out = []
     for r in src:

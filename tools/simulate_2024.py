@@ -18,9 +18,9 @@ price. STAKE: instead of playing its hand, an outlet may spend its turn
 setting one card from its hand aside, face down, on Trump or Harris. A
 state counts only once an outlet has called or bought it for a side; the
 game ends when either candidate reaches 270 (the round is played out),
-and that candidate wins. The score is in electoral votes: each state you hold is worth its
-EVs, a story's prestige counts STORY_EV per star, and a staked card scores
-only if its candidate won -- its own worth plus the stake bonus.
+and that candidate wins. Every card has a PRESTIGE value, 1-12 (California 12). Only the
+stake pile scores: the prestige of the cards you staked on the candidate
+who reached 270. Cards left in your deck score nothing.
 
 Content: docs/states-2024.csv (tools/build_states_2024.py) and
 docs/deck-2024.csv (tools/build_deck_2024.py).
@@ -33,6 +33,7 @@ import argparse
 import csv
 import os
 import random
+import math
 import statistics
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,7 +45,6 @@ PARTY = {"trump": "rep", "harris": "dem"}
 SIDE = {"rep": "trump", "dem": "harris"}
 INT = ("cost", "vp", "gen", "themed", "campaign", "draw", "trash", "gain_upto", "chain", "per_same",
        "per_office", "defense", "ongoing_gen", "ongoing_draw", "others_bonus", "copies", "retract")
-STORY_EV = 6        # electoral votes per star of a story's prestige
 
 
 def load():
@@ -88,7 +88,7 @@ def card(cid):
     if cid.startswith("st#"):
         key, _, side = cid[3:].partition(":")
         s = STATES[key]
-        c = dict(key=cid, name=s["state"], type="State", kind=None, lean=PARTY.get(side), vp=s["ev"], cost=0,
+        c = dict(key=cid, name=s["state"], type="State", kind=None, lean=PARTY.get(side), vp=int(s["vp"]), cost=0,
                  others_theme="", step=None, attack="", **{f: 0 for f in INT if f not in ("vp", "cost")})
         if side:
             c.update(name="%s for %s" % (s["state"], side.title()), gen=s[side + "_gen"],
@@ -107,24 +107,24 @@ def state_side(cid):
 
 
 DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=80,
-                story_ev=STORY_EV,
                 office_div=3,               # per-office stories: one office per this many states held
                 papers=True,
                 power_choice=0.5,           # bots weigh a card's worth against the neutral it costs
                 sun_draw=3,
                 north_star_at=2, north_star_draw=1,
-                argus_ev=6,                 # the Argus: electoral votes per big state called
+                argus_vp=1,                 # the Argus: prestige per big state it called (stand-in)
                 herald_cost=2,
                 aurora_per=1,
                 attack_reward=1,
                 finish_round=True,          # when a candidate reaches 270, the round is played out
                 win_at=270,
                 news_cycle=True,            # each turn the oldest exchange card goes to the bottom of the main deck
-                extra_editorials=(0, 1, 2, 3),  # catch-up: Editorials in each seat's starting deck
+                extra_editorials=(0, 0, 0, 0),  # catch-up: Editorials in each seat's starting deck (none needed now)
                 stake=True,
-                stake_bonus=12,             # EV for a staked card on the winner, on top of its own worth
-                stake_mult=1.0,             # ... and its own worth counts this many times
-                stake_turn_value=None,      # bots: what a played turn is worth (None: learn it as they go)
+                stake_eager=6.0,            # bots: expected prestige a stake must promise at the start
+                                            # (falling to stake_floor as a side nears 270)
+                stake_floor=2.0,            # bots: ... but never less than this
+                stake_gap=1,                # bots: played turns between stakes (before 270)
                 unclaimed="none")           # states nobody took: 'none' (count for nobody) / 'history' (as in 2024)
 
 
@@ -136,9 +136,10 @@ class Player:
         self.deck = ["letter#%d.%d" % (seat, i) for i in range(7)] + ["notice#%d.%d" % (seat, i) for i in range(3)]
         self.hand, self.discard, self.locations = [], [], []
         self.staked = []            # (card, side), face down
+        self.last_stake = -99       # the turn of the last stake
         self.stats = dict(turns=0, called=0, bought=0, states_bought=0, attacks=0, scandals=0, trashed=0,
                           gen=0, party=0, draws=0, unhistorical=0, ev=0, stakes=0, stake_won=0, stake_ev=0,
-                          played_turns=0, played_ev=0)
+                          stake_vp=0)
 
     def owned(self):
         return self.deck + self.hand + self.discard + self.locations
@@ -146,18 +147,13 @@ class Player:
     def states(self):
         return [c for c in self.owned() if c.startswith("st#")]
 
-    def card_ev(self, cid, cfg):
-        c = card(cid)
-        return c["vp"] if c["type"] == "State" else cfg["story_ev"] * c["vp"]
-
     def score(self, cfg, winner):
-        ev = sum(self.card_ev(c, cfg) for c in self.owned())
+        """Only the stake pile scores: the prestige of the cards staked on
+        the winner."""
+        vp = sum(card(c)["vp"] for c, side in self.staked if side == winner)
         if self.paper == "argus":
-            ev += cfg["argus_ev"] * sum(1 for c in self.states() if state_key(c) in BIG)
-        for cid, side in self.staked:
-            if side == winner:
-                ev += cfg["stake_mult"] * self.card_ev(cid, cfg) + cfg["stake_bonus"]
-        return ev
+            vp += cfg["argus_vp"] * self.stats["called"]
+        return vp
 
 
 class Game:
@@ -189,7 +185,6 @@ class Game:
         self.scandals = CARDS["scandal"]["copies"]
         self.ended, self.rounds = None, 0
         self.log = []                   # (state, seat, side, round, 'call' / 'buy')
-        self.turn_ev = []               # EV gained by played turns, for the bots' stake decisions
 
     def release(self, step):
         self.main += [k for k in STORIES if CARDS[k]["step"] == step]
@@ -255,12 +250,7 @@ class Game:
                 p.hand = []
                 self.draw(p, self.cfg["hand"])
                 return
-        before = p.score(self.cfg, None)
         self.play_turn(p, bot)
-        gained = p.score(self.cfg, None) - before
-        self.turn_ev.append(gained)
-        p.stats["played_turns"] += 1
-        p.stats["played_ev"] += gained
 
     def play_turn(self, p, bot):
         gen, campaign = 0, 0
@@ -501,13 +491,17 @@ class Game:
 # Bots
 # =====================================================================
 
+VP_WEIGHT = 0.6
+
+
 def value(c):
-    """A card's worth to a bot, in stars (a state's votes / STORY_EV)."""
+    """A card's worth to a bot: its power, plus VP_WEIGHT per prestige (it
+    scores only if staked). tools/build_states_2024.py uses the same."""
     t = c["type"]
-    vp = c["vp"] / STORY_EV if t == "State" else c["vp"]
+    vp = VP_WEIGHT * c["vp"]
     if t == "Media event":
-        return 1.2 * vp + 3 * (c["ongoing_gen"] + 1.3 * c["ongoing_draw"]) - 0.5 * c["others_bonus"]
-    v = (1.2 * vp + c["gen"] + 0.8 * c["themed"] + 0.6 * c["campaign"] + 1.3 * c["draw"]
+        return vp + 3 * (c["ongoing_gen"] + 1.3 * c["ongoing_draw"]) - 0.5 * c["others_bonus"]
+    v = (vp + c["gen"] + 0.8 * c["themed"] + 0.6 * c["campaign"] + 1.3 * c["draw"]
          + 0.8 * c["trash"] + 0.4 * c["gain_upto"] + 0.6 * c["chain"] + 0.8 * c["per_same"]
          + 1.0 * c["per_office"] + 0.3 * c["defense"] + 0.8 * c.get("retract", 0))
     if c["attack"] == "scandal":
@@ -518,9 +512,9 @@ def value(c):
 
 
 class Bot:
-    def __init__(self, attack=1.0, big=False, min_value=1.5, stake_margin=0.0, partisan=None):
+    def __init__(self, attack=1.0, big=False, min_value=1.5, eager=1.0, partisan=None):
         self.attack_w, self.big, self.min_value = attack, big, min_value
-        self.stake_margin = stake_margin    # extra EV a stake must promise over a played turn
+        self.eager = eager                  # x the table's stake_eager: lower stakes sooner
         self.partisan = partisan            # 'trump' / 'harris': always backs this side
 
     def late(self, game):
@@ -530,8 +524,7 @@ class Bot:
         """The side this outlet has a stake in (most staked worth), if any."""
         if self.partisan:
             return self.partisan
-        w = {s: sum(p.card_ev(c, game.cfg) + game.cfg["stake_bonus"] for c, side in p.staked if side == s)
-             for s in SIDES}
+        w = {s: sum(card(c)["vp"] for c, side in p.staked if side == s) for s in SIDES}
         return max(SIDES, key=lambda s: w[s]) if any(w.values()) else None
 
     def score(self, game, p, cid):
@@ -541,8 +534,8 @@ class Bot:
             v *= self.attack_w
         if self.big and c["type"] not in ("Editorial", "State") and c["cost"] < 5:
             v = 0
-        if self.late(game):                 # late in the game only electoral votes count
-            v = (c["vp"] / STORY_EV if c["type"] == "State" else c["vp"]) * 2 + 0.2 * v
+        if self.late(game):                 # late in the game a card is mostly its prestige
+            v = c["vp"] + 0.4 * v
         if c["type"] == "State" and cid.count(":"):
             side = state_side(cid)
             if side == self.leaning(game, p):
@@ -566,33 +559,34 @@ class Bot:
             return None
         return best
 
-    def stake(self, game, p):
-        """Stake when the bet beats playing the hand: the chance the projected
-        winner wins, times the card's worth plus the bonus, against what a
-        played turn has been worth this game (and the card's own EV, kept
-        either way if not staked)."""
+    def win_chance(self, game):
+        """(the side ahead, the chance it reaches 270 first): the lead over
+        the votes still unclaimed."""
         ev, unclaimed = game.tally()
-        left = sum(STATES[k]["ev"] for k in game.big[game.e:])
-        lead = max(SIDES, key=lambda s: ev[s])
+        lead = max(SIDES, key=lambda s: (ev[s], game.rng.random()))
         if self.partisan:
             lead = self.partisan
         margin = ev[lead] - ev["harris" if lead == "trump" else "trump"]
-        # Uncalled big states and unclaimed small ones can still swing.
-        swing = left + 0.5 * sum(STATES[k]["ev"] for k in SMALL
-                                 if k not in {state_key(c) for q in game.players for c in q.states()})
-        prob = min(0.98, max(0.02, 0.5 + 0.5 * margin / max(1.0, swing)))
-        turn_value = game.cfg["stake_turn_value"]
-        if turn_value is None:
-            turn_value = statistics.mean(game.turn_ev[-30:]) if len(game.turn_ev) >= 6 else 15.0
-        best = None
-        for cid in p.hand:
-            worth = p.card_ev(cid, game.cfg)
-            gain = prob * (game.cfg["stake_mult"] * worth + game.cfg["stake_bonus"]) - worth   # it scored anyway if kept
-            gain -= 0.3 * value(card(cid)) * max(0, len(game.big) - game.e - 1)   # its future plays
-            if best is None or gain > best[0]:
-                best = (gain, cid)
-        if best and best[0] > turn_value + self.stake_margin:
-            return best[1], lead
+        open_ = 538 - ev["trump"] - ev["harris"]
+        prob = 1 / (1 + math.exp(-margin / (0.15 * open_ + 8)))
+        return lead, prob
+
+    def stake(self, game, p):
+        """Stake the hand's best bet -- prestige x the chance its side wins --
+        once it promises enough: stake_eager prestige at the start, falling
+        to nothing as a side nears 270. After 270, always."""
+        lead, prob = self.win_chance(game)
+        best = max(p.hand, key=lambda c: (card(c)["vp"], -value(card(c))))
+        expect = prob * card(best)["vp"]
+        if game.ended:
+            return (best, lead) if expect > 0 else None
+        if p.stats["turns"] - p.last_stake <= game.cfg["stake_gap"]:
+            return None
+        ev, _ = game.tally()
+        need = game.cfg["stake_eager"] * self.eager * max(0.0, 1 - max(ev.values()) / game.cfg["win_at"])
+        if expect >= max(game.cfg["stake_floor"], need):
+            p.last_stake = p.stats["turns"]
+            return best, lead
         return None
 
     def scoop(self, game, p):
@@ -608,8 +602,8 @@ BOTS = {
     "attacker": Bot(attack=2.5),
     "pacifist": Bot(attack=0.0),
     "bigmoney": Bot(big=True),
-    "nostake": Bot(stake_margin=1e9),
-    "staker": Bot(stake_margin=-8),
+    "late": Bot(eager=2.0),             # stakes later than the rest
+    "early": Bot(eager=0.5),            # stakes sooner
     "trump": Bot(partisan="trump"),
     "harris": Bot(partisan="harris"),
 }
@@ -625,7 +619,7 @@ def run_matchup(strategies, games, config=None, seed=0):
     vp = [[] for _ in strategies]
     stats = [[] for _ in strategies]
     ended, rounds, unhist, claims = {}, [], 0, 0
-    harris_wins, early_lead_wins, story_share, claimed_share = 0, 0, [], []
+    harris_wins, early_lead_wins, claimed_share = 0, 0, []
     for _ in range(games):
         g = Game(list(strategies), config, random.Random(rng.randrange(1 << 30))).run()
         ended[g.ended] = ended.get(g.ended, 0) + 1
@@ -641,11 +635,9 @@ def run_matchup(strategies, games, config=None, seed=0):
             vp[p.seat].append(scores[p.seat])
             st = dict(p.stats)
             st["stake_won"] = sum(1 for c, side in p.staked if side == w)
-            st["stake_ev"] = sum(g.cfg["stake_mult"] * p.card_ev(c, g.cfg) + g.cfg["stake_bonus"]
-                                 for c, side in p.staked if side == w)
+            st["stake_vp"] = sum(card(c)["vp"] for c, side in p.staked)
+            st["stake_states"] = sum(1 for c, side in p.staked if c.startswith("st#"))
             stats[p.seat].append(st)
-            if scores[p.seat] > 0:
-                story_share.append(1 - p.stats["ev"] / scores[p.seat])
         unhist += sum(1 for k, s, side, t, how in g.log if side != STATES[k]["winner"])
         claims += len(g.log)
         _, unclaimed = g.tally()
@@ -658,7 +650,7 @@ def run_matchup(strategies, games, config=None, seed=0):
             early_lead_wins += (lead in leaders) / len(leaders)
     return dict(strategies=strategies, games=games, wins=wins, vp=vp, stats=stats, ended=ended,
                 rounds=rounds, unhistorical=unhist / max(1, claims), harris=harris_wins / games,
-                early_lead=early_lead_wins / games, story_share=mean(story_share),
+                early_lead=early_lead_wins / games,
                 claimed=mean(claimed_share))
 
 
@@ -689,17 +681,17 @@ def shape(games, seed, config=None, seats=(2, 3, 4)):
         r = run_matchup(["balanced"] * n, games, config, seed)
         st = [x for s in r["stats"] for x in s]
         print("  %d outlets: seat wins %s   ended %s" % (n, " / ".join(pct(w / games) for w in r["wins"]), r["ended"]))
-        print("    rounds %.1f, score %.0f EV (stories and stakes %s of it); per outlet: %.1f big states called, "
+        print("    rounds %.1f, winning score %.1f prestige (mean %.1f); per outlet: %.1f big states called, "
               "%.1f states bought, %.1f stories bought"
-              % (mean(r["rounds"]), mean([x for v in r["vp"] for x in v]), pct(r["story_share"]),
+              % (mean(r["rounds"]), mean([max(v) for v in zip(*r["vp"])]), mean([x for v in r["vp"] for x in v]),
                  mean([x["called"] for x in st]), mean([x["states_bought"] for x in st]),
                  mean([x["bought"] - x["states_bought"] for x in st])))
         print("    states claimed %s of the EVs; history rewritten %s; Harris wins %s; early leader wins %s"
               % (pct(r["claimed"]), pct(r["unhistorical"]), pct(r["harris"]), pct(r["early_lead"])))
-        print("    stakes per outlet %.2f (won %.2f, %.0f EV); turns %.1f, a played turn worth %.1f EV"
-              % (mean([x["stakes"] for x in st]), mean([x["stake_won"] for x in st]), mean([x["stake_ev"] for x in st]),
-                 mean([x["turns"] for x in st]),
-                 sum(x["played_ev"] for x in st) / max(1, sum(x["played_turns"] for x in st))))
+        print("    stakes per outlet %.2f (on the winner %.2f; states %.2f), %.1f prestige staked; turns %.1f"
+              % (mean([x["stakes"] for x in st]), mean([x["stake_won"] for x in st]),
+                 mean([x["stake_states"] for x in st]), mean([x["stake_vp"] for x in st]),
+                 mean([x["turns"] for x in st])))
 
 
 def report(games, seed, config=None):
@@ -713,7 +705,7 @@ def report(games, seed, config=None):
     print("=" * 78)
     for n in (3, 4):
         row = []
-        for s in ("nostake", "staker", "trump", "harris", "attacker", "pacifist", "bigmoney"):
+        for s in ("early", "late", "trump", "harris", "attacker", "pacifist", "bigmoney"):
             share = rotated([s] + ["balanced"] * (n - 1), games, config, seed)
             row.append("%s %s" % (s, pct(share[s])))
         print("  %d outlets (fair %s): %s" % (n, pct(1 / n), "  ".join(row)))

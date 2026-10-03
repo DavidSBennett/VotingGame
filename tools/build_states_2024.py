@@ -101,21 +101,49 @@ def thresholds(ev, margin):
     return won, lost
 
 
+# Prestige (the user, 2026-10-03): every card has 1-12; California, the
+# biggest state, is 12 and the rest scale with their electoral votes.
+def prestige(ev):
+    return max(1, round(12 * ev / 54))
+
+
 # The state's card: the strongest card at its price (the user, 2026-10-03).
-# BEST is the best story at each cost in the simulator's value() (in stars,
-# its prestige included), measured on docs/deck-2024.csv's source deck: a
-# state's card is worth MARGIN more at its history's-side cost, counting
-# its electoral votes at 1.2 per STORY_EV. The big ten (the elections deck)
-# are worth BIG_MARGIN more again. Two versions of equal worth alternate
-# between the sides: A pays more currency, B draws and destroys.
-BEST = {4: 5.6, 5: 6.8, 6: 8.6, 7: 8.8, 8: 12.0}
-MARGIN, BIG_MARGIN, STORY_EV = 0.6, 1.5, 6
+# Card worth is the simulator's value(): power, plus VP_WEIGHT per prestige.
+# A state's card is worth MARGIN more than the best story costing as much
+# or less (docs/deck-2024.csv) at its history's-side cost; the big ten (the
+# elections deck) BIG_MARGIN more again. Two versions of equal worth
+# alternate between the sides: A pays more currency, B draws and destroys.
+MARGIN, BIG_MARGIN, VP_WEIGHT = 0.6, 1.5, 0.6
 WEIGHT = dict(gen=1.0, party=0.8, draw=1.3, trash=0.8)
 POWER_FIELDS = ("gen", "party", "draw", "trash")
 
 
+def story_value(c):
+    """The simulator's value() for a story row of docs/deck-2024.csv."""
+    n = lambda f: int(c[f] or 0)
+    if c["type"] == "Media event":
+        return VP_WEIGHT * n("vp") + 3 * (n("ongoing_gen") + 1.3 * n("ongoing_draw")) - 0.5 * n("others_bonus")
+    v = (VP_WEIGHT * n("vp") + n("gen") + 0.8 * n("themed") + 0.6 * n("campaign") + 1.3 * n("draw")
+         + 0.8 * n("trash") + 0.4 * n("gain_upto") + 0.6 * n("chain") + 0.8 * n("per_same")
+         + n("per_office") + 0.3 * n("defense") + 0.8 * n("retract"))
+    return v + {"scandal": 1.5, "discard": 1.0}.get(c["attack"], 0)
+
+
+def best_by_cost():
+    rows = [r for r in csv.DictReader(open(os.path.join(DOCS, "deck-2024.csv"), encoding="utf-8-sig")) if r["step"]]
+    best, top = {}, 0.0
+    for cost in range(1, max(int(r["cost"]) for r in rows) + 1):
+        top = max([top] + [story_value(r) for r in rows if int(r["cost"]) == cost])
+        best[cost] = round(top, 2)
+    return best
+
+
+BEST = best_by_cost()
+
+
 def best_story(cost):
-    return BEST.get(cost, BEST[8] + 0.6 * (cost - 8))
+    last = max(BEST)
+    return BEST[cost] if cost <= last else BEST[last] + 0.6 * (cost - last)
 
 
 def worth(p):
@@ -123,7 +151,7 @@ def worth(p):
 
 
 def powers(ev, cost, big):
-    target = best_story(cost) + MARGIN + (BIG_MARGIN if big else 0) - 1.2 * ev / STORY_EV
+    target = best_story(cost) + MARGIN + (BIG_MARGIN if big else 0) - VP_WEIGHT * prestige(ev)
     a = dict(draw=1, party=max(1, round(cost / 3)), trash=0)
     b = dict(draw=2 if target >= 7 else 1, party=max(1, round(cost / 4)), trash=1 if cost >= 6 else 0)
     for p in (a, b):
@@ -166,21 +194,21 @@ def main():
         mine, theirs = (a, b) if i % 2 == 0 else (b, a)
         side_power = {winner: mine, ("harris" if winner == "trump" else "trump"): theirs}
         row = dict(key=abbr.lower(), abbr=abbr, state=state, ev=ev, trump_pct=t, harris_pct=h, margin=margin,
-                   winner=winner, tier=tier(margin), deck="elections" if big else "main")
+                   winner=winner, tier=tier(margin), deck="elections" if big else "main", vp=prestige(ev))
         for side in ("trump", "harris"):
             p = side_power[side]
             row[side + "_threshold"] = won if side == winner else lost
             for f in POWER_FIELDS:
                 row["%s_%s" % (side, f)] = p.get(f, 0)
             row[side + "_text"] = power_text(p, side)
-            row[side + "_worth"] = round(worth(p) + 1.2 * ev / STORY_EV, 1)
+            row[side + "_worth"] = round(worth(p) + VP_WEIGHT * prestige(ev), 1)
         row["best_story"] = best_story(won)
         rows.append(row)
     # Safe states first, the closest last (ties: the bigger margin first).
     rows.sort(key=lambda r: (ORDER[r["tier"]], -abs(r["margin"])))
     for n, r in enumerate(rows, 1):
         r["order"] = n
-    fields = ["key", "abbr", "state", "ev", "trump_pct", "harris_pct", "margin", "winner", "tier", "order", "deck"]
+    fields = ["key", "abbr", "state", "ev", "vp", "trump_pct", "harris_pct", "margin", "winner", "tier", "order", "deck"]
     for side in ("trump", "harris"):
         fields += [side + "_threshold"] + ["%s_%s" % (side, f) for f in POWER_FIELDS] + [side + "_text", side + "_worth"]
     fields.append("best_story")
@@ -193,12 +221,14 @@ def main():
     print("elections deck:", ", ".join("%s %d" % (r["abbr"], r["ev"]) for r in sorted(big, key=lambda r: -r["ev"])),
           "= %d EV; main deck %d states, %d EV" % (sum(r["ev"] for r in big), 51 - len(big),
                                                   538 - sum(r["ev"] for r in big)))
+    print("best story by cost (prestige counted): %s" % BEST)
     print("%d contests, %d electoral votes: %s; tiers %s"
           % (len(rows), sum(r["ev"] for r in rows), ev, {t: sum(1 for r in rows if r["tier"] == t) for t in ORDER}))
     for r in sorted(rows, key=lambda r: -r["ev"]):
         s = r["winner"]
-        print("  %-3s %2d  history %-6s cost %2d  best story %4.1f  card %4.1f: %s"
-              % (r["abbr"], r["ev"], s, r[s + "_threshold"], r["best_story"], r[s + "_worth"], r[s + "_text"]))
+        print("  %-3s %2d EV %2d prestige  costs T %2d / H %2d  best story %4.1f  cards T %4.1f / H %4.1f   %s: %s"
+              % (r["abbr"], r["ev"], r["vp"], r["trump_threshold"], r["harris_threshold"], r["best_story"],
+                 r["trump_worth"], r["harris_worth"], s, r[s + "_text"]))
         assert min(r["trump_worth"], r["harris_worth"]) > r["best_story"], r["abbr"]
     assert len(rows) == 51 and sum(r["ev"] for r in rows) == 538 and ev == {"trump": 312, "harris": 226}
 
