@@ -10,7 +10,7 @@ this branch changes since; keep it up to date.
 - Work on the `2024` branch only. Never commit to, merge into, or push
   `main` or `variant`. Never run `deploy.yml` (the real game) or
   `deploy-variant.yml` (the variant).
-- This copy is live at https://2024.thehistorians.org, with its own
+- This copy is live at https://2024.davidsbennett.com, with its own
   database. Pushing `2024` deploys it (`deploy-2024.yml`); to deploy by
   hand: `gh workflow run deploy-2024.yml --ref 2024`, then `gh run watch`.
 - Nothing here should touch https://voting.thehistorians.org (the real

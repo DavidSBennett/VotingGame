@@ -1,7 +1,7 @@
 # The variant, and its 2024 copy
 
 **2026-10-03: copied to the `2024` branch**, live at
-https://2024.thehistorians.org with its own database. Everything below up
+https://2024.davidsbennett.com with its own database. Everything below up
 to that date is the variant's history, shared by both branches; entries
 after it are this branch's own.
 
@@ -771,7 +771,7 @@ The card modal shows a card's image when it exists.
 ### 2026-10-03: the 2024 copy (the user)
 
 The whole variant, as of commit 668ffe2, copied to a new branch `2024`
-with its own site, https://2024.thehistorians.org, and its own database.
+with its own site, https://2024.davidsbennett.com, and its own database.
 The two now change independently. What differs from the variant: the
 deploy workflow (`deploy-2024.yml`, pushes to `2024` only), the site the
 dev server, smoke tests and high scores point at, the lobby label and tab
