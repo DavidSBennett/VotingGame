@@ -19,6 +19,9 @@ For now the stories keep the variant's mechanics, names and flavor (the
   become 1 / 3 / 4 (one old star was 6 EV, and 12 prestige is 54 EV);
   every card worth no stars -- Letters, Local Notices, negative stories --
   is worth 1. Scandals stay at -1. The old stars are kept in `stars`.
+- Each story is a 2024 news story (docs/stories-2024.csv: its key, name,
+  date and flavor, and the card slot whose mechanics it carries); the
+  starters, Editorial and Scandal get 2024 flavor (STARTER_FLAVOR).
 - `card_text` is rewritten for the 2024 rules (text_2024): influence is
   "neutral", a story's themed influence is its party's currency, Campaign
   is for big states, per-office counts every 3 states held, and media
@@ -40,6 +43,17 @@ STEPS = 10
 
 
 PARTY = {"rep": "Republican", "dem": "Democratic"}
+STARTER_FLAVOR = {
+    "letter": "A reader writes in. Printed free, read by a few.",
+    "notice": "Road closures, a bake sale, a zoning hearing. Fills the page; moves no one.",
+    "editorial": "The editorial board's own voice, always on offer.",
+    "scandal": "Something was published about you. It will not go away.",
+}
+
+
+def stories_2024():
+    with open(os.path.join(DOCS, "stories-2024.csv"), encoding="utf-8") as fh:
+        return {r["slot"]: r for r in csv.DictReader(fh)}
 
 
 def text_2024(r):
@@ -59,7 +73,8 @@ def text_2024(r):
 
 def main():
     src = list(csv.DictReader(open(os.path.join(DOCS, "deck-dc.csv"), encoding="utf-8-sig")))
-    fields = list(src[0].keys()) + ["stars", "lean", "step"]
+    fields = list(src[0].keys()) + ["stars", "lean", "step", "date"]
+    news = stories_2024()
     for r in src:
         r["stars"] = r["vp"]
         if r["type"] != "Scandal":
@@ -68,8 +83,9 @@ def main():
     out = []
     for r in src:
         if not r["released"]:
-            row = dict(r, lean="", step="")
+            row = dict(r, lean="", step="", date="")
             row["card_text"] = text_2024(row)
+            row["flavor"] = STARTER_FLAVOR[row["key"]]
             out.append(row)
     flip = 0
     for kind, k in KEEP.items():
@@ -83,6 +99,9 @@ def main():
             step = years.index(int(r["released"])) * STEPS // len(years)
             row = dict(r, lean=lean, step=step)
             row["card_text"] = text_2024(row)
+            s = news[r["key"]]              # the 2024 story on this slot
+            row.update(key=s["key"], name=s["name"], date=s["date"], year=s["date"][:4], flavor=s["flavor"],
+                       released="")
             out.append(row)
         flip += k            # alternate which party a kind starts with
     with open(os.path.join(DOCS, "deck-2024.csv"), "w", encoding="utf-8-sig", newline="") as fh:
