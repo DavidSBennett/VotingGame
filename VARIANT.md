@@ -838,3 +838,36 @@ Balanced bots, 400-2,400 games a line:
   ~25 before; stories 20-30% of the score); the early leader wins 52% at
   3 outlets; among the old papers the Herald wins 51% and the Argus 39%,
   and at a three-beat table Politics wins 42%.
+
+### 2026-10-03: two decks, three currencies, Stake (the user)
+
+- **The elections deck is the ten biggest states** (CA, TX, FL, NY, IL,
+  PA, OH, NC, GA, MI: 254 EV), shuffled, one up at a time, called once a
+  turn for Trump or Harris; each call moves the calendar on a step (10
+  steps); the game ends when the tenth is called.
+- **The main deck holds the other 41 states** (284 EV), all from the
+  start, with 65 of the 106 stories (each kind keeps its share;
+  `tools/build_deck_2024.py` -> `docs/deck-2024.csv`). A state on the
+  exchange is bought for a side at that side's threshold.
+- **Three currencies** replace the beats: neutral (anything), Republican
+  (Trump's side of a state, Republican stories), Democratic (Harris's,
+  Democratic stories). Most cards pay neutral plus one party; stories lean
+  half each way within each kind (33 Republican, 32 Democratic).
+- **States are the strongest cards at every price**: each state card is
+  worth 0.6 (in the simulator's value()) more than the best story at its
+  cost, the big ten 2.1 more. E.g. a 3-EV state costs 4 and pays +4
+  neutral, +1 party, draw 1.
+- **Stake**: instead of playing its hand, an outlet may spend its turn
+  setting one card from it aside, face down, on Trump or Harris. At the
+  end the candidate with the most EVs wins (claimed states for their side;
+  unclaimed as in 2024); a staked card on the winner scores its worth plus
+  a bonus (12 EV to start), on the loser nothing.
+
+First pass (`tools/simulate_2024.py`, 300-400 games, balanced bots):
+games of 10-12 rounds (only ten calls, and a rich economy); a played turn
+is worth ~24 EV at 3 outlets. **Harris wins 1-3% of games**: ~30% of the
+EVs go unclaimed and count as in 2024, and history's side is cheaper, so
+every bot stakes Trump and every stake pays (3.4 stakes per outlet).
+Counting unclaimed states for nobody: Harris 20%. Seats at 4 outlets
+8/15/39/38 (the Editorial catch-up is too much in a short game); early
+leader wins 62% at 3.

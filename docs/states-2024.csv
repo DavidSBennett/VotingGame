@@ -1,52 +1,52 @@
-﻿key,abbr,state,ev,trump_pct,harris_pct,margin,winner,tier,order,beat,trump_beat,trump_theme,trump_threshold,trump_gen,trump_themed,trump_draw,trump_trash,trump_text,harris_beat,harris_theme,harris_threshold,harris_gen,harris_themed,harris_draw,harris_trash,harris_text
-dc,DC,District of Columbia,3,6.47,90.28,-83.81,harris,Safe,1,Politics,Culture,Social,13,0,0,1,0,Draw 1 card.,Politics,Political,4,1,0,0,0,+1 influence.
-wy,WY,Wyoming,3,71.6,25.84,45.76,trump,Safe,2,Culture,Culture,Social,4,1,0,0,0,+1 influence.,Economy,Economic,9,0,0,1,0,Draw 1 card.
-wv,WV,West Virginia,4,69.97,28.1,41.87,trump,Safe,3,Economy,Politics,Political,5,1,0,0,0,+1 influence.,Economy,Economic,10,0,0,1,0,Draw 1 card.
-id,ID,Idaho,4,66.87,30.38,36.49,trump,Safe,4,Culture,Culture,Social,5,1,0,0,0,+1 influence.,Economy,Economic,9,0,0,1,0,Draw 1 card.
-nd,ND,North Dakota,3,66.96,30.51,36.45,trump,Safe,5,Economy,Economy,Economic,4,1,0,0,0,+1 influence.,Culture,Social,8,0,0,1,0,Draw 1 card.
-ok,OK,Oklahoma,7,66.16,31.9,34.26,trump,Safe,6,Economy,Economy,Economic,6,2,0,0,0,+2 influence.,Culture,Social,10,1,0,1,0,"+1 influence, draw 1 card."
-vt,VT,Vermont,3,32.32,63.83,-31.51,harris,Safe,7,Politics,Economy,Economic,8,1,0,0,0,+1 influence.,Politics,Political,4,0,0,1,0,Draw 1 card.
-ar,AR,Arkansas,6,64.2,33.56,30.64,trump,Safe,8,Culture,Culture,Social,5,1,0,1,0,"+1 influence, draw 1 card.",Politics,Political,9,2,0,0,0,+2 influence.
-ky,KY,Kentucky,8,64.47,33.94,30.53,trump,Safe,9,Economy,Economy,Economic,6,1,0,1,0,"+1 influence, draw 1 card.",Politics,Political,10,2,0,0,0,+2 influence.
-al,AL,Alabama,9,64.57,34.1,30.47,trump,Safe,10,Culture,Culture,Social,6,2,1,0,0,"+2 influence, +1 Culture.",Economy,Economic,10,0,0,2,0,Draw 2 cards.
-tn,TN,Tennessee,11,64.19,34.47,29.72,trump,Safe,11,Culture,Culture,Social,7,2,1,0,0,"+2 influence, +1 Culture.",Economy,Economic,10,0,0,2,0,Draw 2 cards.
-sd,SD,South Dakota,3,63.43,34.24,29.19,trump,Safe,12,Culture,Culture,Social,4,0,0,1,0,Draw 1 card.,Politics,Political,7,1,0,0,0,+1 influence.
-md,MD,Maryland,10,34.08,62.62,-28.54,harris,Safe,13,Politics,Politics,Political,10,0,0,2,0,Draw 2 cards.,Culture,Social,7,2,1,0,0,"+2 influence, +1 Culture."
-ma,MA,Massachusetts,11,36.02,61.22,-25.2,harris,Safe,14,Politics,Culture,Social,10,2,1,0,0,"+2 influence, +1 Culture.",Politics,Political,7,0,0,2,0,Draw 2 cards.
-hi,HI,Hawaii,4,37.48,60.59,-23.11,harris,Safe,15,Politics,Economy,Economic,8,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
-ms,MS,Mississippi,6,60.89,38.0,22.89,trump,Safe,16,Culture,Culture,Social,5,2,0,0,0,+2 influence.,Politics,Political,8,1,0,1,0,"+1 influence, draw 1 card."
-la,LA,Louisiana,8,60.22,38.21,22.01,trump,Safe,17,Culture,Culture,Social,6,2,0,0,0,+2 influence.,Economy,Economic,9,1,0,1,0,"+1 influence, draw 1 card."
-ut,UT,Utah,6,59.38,37.79,21.59,trump,Safe,18,Culture,Culture,Social,5,2,0,0,0,+2 influence.,Economy,Economic,8,1,0,1,0,"+1 influence, draw 1 card."
-ne,NE,Nebraska,5,59.32,38.86,20.46,trump,Safe,19,Economy,Politics,Political,5,1,0,1,0,"+1 influence, draw 1 card.",Culture,Social,8,2,0,0,0,+2 influence.
-ca,CA,California,54,38.33,58.47,-20.14,harris,Safe,20,Politics,Economy,Economic,17,2,0,2,0,"+2 influence, draw 2 cards.",Politics,Political,14,4,0,1,0,"+4 influence, draw 1 card."
-mt,MT,Montana,4,58.39,38.46,19.93,trump,Safe,21,Culture,Culture,Social,5,1,0,0,0,+1 influence.,Economy,Economic,7,0,0,1,0,Draw 1 card.
-in,IN,Indiana,11,58.58,39.62,18.96,trump,Safe,22,Economy,Economy,Economic,7,2,1,0,0,"+2 influence, +1 Economy.",Culture,Social,9,0,0,2,0,Draw 2 cards.
-mo,MO,Missouri,10,58.49,40.08,18.41,trump,Safe,23,Culture,Culture,Social,7,0,0,2,0,Draw 2 cards.,Politics,Political,9,2,1,0,0,"+2 influence, +1 Politics."
-wa,WA,Washington,12,39.01,57.23,-18.22,harris,Safe,24,Politics,Politics,Political,9,2,1,0,0,"+2 influence, +1 Politics.",Culture,Social,7,0,0,2,0,Draw 2 cards.
-sc,SC,South Carolina,9,58.23,40.36,17.87,trump,Safe,25,Culture,Politics,Political,6,2,1,0,0,"+2 influence, +1 Politics.",Culture,Social,8,0,0,2,0,Draw 2 cards.
-ks,KS,Kansas,6,57.16,41.04,16.12,trump,Safe,26,Economy,Politics,Political,5,2,0,0,0,+2 influence.,Economy,Economic,7,1,0,1,0,"+1 influence, draw 1 card."
-de,DE,Delaware,3,41.79,56.49,-14.7,harris,Likely,27,Economy,Politics,Political,6,1,0,0,0,+1 influence.,Economy,Economic,4,0,0,1,0,Draw 1 card.
-ct,CT,Connecticut,7,41.89,56.4,-14.51,harris,Likely,28,Economy,Politics,Political,8,1,0,1,0,"+1 influence, draw 1 card.",Economy,Economic,6,2,0,0,0,+2 influence.
-or,OR,Oregon,8,40.97,55.27,-14.3,harris,Likely,29,Politics,Economy,Economic,8,2,0,0,0,+2 influence.,Politics,Political,6,1,0,1,0,"+1 influence, draw 1 card."
-ri,RI,Rhode Island,4,41.76,55.54,-13.78,harris,Likely,30,Politics,Economy,Economic,7,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
-tx,TX,Texas,40,56.14,42.46,13.68,trump,Likely,31,Culture,Culture,Social,12,2,0,2,0,"+2 influence, draw 2 cards.",Economy,Economic,14,4,0,1,0,"+4 influence, draw 1 card."
-ia,IA,Iowa,6,55.73,42.52,13.21,trump,Likely,32,Economy,Economy,Economic,5,1,0,1,0,"+1 influence, draw 1 card.",Culture,Social,7,2,0,0,0,+2 influence.
-ak,AK,Alaska,3,54.54,41.41,13.13,trump,Likely,33,Politics,Politics,Political,4,0,0,1,0,Draw 1 card.,Culture,Social,6,1,0,0,0,+1 influence.
-fl,FL,Florida,30,56.09,42.99,13.1,trump,Likely,34,Culture,Politics,Political,11,2,0,2,0,"+2 influence, draw 2 cards.",Culture,Social,13,4,0,1,0,"+4 influence, draw 1 card."
-ny,NY,New York,28,43.31,55.91,-12.6,harris,Likely,35,Politics,Politics,Political,13,2,0,2,0,"+2 influence, draw 2 cards.",Culture,Social,11,4,0,1,0,"+4 influence, draw 1 card."
-oh,OH,Ohio,17,55.14,43.93,11.21,trump,Likely,36,Economy,Economy,Economic,8,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile.",Culture,Social,10,3,0,1,0,"+3 influence, draw 1 card."
-co,CO,Colorado,10,43.14,54.13,-10.99,harris,Likely,37,Politics,Economy,Economic,9,2,1,0,0,"+2 influence, +1 Economy.",Politics,Political,7,0,0,2,0,Draw 2 cards.
-il,IL,Illinois,19,43.47,54.37,-10.9,harris,Likely,38,Economy,Culture,Social,11,3,0,1,0,"+3 influence, draw 1 card.",Economy,Economic,9,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile."
-me,ME,Maine,4,45.46,52.4,-6.94,harris,Lean,39,Politics,Economy,Economic,6,1,0,0,0,+1 influence.,Politics,Political,5,0,0,1,0,Draw 1 card.
-nm,NM,New Mexico,5,45.85,51.85,-6.0,harris,Lean,40,Culture,Politics,Political,6,2,0,0,0,+2 influence.,Culture,Social,5,1,0,1,0,"+1 influence, draw 1 card."
-nj,NJ,New Jersey,14,46.06,51.97,-5.91,harris,Lean,41,Economy,Culture,Social,9,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile.",Economy,Economic,8,3,0,1,0,"+3 influence, draw 1 card."
-va,VA,Virginia,13,46.05,51.83,-5.78,harris,Lean,42,Politics,Culture,Social,8,0,0,2,0,Draw 2 cards.,Politics,Political,7,2,1,0,0,"+2 influence, +1 Politics."
-az,AZ,Arizona,11,52.22,46.69,5.53,trump,Lean,43,Culture,Economy,Economic,7,2,1,0,0,"+2 influence, +1 Economy.",Culture,Social,8,0,0,2,0,Draw 2 cards.
-mn,MN,Minnesota,10,46.68,50.92,-4.24,harris,Lean,44,Economy,Politics,Political,8,2,1,0,0,"+2 influence, +1 Politics.",Economy,Economic,7,0,0,2,0,Draw 2 cards.
-nc,NC,North Carolina,16,50.86,47.65,3.21,trump,Lean,45,Politics,Politics,Political,8,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile.",Economy,Economic,9,3,0,1,0,"+3 influence, draw 1 card."
-nv,NV,Nevada,6,50.59,47.49,3.1,trump,Lean,46,Economy,Economy,Economic,5,2,0,0,0,+2 influence.,Culture,Social,6,1,0,1,0,"+1 influence, draw 1 card."
-nh,NH,New Hampshire,4,47.87,50.65,-2.78,harris,Toss-up,47,Politics,Politics,Political,6,1,0,0,0,+1 influence.,Culture,Social,5,0,0,1,0,Draw 1 card.
-ga,GA,Georgia,16,50.72,48.53,2.19,trump,Toss-up,48,Politics,Politics,Political,8,3,0,1,0,"+3 influence, draw 1 card.",Economy,Economic,9,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile."
-pa,PA,Pennsylvania,19,50.37,48.66,1.71,trump,Toss-up,49,Economy,Economy,Economic,9,3,0,1,0,"+3 influence, draw 1 card.",Politics,Political,10,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile."
-mi,MI,Michigan,15,49.73,48.31,1.42,trump,Toss-up,50,Economy,Culture,Social,8,3,0,1,0,"+3 influence, draw 1 card.",Politics,Political,9,2,0,1,1,"+2 influence, draw 1 card, then you may destroy a card in your hand or discard pile."
-wi,WI,Wisconsin,10,49.6,48.74,0.86,trump,Toss-up,51,Economy,Economy,Economic,7,0,0,2,0,Draw 2 cards.,Culture,Social,8,2,1,0,0,"+2 influence, +1 Culture."
+﻿key,abbr,state,ev,trump_pct,harris_pct,margin,winner,tier,order,deck,trump_threshold,trump_gen,trump_party,trump_draw,trump_trash,trump_text,trump_worth,harris_threshold,harris_gen,harris_party,harris_draw,harris_trash,harris_text,harris_worth,best_story
+dc,DC,District of Columbia,3,6.47,90.28,-83.81,harris,Safe,1,main,13,4,1,1,0,"+4 neutral, +1 Republican, draw 1 card.",6.7,4,4,1,1,0,"+4 neutral, +1 Democratic, draw 1 card.",6.7,5.6
+wy,WY,Wyoming,3,71.6,25.84,45.76,trump,Safe,2,main,4,4,1,1,0,"+4 neutral, +1 Republican, draw 1 card.",6.7,9,4,1,1,0,"+4 neutral, +1 Democratic, draw 1 card.",6.7,5.6
+wv,WV,West Virginia,4,69.97,28.1,41.87,trump,Safe,3,main,5,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",7.7,10,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",7.9,6.8
+id,ID,Idaho,4,66.87,30.38,36.49,trump,Safe,4,main,5,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",7.7,9,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",7.9,6.8
+nd,ND,North Dakota,3,66.96,30.51,36.45,trump,Safe,5,main,4,4,1,1,0,"+4 neutral, +1 Republican, draw 1 card.",6.7,8,4,1,1,0,"+4 neutral, +1 Democratic, draw 1 card.",6.7,5.6
+ok,OK,Oklahoma,7,66.16,31.9,34.26,trump,Safe,6,main,6,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",9.3,10,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",9.4,8.6
+vt,VT,Vermont,3,32.32,63.83,-31.51,harris,Safe,7,main,8,4,1,1,0,"+4 neutral, +1 Republican, draw 1 card.",6.7,4,4,1,1,0,"+4 neutral, +1 Democratic, draw 1 card.",6.7,5.6
+ar,AR,Arkansas,6,64.2,33.56,30.64,trump,Safe,8,main,5,5,1,1,0,"+5 neutral, +1 Republican, draw 1 card.",8.3,9,4,2,1,0,"+4 neutral, +2 Democratic, draw 1 card.",8.1,6.8
+ky,KY,Kentucky,8,64.47,33.94,30.53,trump,Safe,9,main,6,3,2,2,1,"+3 neutral, +2 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",9.6,10,5,2,1,0,"+5 neutral, +2 Democratic, draw 1 card.",9.5,8.6
+al,AL,Alabama,9,64.57,34.1,30.47,trump,Safe,10,main,6,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",9.7,10,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",9.8,8.6
+tn,TN,Tennessee,11,64.19,34.47,29.72,trump,Safe,11,main,7,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",10.1,10,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.2,8.8
+sd,SD,South Dakota,3,63.43,34.24,29.19,trump,Safe,12,main,4,4,1,1,0,"+4 neutral, +1 Republican, draw 1 card.",6.7,7,4,1,1,0,"+4 neutral, +1 Democratic, draw 1 card.",6.7,5.6
+md,MD,Maryland,10,34.08,62.62,-28.54,harris,Safe,13,main,10,3,2,2,1,"+3 neutral, +2 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.0,7,5,2,1,0,"+5 neutral, +2 Democratic, draw 1 card.",9.9,8.8
+ma,MA,Massachusetts,11,36.02,61.22,-25.2,harris,Safe,14,main,10,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",10.1,7,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.2,8.8
+hi,HI,Hawaii,4,37.48,60.59,-23.11,harris,Safe,15,main,8,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",7.7,5,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",7.9,6.8
+ms,MS,Mississippi,6,60.89,38.0,22.89,trump,Safe,16,main,5,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",8.1,8,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",8.3,6.8
+la,LA,Louisiana,8,60.22,38.21,22.01,trump,Safe,17,main,6,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",9.5,9,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",9.6,8.6
+ut,UT,Utah,6,59.38,37.79,21.59,trump,Safe,18,main,5,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",8.1,8,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",8.3,6.8
+ne,NE,Nebraska,5,59.32,38.86,20.46,trump,Safe,19,main,5,5,1,1,0,"+5 neutral, +1 Republican, draw 1 card.",8.1,8,4,2,1,0,"+4 neutral, +2 Democratic, draw 1 card.",7.9,6.8
+ca,CA,California,54,38.33,58.47,-20.14,harris,Safe,20,elections,17,2,4,1,1,"+2 neutral, +4 Republican, draw 1 card, then you may destroy a card in your hand or discard pile.",18.1,14,2,5,1,0,"+2 neutral, +5 Democratic, draw 1 card.",18.1,15.6
+mt,MT,Montana,4,58.39,38.46,19.93,trump,Safe,21,main,5,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",7.7,7,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",7.9,6.8
+in,IN,Indiana,11,58.58,39.62,18.96,trump,Safe,22,main,7,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",10.1,9,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.2,8.8
+mo,MO,Missouri,10,58.49,40.08,18.41,trump,Safe,23,main,7,3,2,2,1,"+3 neutral, +2 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.0,9,5,2,1,0,"+5 neutral, +2 Democratic, draw 1 card.",9.9,8.8
+wa,WA,Washington,12,39.01,57.23,-18.22,harris,Safe,24,main,9,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",10.3,7,2,2,2,1,"+2 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",9.4,8.8
+sc,SC,South Carolina,9,58.23,40.36,17.87,trump,Safe,25,main,6,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",9.7,8,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",9.8,8.6
+ks,KS,Kansas,6,57.16,41.04,16.12,trump,Safe,26,main,5,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",8.1,7,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",8.3,6.8
+de,DE,Delaware,3,41.79,56.49,-14.7,harris,Likely,27,main,6,4,1,1,0,"+4 neutral, +1 Republican, draw 1 card.",6.7,4,4,1,1,0,"+4 neutral, +1 Democratic, draw 1 card.",6.7,5.6
+ct,CT,Connecticut,7,41.89,56.4,-14.51,harris,Likely,28,main,8,3,2,2,1,"+3 neutral, +2 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",9.4,6,5,2,1,0,"+5 neutral, +2 Democratic, draw 1 card.",9.3,8.6
+or,OR,Oregon,8,40.97,55.27,-14.3,harris,Likely,29,main,8,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",9.5,6,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",9.6,8.6
+ri,RI,Rhode Island,4,41.76,55.54,-13.78,harris,Likely,30,main,7,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",7.7,5,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",7.9,6.8
+tx,TX,Texas,40,56.14,42.46,13.68,trump,Likely,31,elections,12,3,3,2,1,"+3 neutral, +3 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",16.8,14,4,4,1,0,"+4 neutral, +4 Democratic, draw 1 card.",16.5,14.4
+ia,IA,Iowa,6,55.73,42.52,13.21,trump,Likely,32,main,5,5,1,1,0,"+5 neutral, +1 Republican, draw 1 card.",8.3,7,4,2,1,0,"+4 neutral, +2 Democratic, draw 1 card.",8.1,6.8
+ak,AK,Alaska,3,54.54,41.41,13.13,trump,Likely,33,main,4,4,1,1,0,"+4 neutral, +1 Republican, draw 1 card.",6.7,6,4,1,1,0,"+4 neutral, +1 Democratic, draw 1 card.",6.7,5.6
+fl,FL,Florida,30,56.09,42.99,13.1,trump,Likely,34,elections,11,5,3,2,1,"+5 neutral, +3 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",16.8,13,6,4,1,0,"+6 neutral, +4 Democratic, draw 1 card.",16.5,13.8
+ny,NY,New York,28,43.31,55.91,-12.6,harris,Likely,35,elections,13,5,3,2,1,"+5 neutral, +3 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",16.4,11,6,4,1,0,"+6 neutral, +4 Democratic, draw 1 card.",16.1,13.8
+oh,OH,Ohio,17,55.14,43.93,11.21,trump,Likely,36,elections,8,6,2,2,1,"+6 neutral, +2 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",14.4,10,7,3,1,0,"+7 neutral, +3 Democratic, draw 1 card.",14.1,12.0
+co,CO,Colorado,10,43.14,54.13,-10.99,harris,Likely,37,main,9,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",9.9,7,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.0,8.8
+il,IL,Illinois,19,43.47,54.37,-10.9,harris,Likely,38,elections,11,8,3,1,0,"+8 neutral, +3 Republican, draw 1 card.",15.5,9,6,2,2,1,"+6 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",14.8,12.6
+me,ME,Maine,4,45.46,52.4,-6.94,harris,Lean,39,main,6,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",7.7,5,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",7.9,6.8
+nm,NM,New Mexico,5,45.85,51.85,-6.0,harris,Lean,40,main,6,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",7.9,5,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",8.1,6.8
+nj,NJ,New Jersey,14,46.06,51.97,-5.91,harris,Lean,41,main,9,5,2,2,1,"+5 neutral, +2 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",12.8,8,7,3,1,0,"+7 neutral, +3 Democratic, draw 1 card.",13.5,12.0
+va,VA,Virginia,13,46.05,51.83,-5.78,harris,Lean,42,main,8,4,2,1,1,"+4 neutral, +2 Republican, draw 1 card, then you may destroy a card in your hand or discard pile.",10.3,7,4,2,1,0,"+4 neutral, +2 Democratic, draw 1 card.",9.5,8.8
+az,AZ,Arizona,11,52.22,46.69,5.53,trump,Lean,43,main,7,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",10.1,8,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.2,8.8
+mn,MN,Minnesota,10,46.68,50.92,-4.24,harris,Lean,44,main,8,5,2,1,0,"+5 neutral, +2 Republican, draw 1 card.",9.9,7,3,2,2,1,"+3 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.0,8.8
+nc,NC,North Carolina,16,50.86,47.65,3.21,trump,Lean,45,elections,8,6,2,2,1,"+6 neutral, +2 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",14.2,9,8,3,1,0,"+8 neutral, +3 Democratic, draw 1 card.",14.9,12.0
+nv,NV,Nevada,6,50.59,47.49,3.1,trump,Lean,46,main,5,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",8.1,6,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",8.3,6.8
+nh,NH,New Hampshire,4,47.87,50.65,-2.78,harris,Toss-up,47,main,6,4,2,1,0,"+4 neutral, +2 Republican, draw 1 card.",7.7,5,5,1,1,0,"+5 neutral, +1 Democratic, draw 1 card.",7.9,6.8
+ga,GA,Georgia,16,50.72,48.53,2.19,trump,Toss-up,48,elections,8,8,3,1,0,"+8 neutral, +3 Republican, draw 1 card.",14.9,9,6,2,2,1,"+6 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",14.2,12.0
+pa,PA,Pennsylvania,19,50.37,48.66,1.71,trump,Toss-up,49,elections,9,8,3,1,0,"+8 neutral, +3 Republican, draw 1 card.",15.5,10,6,2,2,1,"+6 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",14.8,12.6
+mi,MI,Michigan,15,49.73,48.31,1.42,trump,Toss-up,50,elections,8,8,3,1,0,"+8 neutral, +3 Republican, draw 1 card.",14.7,9,7,2,2,1,"+7 neutral, +2 Democratic, draw 2 cards, then you may destroy a card in your hand or discard pile.",15.0,12.0
+wi,WI,Wisconsin,10,49.6,48.74,0.86,trump,Toss-up,51,main,7,3,2,2,1,"+3 neutral, +2 Republican, draw 2 cards, then you may destroy a card in your hand or discard pile.",10.0,8,5,2,1,0,"+5 neutral, +2 Democratic, draw 1 card.",9.9,8.8
