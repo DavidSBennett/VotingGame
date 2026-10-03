@@ -65,13 +65,13 @@ if (!in_array($level, ['easy', 'hard'], true)) error('bot_level must be easy or 
 $config['bot_level'] = $level;
 $configJson = json_encode($config, JSON_UNESCAPED_UNICODE);
 
-/** Rival papers, for bot seats. Real mastheads of the period. */
+/** Rival editors, for bot seats (each is dealt an outlet at the start). */
 function vg_bot_names() {
   return [
-    'The National Intelligencer',
-    'The Richmond Enquirer',
-    'The New York Tribune',
-    'The Columbian Centinel',
+    'The City Desk',
+    'The Night Desk',
+    'The Wire Desk',
+    'The Politics Desk',
   ];
 }
 
