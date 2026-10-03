@@ -51,6 +51,9 @@ def my_prestige(st):
     if st.get("turn") and st["turn"]["seat"] == you["seat"]:
         cards += st["turn"]["played"]
     vp = sum(c["vp"] for c in cards)
+    # An election card may also be worth prestige per office held (1860).
+    offices = sum(1 for c in cards if c["type"] == "Election")
+    vp += sum(c.get("vp_per_office") or 0 for c in cards) * offices
     if me["paper"] and me["paper"]["key"] == "argus":
         vp += sum(1 for c in cards if c["type"] == "Election")
     return vp
