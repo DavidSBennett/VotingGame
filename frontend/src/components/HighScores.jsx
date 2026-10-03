@@ -12,7 +12,7 @@ export default function HighScores({ papers = [] }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchHighScores({ limit: 15, variant: 'variant', engine: 'dc' })
+    fetchHighScores({ limit: 15, variant: '2024', engine: 'dc' })
       .then((data) => setScores(data.scores || []))
       .catch((err) => setError(err.message));
   }, []);

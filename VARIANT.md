@@ -1,4 +1,10 @@
-# The variant
+# The variant, and its 2024 copy
+
+**2026-10-03: copied to the `2024` branch**, live at
+https://2024.thehistorians.org with its own database. Everything below up
+to that date is the variant's history, shared by both branches; entries
+after it are this branch's own.
+
 
 Branched from `main` on 2026-09-27, at the rules of the live game:
 seventeen elections, stories run positive / run negative / buried,
@@ -761,3 +767,12 @@ woodcut to 1819 (66 cards), wood engraving 1820-1835 (27), lithograph
 Native people ask for dignified figures and no caricature, since period
 prints often caricatured them. Images go in `frontend/public/art/<file>`.
 The card modal shows a card's image when it exists.
+
+### 2026-10-03: the 2024 copy (the user)
+
+The whole variant, as of commit 668ffe2, copied to a new branch `2024`
+with its own site, https://2024.thehistorians.org, and its own database.
+The two now change independently. What differs from the variant: the
+deploy workflow (`deploy-2024.yml`, pushes to `2024` only), the site the
+dev server, smoke tests and high scores point at, the lobby label and tab
+title, and the edition recorded on new games and scores ('2024').

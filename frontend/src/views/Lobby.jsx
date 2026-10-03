@@ -174,7 +174,7 @@ export default function Lobby({ onSeated }) {
       {/* Title page */}
       <header className="text-center animate-fade">
         <div className="mx-auto mb-4 inline-block border border-oxblood-500 bg-oxblood-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-oxblood-300">
-          Variant · experimental rules · not the real game
+          2024 · a copy of the variant · not the real game
         </div>
         <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-gold-500">
           A card game of the partisan press · 1796–1860

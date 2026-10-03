@@ -1,18 +1,19 @@
-name: Build & Deploy the VARIANT (SSH)
+name: Build & Deploy the 2024 copy (SSH)
 
-# Publishes the `variant` branch -- an experimental copy of the game -- to
-# its own subdomain, with its own database. It never touches the live game.
-#     gh workflow run deploy-variant.yml --ref variant
+# Publishes the `2024` branch -- a copy of the variant (itself an
+# experimental copy of the game) -- to its own subdomain, with its own
+# database. It never touches the live game or the variant.
+#     gh workflow run deploy-2024.yml --ref 2024
 #     gh run watch
 on:
   push:
-    branches: [ variant ]
+    branches: [ '2024' ]
   workflow_dispatch:
 
 env:
   # The subdomain this install serves. Used for the rsync target path and
   # the post-deploy OPcache flush. Change in ONE place.
-  SUBDOMAIN: fourthestate.thehistorians.org
+  SUBDOMAIN: 2024.thehistorians.org
   # The OPcache flush token is the OPCACHE_TOKEN Actions secret. Never put
   # it here: this repository is public.
 
@@ -20,9 +21,9 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Refuse anything but the variant branch
+      - name: Refuse anything but the 2024 branch
         run: |
-          test "$GITHUB_REF" = "refs/heads/variant" || { echo "deploy-variant.yml publishes variant only (got $GITHUB_REF)"; exit 1; }
+          test "$GITHUB_REF" = "refs/heads/2024" || { echo "deploy-2024.yml publishes the 2024 branch only (got $GITHUB_REF)"; exit 1; }
 
       - name: Checkout
         uses: actions/checkout@v4

@@ -1,19 +1,20 @@
-# This checkout is the VARIANT of The Fourth Estate
+# This checkout is the 2024 copy of The Fourth Estate
 
-The `variant` branch is an experimental copy of the game, used to test rule
-ideas without touching the real game. Read `VARIANT.md` for what is being
-tested and what has been tried so far, and keep it up to date.
+The `2024` branch is a copy of the `variant` branch (itself an experimental
+copy of the game), taken on 2026-10-03, with its own site and database.
+`VARIANT.md` records everything the variant tried before the copy and what
+this branch changes since; keep it up to date.
 
 ## Hard rules
 
-- Work on the `variant` branch only. Never commit to, merge into, or push
-  `main`. Never run `deploy.yml` (it publishes the real game and refuses any
-  ref but main anyway).
-- The variant is live at https://fourthestate.thehistorians.org, with its own
-  database. Pushing `variant` deploys it (`deploy-variant.yml`); to deploy
-  by hand: `gh workflow run deploy-variant.yml --ref variant`, then
-  `gh run watch`.
-- Nothing here should touch https://voting.thehistorians.org.
+- Work on the `2024` branch only. Never commit to, merge into, or push
+  `main` or `variant`. Never run `deploy.yml` (the real game) or
+  `deploy-variant.yml` (the variant).
+- This copy is live at https://2024.thehistorians.org, with its own
+  database. Pushing `2024` deploys it (`deploy-2024.yml`); to deploy by
+  hand: `gh workflow run deploy-2024.yml --ref 2024`, then `gh run watch`.
+- Nothing here should touch https://voting.thehistorians.org (the real
+  game) or https://fourthestate.thehistorians.org (the variant).
 
 ## What the variant plays
 
@@ -47,7 +48,7 @@ game (`backend/engine.php`, `backend/game_data.php`, `tools/simulate.py`,
 - Frontend: `frontend/` (Vite + React + Tailwind; literal class strings
   only). The game screen is `views/DcShell.jsx` + `components/dc/`.
   `npm run build` in `frontend/` to check it compiles; `npm run dev`
-  (`.claude/launch.json`: "frontend") talks to the live variant.
+  (`.claude/launch.json`: "frontend") talks to the live 2024 site.
 - `docs/DESIGN.md` records the main game's design; `docs/design-doc.md` +
   `tools/build_design_doc.py` build the Word design document.
 
