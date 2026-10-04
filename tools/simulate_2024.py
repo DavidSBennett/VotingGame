@@ -79,8 +79,9 @@ with open(os.path.join(DOCS, "outlets-2024.csv"), encoding="utf-8-sig") as fh:
     PAPERS = {r["key"]: r for r in csv.DictReader(fh)}      # the eight 2024 outlets (one ability each)
 assert len(STATES) == 51 and sum(s["ev"] for s in STATES.values()) == 538
 STORIES = [k for k, c in CARDS.items() if c["step"] is not None]
-BIG = [k for k, s in STATES.items() if s["deck"] == "big"]        # the big-states deck (priced 8+)
-SMALL = [k for k, s in STATES.items() if s["deck"] == "small"]    # the small-states deck
+DECKS = ("large", "medium", "small")                            # three state decks, one state face up on each
+BIG = [k for k, s in STATES.items() if s["deck"] == "large"]     # priced 8+: buying one moves the calendar
+SMALL = [k for k, s in STATES.items() if s["deck"] != "large"]
 STEPS = 1 + max(CARDS[k]["step"] for k in STORIES)                # the calendar
 
 
@@ -178,7 +179,7 @@ class Game:
             self.rng.shuffle(p.deck)
             self.draw(p, self.cfg["hand"])
         # Two state decks, one card face up on each; buying it reveals the next.
-        self.decks = {"big": list(BIG), "small": list(SMALL)}
+        self.decks = {d: [k for k in STATES if STATES[k]["deck"] == d] for d in DECKS}
         for d in self.decks.values():
             self.rng.shuffle(d)
         self.up = {d: self.decks[d].pop() for d in self.decks}
@@ -370,7 +371,7 @@ class Game:
                 self.up[deck] = self.decks[deck].pop() if self.decks[deck] else None
                 if self.up[deck]:
                     self.reveal(self.up[deck])          # the next state turns over: its reveal hits everyone
-                if deck == "big":
+                if deck == "large":
                     p.stats["called"] += 1
                     self.big_bought += 1
                     while self.step < min(STEPS - 1, self.big_bought):
