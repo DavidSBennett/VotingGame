@@ -44,7 +44,7 @@ SIDES = ("trump", "harris")
 PARTY = {"trump": "rep", "harris": "dem"}
 SIDE = {"rep": "trump", "dem": "harris"}
 INT = ("cost", "vp", "gen", "themed", "campaign", "draw", "trash", "gain_upto", "chain", "per_same",
-       "per_office", "defense", "ongoing_gen", "ongoing_draw", "others_bonus", "copies", "retract")
+       "per_office", "defense", "ongoing_gen", "ongoing_draw", "others_bonus", "copies", "retract", "top_party")
 
 
 def load():
@@ -57,6 +57,7 @@ def load():
             c["kind"] = r["theme"] or None
             c["lean"] = r["lean"] or None
             c["step"] = int(r["step"]) if r["step"] else None
+            c["bottom_attack"] = r.get("bottom_attack") or ""
             cards[c["key"]] = c
     states = {}
     with open(os.path.join(DOCS, "states-2024.csv"), encoding="utf-8-sig") as fh:
@@ -68,6 +69,7 @@ def load():
             for side in SIDES:
                 for f in ("threshold", "gen", "party", "draw", "trash"):
                     s["%s_%s" % (side, f)] = int(r["%s_%s" % (side, f)])
+            s["reveal_n"] = int(r.get("reveal_n") or 0)
             states[s["key"]] = s
     return cards, states
 
@@ -77,9 +79,9 @@ with open(os.path.join(DOCS, "outlets-2024.csv"), encoding="utf-8-sig") as fh:
     PAPERS = {r["key"]: r for r in csv.DictReader(fh)}      # the eight 2024 outlets (one ability each)
 assert len(STATES) == 51 and sum(s["ev"] for s in STATES.values()) == 538
 STORIES = [k for k, c in CARDS.items() if c["step"] is not None]
-BIG = [k for k, s in STATES.items() if s["deck"] == "elections"]
-SMALL = [k for k, s in STATES.items() if s["deck"] == "main"]
-STEPS = len(BIG)
+BIG = [k for k, s in STATES.items() if s["deck"] == "big"]        # the big-states deck (priced 8+)
+SMALL = [k for k, s in STATES.items() if s["deck"] == "small"]    # the small-states deck
+STEPS = 1 + max(CARDS[k]["step"] for k in STORIES)                # the calendar
 
 
 def card(cid):
@@ -89,7 +91,8 @@ def card(cid):
         key, _, side = cid[3:].partition(":")
         s = STATES[key]
         c = dict(key=cid, name=s["state"], type="State", kind=None, lean=PARTY.get(side), vp=int(s["vp"]), cost=0,
-                 others_theme="", step=None, attack="", **{f: 0 for f in INT if f not in ("vp", "cost")})
+                 others_theme="", step=None, attack="", bottom_attack="",
+                 **{f: 0 for f in INT if f not in ("vp", "cost")})
         if side:
             c.update(name=s[side + "_name"], gen=s[side + "_gen"],
                      themed=s[side + "_party"], draw=s[side + "_draw"], trash=s[side + "_trash"],
@@ -174,11 +177,14 @@ class Game:
             p.deck += ["editorial#s%d.%d" % (p.seat, i) for i in range(self.cfg["extra_editorials"][p.seat])]
             self.rng.shuffle(p.deck)
             self.draw(p, self.cfg["hand"])
-        self.big = list(BIG)
-        self.rng.shuffle(self.big)      # the elections deck, one at a time
-        self.e = 0
+        # Two state decks, one card face up on each; buying it reveals the next.
+        self.decks = {"big": list(BIG), "small": list(SMALL)}
+        for d in self.decks.values():
+            self.rng.shuffle(d)
+        self.up = {d: self.decks[d].pop() for d in self.decks}
+        self.big_bought = 0
         self.step = 0
-        self.main = ["st#" + k for k in SMALL]
+        self.main = []                  # the main deck: stories only
         self.release(0)
         self.exchange = []
         self.refill()
@@ -277,6 +283,7 @@ class Game:
                 p.stats["draws"] += len(self.draw(p, self.cfg["sun_draw"]))
 
         played = []
+        frames = {}
         count = {t: 0 for t in KINDS}
         star_done = False
         while p.hand:
@@ -295,6 +302,17 @@ class Game:
             if c["lean"]:
                 party[c["lean"]] += c["themed"]
             campaign += c["campaign"]
+            # A story is used in one framing: the top (positive: its own
+            # ability) or the bottom (oppositional: an attack on every rival).
+            framing = bot.frame(self, p, c) if c.get("bottom_attack") else "top"
+            frames[cid] = framing
+            if framing == "bottom":
+                p.stats["attacks"] += 1
+                hits = sum(self.attack(q, c["bottom_attack"]) for q in self.players if q is not p)
+                gen += self.cfg["attack_reward"] * min(1, hits)
+                continue
+            if c["top_party"] and c["lean"]:
+                party[c["lean"]] += c["top_party"]
             if c["draw"]:
                 p.stats["draws"] += len(self.draw(p, c["draw"]))
             for _ in range(c["trash"]):
@@ -302,72 +320,42 @@ class Game:
             for _ in range(c["retract"]):
                 self.retract(p)
             if c["gain_upto"]:
-                options = [x for x in self.exchange if not x.startswith("st#") and card(x)["cost"] <= c["gain_upto"]]
+                options = [x for x in self.exchange if card(x)["cost"] <= c["gain_upto"]]
                 pick = bot.choose(self, p, options)
                 if pick:
                     self.exchange.remove(pick)
                     p.discard.append(pick)
                     self.refill()
-            if c["attack"]:
-                p.stats["attacks"] += 1
-                hits = sum(self.attack(q, c["attack"]) for q in self.players if q is not p)
-                gen += self.cfg["attack_reward"] * min(1, hits)
         by_kind = {t: sum(1 for x in played if card(x)["kind"] == t) for t in KINDS}
         offices = len(p.states()) // self.cfg["office_div"]
         for cid in played:
             c = card(cid)
-            if c["per_same"]:
+            if c["per_same"] and frames.get(cid) == "top":
                 gen += c["per_same"] * max(0, by_kind[c["kind"]] - 1)
-            if c["chain"] and by_kind[c["kind"]] >= 2:
+            if c["chain"] and by_kind[c["kind"]] >= 2 and frames.get(cid) == "top":
                 gen += c["chain"]
             if c["per_office"]:
                 party[c["lean"]] += c["per_office"] * offices
         if p.paper == "aurora":
-            gen += self.cfg["aurora_per"] * len({card(x)["key"] for x in played if card(x)["type"] == "Negative story"})
+            gen += self.cfg["aurora_per"] * len({card(x)["key"] for x in played if frames.get(x) == "bottom"})
         p.stats["gen"] += gen
         p.stats["party"] += sum(party.values())
         pool = dict(gen=gen, campaign=campaign, **party)
-
-        # Call the big state up (once a turn).
-        if self.e < len(self.big):
-            key = self.big[self.e]
-            best = None
-            for side in SIDES:
-                need = STATES[key][side + "_threshold"]
-                if (self.affordable(p, pool, side, need, campaign=True)
-                        and bot.will_claim(self, p, key, side)):
-                    rank = (bot.side_rank(self, p, "st#%s:%s" % (key, side), self.neutral_needed(p, pool, side, need, True)),
-                            self.rng.random())          # ties: neither side by list order
-                    if best is None or rank > best[0]:
-                        best = (rank, side, need)
-            if best:
-                _, side, need = best
-                self.pay(p, pool, side, need, campaign=True)
-                p.discard.append("st#%s:%s" % (key, side))
-                p.stats["called"] += 1
-                p.stats["ev"] += STATES[key]["ev"]
-                p.stats["unhistorical"] += side != STATES[key]["winner"]
-                self.log.append((key, p.seat, side, self.rounds, "call"))
-                self.e += 1
-                self.check_270()
-                if self.e < len(self.big):
-                    self.step += 1
-                    self.release(self.step)
-                    self.refill()
 
         # Buy: stories, states (for a side), Editorials.
         while True:
             options = []
             for x in self.exchange:
-                if x.startswith("st#"):
-                    for side in SIDES:
-                        cid = x + ":" + side
-                        if self.affordable(p, pool, side, card(cid)["cost"]) and bot.will_claim(self, p, x[3:], side):
-                            options.append(cid)
-                else:
-                    c = card(x)
-                    if pool["gen"] + (pool[c["lean"]] if c["lean"] else 0) >= c["cost"]:
-                        options.append(x)
+                c = card(x)
+                if pool["gen"] + (pool[c["lean"]] if c["lean"] else 0) >= c["cost"]:
+                    options.append(x)
+            for key in self.up.values():
+                if key is None:
+                    continue
+                for side in SIDES:
+                    cid = "st#%s:%s" % (key, side)
+                    if self.affordable(p, pool, side, card(cid)["cost"], campaign=True) and bot.will_claim(self, p, key, side):
+                        options.append(cid)
             if self.editorials and pool["gen"] >= CARDS["editorial"]["cost"]:
                 options.append("editorial")
             pick = bot.choose(self, p, options, buying=True, pool=pool)
@@ -376,8 +364,19 @@ class Game:
             c = card(pick)
             if pick.startswith("st#"):
                 side = state_side(pick)
-                self.pay(p, pool, side, c["cost"])
-                self.exchange.remove(pick.split(":")[0])
+                key = state_key(pick)
+                self.pay(p, pool, side, c["cost"], campaign=True)
+                deck = STATES[key]["deck"]
+                self.up[deck] = self.decks[deck].pop() if self.decks[deck] else None
+                if self.up[deck]:
+                    self.reveal(self.up[deck])          # the next state turns over: its reveal hits everyone
+                if deck == "big":
+                    p.stats["called"] += 1
+                    self.big_bought += 1
+                    while self.step < min(STEPS - 1, self.big_bought):
+                        self.step += 1
+                        self.release(self.step)
+                        self.refill()
                 p.stats["states_bought"] += 1
                 p.stats["ev"] += c["vp"]
                 p.stats["unhistorical"] += side != STATES[state_key(pick)]["winner"]
@@ -405,11 +404,38 @@ class Game:
         self.refill()
 
         for cid in played:
-            (p.locations if card(cid)["type"] == "Media event" else p.discard).append(cid)
+            stays = card(cid)["type"] == "Media event" and frames.get(cid) == "top"
+            (p.locations if stays else p.discard).append(cid)
         self.draw(p, self.cfg["hand"])
         p.hand += p.held                # the Herald's scoop joins the next hand
         p.held = []
         self.news_cycle()
+
+    def reveal(self, key):
+        """A state's reveal: a real article from its own press criticizing the
+        national media, hitting every outlet at the table."""
+        s = STATES[key]
+        kind, n = s["reveal_kind"], max(1, s["reveal_n"])
+        self.reveals = getattr(self, "reveals", 0) + 1
+        if kind == "sweep":
+            self.main[0:0] = self.exchange
+            self.exchange = []
+            self.refill()
+            return
+        for q in self.players:
+            for _ in range(n):
+                if kind == "discard" and q.hand:
+                    c = self.rng.choice(q.hand)
+                    q.hand.remove(c)
+                    q.discard.append(c)
+                elif kind == "discard_dearest" and q.hand:
+                    c = max(q.hand, key=lambda x: card(x)["cost"])
+                    q.hand.remove(c)
+                    q.discard.append(c)
+                elif kind == "scandal" and q.paper != "intelligencer" and self.scandals:
+                    self.scandals -= 1
+                    q.discard.append("scandal#%d" % self.scandals)
+                    q.stats["scandals"] += 1
 
     def news_cycle(self):
         """The oldest card on the exchange slides to the bottom of the main
@@ -515,6 +541,9 @@ def value(c):
         v += 1.5
     elif c["attack"] == "discard":
         v += 1.0
+    v += 0.8 * c.get("top_party", 0)
+    if c.get("bottom_attack"):              # the oppositional framing is an option on top of the ability
+        v += 0.5 * (1.5 if c["bottom_attack"] == "scandal" else 1.0)
     return v
 
 
@@ -525,7 +554,19 @@ class Bot:
         self.partisan = partisan            # 'trump' / 'harris': always backs this side
 
     def late(self, game):
-        return game.e >= len(game.big) - 2
+        ev, _ = game.tally()
+        return max(ev.values()) >= game.cfg["win_at"] - 70
+
+    def frame(self, game, p, c):
+        """Top (the card's own ability) or bottom (an attack on every rival)."""
+        if c["type"] == "Media event":
+            top = 3 * (c["ongoing_gen"] + 1.3 * c["ongoing_draw"])
+        else:
+            top = (1.3 * c["draw"] + 0.8 * c["trash"] + 0.4 * c["gain_upto"] + 0.6 * c["chain"]
+                   + 0.8 * c["per_same"] + 0.8 * c["retract"] + 0.8 * c["top_party"])
+        rivals = sum(1 for q in game.players if q is not p)
+        bottom = self.attack_w * (1.5 if c["bottom_attack"] == "scandal" else 1.0) * (0.5 + 0.25 * rivals) + 0.5
+        return "top" if top >= bottom else "bottom"
 
     def leaning(self, game, p):
         """The side this outlet has a stake in (most staked worth), if any."""

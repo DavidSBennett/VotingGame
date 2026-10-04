@@ -77,10 +77,101 @@ def text_2024(r):
     return s
 
 
+HEADLINE_FIELDS = ["top_title", "top_outlet", "top_url", "top_date",
+                   "bottom_title", "bottom_outlet", "bottom_url", "bottom_date"]
+
+
+def frames_2024():
+    """The real headlines for each framing (docs/frames-2024.csv), by story key."""
+    path = os.path.join(DOCS, "frames-2024.csv")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        return {r["key"]: r for r in csv.DictReader(fh)}
+
+
+def n(r, f):
+    return int(r.get(f) or 0)
+
+
+def currency_text(r):
+    """What the card pays from the hand."""
+    party = PARTY.get(r.get("lean") or "", "")
+    parts = []
+    if n(r, "gen"):
+        parts.append("+%d neutral" % n(r, "gen"))
+    if n(r, "themed") and party:
+        parts.append("+%d %s" % (n(r, "themed"), party))
+    if n(r, "campaign"):
+        parts.append("+%d Campaign (states only)" % n(r, "campaign"))
+    text = ", ".join(parts) + "." if parts else "No currency."
+    if n(r, "per_office") and party:
+        text += " +%d %s for every 3 states you hold." % (n(r, "per_office"), party)
+    if n(r, "defense"):
+        text += " Defense: discard this from your hand to ignore an attack, and draw a card."
+    return text
+
+
+def top_text(r):
+    """The positive framing: the card's own ability."""
+    if r["type"] == "Media event":
+        return r["card_text"].replace("Stays in play for the rest of the game. ", "Stays in play. ")
+    kind = r["theme"]
+    parts = []
+    if n(r, "top_party"):
+        parts.append("+%d %s." % (n(r, "top_party"), PARTY[r["lean"]]))
+    if n(r, "draw"):
+        parts.append("Draw %d card%s." % (n(r, "draw"), "s" if n(r, "draw") > 1 else ""))
+    if n(r, "trash"):
+        parts.append("You may destroy a card in your hand or discard pile.")
+    if n(r, "gain_upto"):
+        parts.append("Gain a story costing %d or less from the exchange." % n(r, "gain_upto"))
+    if n(r, "chain"):
+        parts.append("If you use another %s story this turn, +%d neutral." % (kind, n(r, "chain")))
+    if n(r, "per_same"):
+        parts.append("+%d neutral for each other %s story you use this turn." % (n(r, "per_same"), kind))
+    if n(r, "retract"):
+        parts.append("Retraction: draw a card, and you may destroy a Scandal in your hand or discard pile.")
+    return " ".join(parts)
+
+
+def bottom_text(r):
+    """The oppositional framing: aimed at every rival."""
+    hit = ("discards a card at random" if r["bottom_attack"] == "discard" else "gains a Scandal")
+    return "Each rival outlet %s; +1 neutral if it hits any of them." % hit
+
+
+def frame(r, heads):
+    """Two framings on every story (the user, 2026-10-04): the top is the
+    positive one (the card's own ability), the bottom the oppositional one
+    (an attack on every rival). Negative stories stop being a kind: their
+    attack is their bottom framing, and their top draws a card."""
+    if r["type"] == "Negative story":
+        r["bottom_attack"] = r["attack"]
+        r["attack"] = ""
+        r["type"] = r["theme"] + " story"
+        if not any(n(r, f) for f in ("draw", "trash", "gain_upto", "chain", "per_same", "retract")):
+            r["draw"] = 1
+    else:
+        r["bottom_attack"] = "discard" if n(r, "cost") <= 4 else "scandal"
+    # A story with no ability of its own frames positively for +1 of its party.
+    r["top_party"] = 0
+    if r["type"] != "Media event" and not any(n(r, f) for f in ("draw", "trash", "gain_upto", "chain", "per_same", "retract")):
+        r["top_party"] = 1
+    r["top_text"] = top_text(r)
+    r["bottom_text"] = bottom_text(r)
+    r["card_text"] = currency_text(r)
+    h = heads.get(r["key"], {})
+    for f in HEADLINE_FIELDS:
+        r[f] = h.get(f, "")
+
+
 def main():
     src = list(csv.DictReader(open(os.path.join(DOCS, "deck-dc.csv"), encoding="utf-8-sig")))
-    fields = list(src[0].keys()) + ["stars", "lean", "step", "date"]
+    fields = list(src[0].keys()) + ["stars", "lean", "step", "date", "bottom_attack", "top_party", "top_text", "bottom_text"]
+    fields += HEADLINE_FIELDS
     news = stories_2024()
+    heads = frames_2024()
     for r in src:
         r["stars"] = r["vp"]
         if r["type"] == "Starter":
@@ -91,7 +182,8 @@ def main():
     out = []
     for r in src:
         if not r["released"]:
-            row = dict(r, lean="", step="", date="")
+            row = dict(r, lean="", step="", date="", bottom_attack="", top_party="", top_text="", bottom_text="",
+                       **{f: "" for f in HEADLINE_FIELDS})
             row["card_text"] = text_2024(row)
             row["flavor"] = STARTER_FLAVOR[row["key"]]
             out.append(row)
@@ -110,6 +202,7 @@ def main():
             s = news[r["key"]]              # the 2024 story on this slot
             row.update(key=s["key"], name=s["name"], date=s["date"], year=s["date"][:4], flavor=s["flavor"],
                        released="")
+            frame(row, heads)
             out.append(row)
         flip += k            # alternate which party a kind starts with
     with open(os.path.join(DOCS, "deck-2024.csv"), "w", encoding="utf-8-sig", newline="") as fh:
@@ -117,12 +210,13 @@ def main():
         w.writeheader()
         w.writerows(out)
     stories = [r for r in out if r["step"] != ""]
-    print("%d stories: %s" % (len(stories), {k: sum(1 for r in stories if r["type"] == k) for k in KEEP}))
+    kinds = sorted({r["type"] for r in stories})
+    print("%d stories: %s" % (len(stories), {k: sum(1 for r in stories if r["type"] == k) for k in kinds}))
+    print("bottom framings:", {a: sum(1 for r in stories if r["bottom_attack"] == a) for a in ("discard", "scandal")},
+          " headlines found:", sum(1 for r in stories if r["top_title"]) + sum(1 for r in stories if r["bottom_title"]), "of", 2 * len(stories))
     print("lean:", {l: sum(1 for r in stories if r["lean"] == l) for l in ("rep", "dem")},
           " by step:", [sum(1 for r in stories if int(r["step"]) == s) for s in range(STEPS)])
-    for kind in KEEP:
-        print("  %-15s rep %s | dem %s" % (kind, sorted(int(r["cost"]) for r in stories if r["type"] == kind and r["lean"] == "rep"),
-                                         sorted(int(r["cost"]) for r in stories if r["type"] == kind and r["lean"] == "dem")))
+
 
 
 if __name__ == "__main__":

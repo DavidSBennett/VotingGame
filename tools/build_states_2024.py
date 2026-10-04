@@ -177,7 +177,8 @@ ORDER = {"Safe": 0, "Likely": 1, "Lean": 2, "Toss-up": 3}
 # The ten biggest states are the elections deck (DC's Super-Villains), called
 # one at a time; the other 41 are shuffled into the main deck and bought off
 # the exchange (the user, 2026-10-03).
-ELECTIONS = 10
+ELECTIONS = 10       # (unused now: the big deck is every state priced BIG_PRICE or more)
+BIG_PRICE = 8        # the user, 2026-10-04: two state decks, the dear ones and the rest
 
 
 # Each half's name (docs/state-cards-2024.csv): where that side's 2024 vote
@@ -191,8 +192,24 @@ def flavor(state, ev, t, h):
     return "%s, %d electoral votes. 2024: Trump %.1f%%, Harris %.1f%%." % (state, ev, t, h)
 
 
+# Each state's reveal (docs/state-reveals-2024.csv): when the card turns face up
+# on its deck, a real article from the state's own press criticizing the
+# national media hits every outlet at the table.
+REVEAL_FIELDS = ["reveal_kind", "reveal_n", "reveal_title", "reveal_outlet", "reveal_url", "reveal_date",
+                 "reveal_text"]
+
+
+def load_reveals():
+    path = os.path.join(DOCS, "state-reveals-2024.csv")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        return {r["key"]: r for r in csv.DictReader(fh)}
+
+
 def main():
     names = card_names()
+    reveals = load_reveals()
     big_keys = {r[0] for r in sorted(RESULTS, key=lambda r: -r[2])[:ELECTIONS]}
     assert sorted((r[2] for r in RESULTS), reverse=True)[ELECTIONS - 1] > sorted(
         (r[2] for r in RESULTS), reverse=True)[ELECTIONS]
@@ -201,12 +218,12 @@ def main():
         margin = round(t - h, 2)
         winner = "trump" if margin > 0 else "harris"
         won, lost = thresholds(ev, margin)
-        big = abbr in big_keys
+        big = round(BASE + PER_EV * ev ** EV_POWER) >= BIG_PRICE     # the big-states deck
         a, b, target = powers(ev, won, big)
         mine, theirs = (a, b) if i % 2 == 0 else (b, a)
         side_power = {winner: mine, ("harris" if winner == "trump" else "trump"): theirs}
         row = dict(key=abbr.lower(), abbr=abbr, state=state, ev=ev, trump_pct=t, harris_pct=h, margin=margin,
-                   winner=winner, tier=tier(margin), deck="elections" if big else "main", vp=prestige(ev),
+                   winner=winner, tier=tier(margin), deck="big" if big else "small", vp=prestige(ev),
                    trump_name=names[abbr.lower()]["trump_name"], harris_name=names[abbr.lower()]["harris_name"],
                    flavor=flavor(state, ev, t, h))
         for side in ("trump", "harris"):
@@ -217,6 +234,11 @@ def main():
             row[side + "_text"] = power_text(p, side)
             row[side + "_worth"] = round(worth(p) + VP_WEIGHT * prestige(ev), 1)
         row["best_story"] = best_story(won)
+        rv = reveals.get(abbr.lower(), {})
+        for f in REVEAL_FIELDS:
+            row[f] = rv.get(f, "")
+        if not row["reveal_kind"]:              # placeholder until the state's article is written up
+            row["reveal_kind"], row["reveal_n"] = ("scandal", 1) if big else ("discard", 1)
         rows.append(row)
     # Safe states first, the closest last (ties: the bigger margin first).
     rows.sort(key=lambda r: (ORDER[r["tier"]], -abs(r["margin"])))
@@ -226,14 +248,15 @@ def main():
     for side in ("trump", "harris"):
         fields += [side + "_threshold"] + ["%s_%s" % (side, f) for f in POWER_FIELDS] + [side + "_text", side + "_worth"]
     fields.append("best_story")
+    fields += REVEAL_FIELDS
     with open(os.path.join(DOCS, "states-2024.csv"), "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
         w.writerows(rows)
     ev = {s: sum(r["ev"] for r in rows if r["winner"] == s) for s in ("trump", "harris")}
-    big = [r for r in rows if r["deck"] == "elections"]
-    print("elections deck:", ", ".join("%s %d" % (r["abbr"], r["ev"]) for r in sorted(big, key=lambda r: -r["ev"])),
-          "= %d EV; main deck %d states, %d EV" % (sum(r["ev"] for r in big), 51 - len(big),
+    big = [r for r in rows if r["deck"] == "big"]
+    print("big-states deck:", ", ".join("%s %d" % (r["abbr"], r["ev"]) for r in sorted(big, key=lambda r: -r["ev"])),
+          "= %d EV; small-states deck %d states, %d EV" % (sum(r["ev"] for r in big), 51 - len(big),
                                                   538 - sum(r["ev"] for r in big)))
     print("best story by cost (prestige counted): %s" % BEST)
     print("%d contests, %d electoral votes: %s; tiers %s"
