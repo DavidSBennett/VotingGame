@@ -986,3 +986,43 @@ now land on the loser (2.5 of 2.7 win at 3). Seats 37/32/31 (3), 26/26/
   currency at play) with the same outcomes (seat wins, Harris 47-50%,
   history rewritten 24%), and fewer attack plays per game (bots buy the
   same negative stories but hold them fewer turns).
+
+### 2026-10-04/05: three state decks, two framings, reveals, party planks (the user; work in progress)
+
+In the data and the simulator only; the engine, the screen and the rulebook
+still play the 2026-10-03 rules (so `export_cards_2024_php.py --check` fails
+until the engine catches up).
+
+- **Three state decks**, large (priced 8+), medium (6-7) and small (4-5),
+  one state face up on each. Buying the face-up state turns up the next,
+  and that state's **reveal** hits every outlet. Each reveal is a real
+  article from the state's own press criticizing the national media, or
+  (loosened 2026-10-04) outraged at bias of any kind
+  (`docs/state-reveals-2024.csv`; 49 of 51, New York and South Dakota
+  still placeholders). Effects are placeholders by deck: large, every
+  outlet takes a Scandal; medium, every outlet discards a card at random;
+  small, the exchange is swept and dealt fresh.
+- **Two framings on every story**: the top is the positive one (the card's
+  ability), the bottom the oppositional one (an attack); the player picks
+  one when using it. Each framing carries a real headline, from MSNBC or
+  Fox News where one exists, never both from the same outlet; where several
+  qualify, the stronger fit, then the oldest (`docs/frames-2024.csv`, 60 of
+  65 stories). Negative stories stopped being a kind: their attack is their
+  bottom framing.
+- **Party planks replace the five media events** (2026-10-05): 20 cards,
+  ten from each party's 2024 platform (`docs/planks-2024.csv`; the
+  Republican platform's twenty promises and the Democratic platform's
+  sections). A plank played stays in play until a rival knocks it out,
+  paying its owner each turn (by cost: 4 = +1 neutral, 5 = draw 1, 6 = +2
+  neutral, 7 = +1 neutral and draw 1) while every other outlet gets +1 of
+  the plank's party currency. Republican planks arrive with the July 8
+  platform (calendar step 6), Democratic ones with the August 19 platform
+  (step 8).
+- **Knocking out a plank**: 20 stories' bottom framings (10 aimed at each
+  party: a Fox bottom hits a Democratic plank, an MSNBC bottom a
+  Republican one) read "Knock out a [party] plank a rival has in play; +1
+  neutral if you do", and the seven swing states (AZ, GA, MI, NV, NC, PA,
+  WI) knock out one when played: for Trump a Democratic plank, for Harris a
+  Republican one. A knocked-out plank goes to its owner's discard pile.
+- Functional check only (30 three-outlet games): planks are bought and
+  played, 7 knocked out, 19 still in play at the end. Not tuned.

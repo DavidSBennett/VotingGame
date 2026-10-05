@@ -43,6 +43,8 @@ PARTIES = ("rep", "dem")
 SIDES = ("trump", "harris")
 PARTY = {"trump": "rep", "harris": "dem"}
 SIDE = {"rep": "trump", "dem": "harris"}
+OTHER = {"rep": "dem", "dem": "rep"}
+ONGOING = ("Media event", "Plank")       # cards that stay in play (the planks replaced the media events)
 INT = ("cost", "vp", "gen", "themed", "campaign", "draw", "trash", "gain_upto", "chain", "per_same",
        "per_office", "defense", "ongoing_gen", "ongoing_draw", "others_bonus", "copies", "retract", "top_party")
 
@@ -58,6 +60,8 @@ def load():
             c["lean"] = r["lean"] or None
             c["step"] = int(r["step"]) if r["step"] else None
             c["bottom_attack"] = r.get("bottom_attack") or ""
+            c["strike"] = r.get("strike") or ""          # the party whose plank a 'plank' bottom knocks out
+            c["knock"] = ""
             cards[c["key"]] = c
     states = {}
     with open(os.path.join(DOCS, "states-2024.csv"), encoding="utf-8-sig") as fh:
@@ -67,8 +71,8 @@ def load():
                 s[f] = int(r[f])
             s["margin"] = float(r["margin"])
             for side in SIDES:
-                for f in ("threshold", "gen", "party", "draw", "trash"):
-                    s["%s_%s" % (side, f)] = int(r["%s_%s" % (side, f)])
+                for f in ("threshold", "gen", "party", "draw", "trash", "strike"):
+                    s["%s_%s" % (side, f)] = int(r.get("%s_%s" % (side, f)) or 0)
             s["reveal_n"] = int(r.get("reveal_n") or 0)
             states[s["key"]] = s
     return cards, states
@@ -92,12 +96,13 @@ def card(cid):
         key, _, side = cid[3:].partition(":")
         s = STATES[key]
         c = dict(key=cid, name=s["state"], type="State", kind=None, lean=PARTY.get(side), vp=int(s["vp"]), cost=0,
-                 others_theme="", step=None, attack="", bottom_attack="",
+                 others_theme="", step=None, attack="", bottom_attack="", strike="", knock="",
                  **{f: 0 for f in INT if f not in ("vp", "cost")})
         if side:
             c.update(name=s[side + "_name"], gen=s[side + "_gen"],
                      themed=s[side + "_party"], draw=s[side + "_draw"], trash=s[side + "_trash"],
-                     cost=s[side + "_threshold"])
+                     cost=s[side + "_threshold"],
+                     knock=OTHER[PARTY[side]] if s[side + "_strike"] else "")   # a swing state knocks out a plank
         return c
     return CARDS[cid.split("#")[0]]
 
@@ -142,7 +147,7 @@ class Player:
         self.hand, self.discard, self.locations, self.held = [], [], [], []
         self.staked = []            # (card, side), face down
         self.last_stake = -99       # the turn of the last stake
-        self.stats = dict(turns=0, called=0, bought=0, states_bought=0, attacks=0, scandals=0, trashed=0,
+        self.stats = dict(turns=0, called=0, bought=0, states_bought=0, attacks=0, scandals=0, trashed=0, knocks=0,
                           gen=0, party=0, draws=0, unhistorical=0, ev=0, stakes=0, stake_won=0, stake_ev=0,
                           stake_vp=0)
 
@@ -309,11 +314,16 @@ class Game:
             frames[cid] = framing
             if framing == "bottom":
                 p.stats["attacks"] += 1
-                hits = sum(self.attack(q, c["bottom_attack"]) for q in self.players if q is not p)
+                if c["bottom_attack"] == "plank":
+                    hits = self.knock(p, c["strike"])
+                else:
+                    hits = sum(self.attack(q, c["bottom_attack"]) for q in self.players if q is not p)
                 gen += self.cfg["attack_reward"] * min(1, hits)
                 continue
             if c["top_party"] and c["lean"]:
                 party[c["lean"]] += c["top_party"]
+            if c["knock"]:
+                self.knock(p, c["knock"])
             if c["draw"]:
                 p.stats["draws"] += len(self.draw(p, c["draw"]))
             for _ in range(c["trash"]):
@@ -405,7 +415,7 @@ class Game:
         self.refill()
 
         for cid in played:
-            stays = card(cid)["type"] == "Media event" and frames.get(cid) == "top"
+            stays = card(cid)["type"] in ONGOING and frames.get(cid) == "top"
             (p.locations if stays else p.discard).append(cid)
         self.draw(p, self.cfg["hand"])
         p.hand += p.held                # the Herald's scoop joins the next hand
@@ -490,6 +500,23 @@ class Game:
             (p.hand if c in p.hand else p.discard).remove(c)
             p.stats["trashed"] += 1
 
+    def planks(self, p, party):
+        """The planks of a party that p's rivals have in play: (rival, card)."""
+        return [(q, loc) for q in self.players if q is not p for loc in q.locations
+                if card(loc)["type"] == "Plank" and card(loc)["lean"] == party]
+
+    def knock(self, p, party):
+        """Knock out the most valuable plank of the party a rival has in play
+        (to its owner's discard pile). True if one was there to hit."""
+        targets = self.planks(p, party)
+        if not targets:
+            return False
+        q, loc = max(targets, key=lambda t: value(card(t[1])))
+        q.locations.remove(loc)
+        q.discard.append(loc)
+        p.stats["knocks"] += 1
+        return True
+
     def attack(self, q, kind):
         shield = next((c for c in q.hand if card(c)["defense"]), None)
         if shield:
@@ -533,7 +560,7 @@ def value(c):
     scores only if staked). tools/build_states_2024.py uses the same."""
     t = c["type"]
     vp = VP_WEIGHT * c["vp"]
-    if t == "Media event":
+    if t in ONGOING:
         return vp + 3 * (c["ongoing_gen"] + 1.3 * c["ongoing_draw"]) - 0.5 * c["others_bonus"]
     v = (vp + c["gen"] + 0.8 * c["themed"] + 0.6 * c["campaign"] + 1.3 * c["draw"]
          + 0.8 * c["trash"] + 0.4 * c["gain_upto"] + 0.6 * c["chain"] + 0.8 * c["per_same"]
@@ -544,7 +571,7 @@ def value(c):
         v += 1.0
     v += 0.8 * c.get("top_party", 0)
     if c.get("bottom_attack"):              # the oppositional framing is an option on top of the ability
-        v += 0.5 * (1.5 if c["bottom_attack"] == "scandal" else 1.0)
+        v += 0.5 * {"scandal": 1.5, "discard": 1.0, "plank": 1.2}[c["bottom_attack"]]
     return v
 
 
@@ -560,12 +587,16 @@ class Bot:
 
     def frame(self, game, p, c):
         """Top (the card's own ability) or bottom (an attack on every rival)."""
-        if c["type"] == "Media event":
+        if c["type"] in ONGOING:
             top = 3 * (c["ongoing_gen"] + 1.3 * c["ongoing_draw"])
         else:
             top = (1.3 * c["draw"] + 0.8 * c["trash"] + 0.4 * c["gain_upto"] + 0.6 * c["chain"]
                    + 0.8 * c["per_same"] + 0.8 * c["retract"] + 0.8 * c["top_party"])
         rivals = sum(1 for q in game.players if q is not p)
+        if c["bottom_attack"] == "plank":     # worth it only with a plank of that party to hit
+            hit = game.planks(p, c["strike"])
+            bottom = self.attack_w * 0.5 * max(value(card(loc)) for _, loc in hit) + 0.5 if hit else -1
+            return "top" if top >= bottom else "bottom"
         bottom = self.attack_w * (1.5 if c["bottom_attack"] == "scandal" else 1.0) * (0.5 + 0.25 * rivals) + 0.5
         return "top" if top >= bottom else "bottom"
 

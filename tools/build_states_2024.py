@@ -115,13 +115,18 @@ def prestige(ev):
 # alternate between the sides: A pays more currency, B draws and destroys.
 MARGIN, BIG_MARGIN, VP_WEIGHT = 0.6, 1.5, 0.6
 WEIGHT = dict(gen=1.0, party=0.8, draw=1.3, trash=0.8)
-POWER_FIELDS = ("gen", "party", "draw", "trash")
+POWER_FIELDS = ("gen", "party", "draw", "trash", "strike")
+# The seven swing states knock out a plank (the user, 2026-10-05: states and
+# bottom framings target the party planks): played for Trump, a Democratic
+# plank a rival has in play; for Harris, a Republican one. A bonus on top of
+# the card's worth.
+SWING = {"AZ", "GA", "MI", "NV", "NC", "PA", "WI"}
 
 
 def story_value(c):
     """The simulator's value() for a story row of docs/deck-2024.csv."""
     n = lambda f: int(c[f] or 0)
-    if c["type"] == "Media event":
+    if c["type"] in ("Media event", "Plank"):         # cards that stay in play
         return VP_WEIGHT * n("vp") + 3 * (n("ongoing_gen") + 1.3 * n("ongoing_draw")) - 0.5 * n("others_bonus")
     v = (VP_WEIGHT * n("vp") + n("gen") + 0.8 * n("themed") + 0.6 * n("campaign") + 1.3 * n("draw")
          + 0.8 * n("trash") + 0.4 * n("gain_upto") + 0.6 * n("chain") + 0.8 * n("per_same")
@@ -170,7 +175,10 @@ def power_text(p, side):
     text = ", ".join(parts)
     if p.get("trash"):
         text += ", then you may destroy a card in your hand or discard pile"
-    return text[0].upper() + text[1:] + "."
+    text = text[0].upper() + text[1:] + "."
+    if p.get("strike"):
+        text += " Knock out a %s plank a rival has in play." % ("Democratic" if side == "trump" else "Republican")
+    return text
 
 
 ORDER = {"Safe": 0, "Likely": 1, "Lean": 2, "Toss-up": 3}
@@ -230,7 +238,7 @@ def main():
                    trump_name=names[abbr.lower()]["trump_name"], harris_name=names[abbr.lower()]["harris_name"],
                    flavor=flavor(state, ev, t, h))
         for side in ("trump", "harris"):
-            p = side_power[side]
+            p = dict(side_power[side], strike=1 if abbr in SWING else 0)
             row[side + "_threshold"] = won if side == winner else lost
             for f in POWER_FIELDS:
                 row["%s_%s" % (side, f)] = p.get(f, 0)

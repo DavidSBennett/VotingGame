@@ -29,6 +29,13 @@ For now the stories keep the variant's mechanics, names and flavor (the
   "neutral", a story's themed influence is its party's currency, Campaign
   is for big states, per-office counts every 3 states held, and media
   events give rivals their party's currency.
+- Party planks replace the media events (the user, 2026-10-05): 20 cards, ten
+  from each party's 2024 platform (docs/planks-2024.csv). A plank played
+  stays in play, paying its owner each turn while every other outlet gets
+  +1 of the plank's party, until a rival knocks it out. Twenty stories'
+  bottom framings knock out a plank (STRIKERS per party): the party whose
+  planks a story hits is the one its oppositional headline is aimed at
+  (a Fox bottom hits a Democratic plank, an MSNBC bottom a Republican one).
 
 WARNING: this OVERWRITES docs/deck-2024.csv.
 
@@ -42,8 +49,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
 PRESTIGE = {0: 1, 1: 1, 2: 3, 3: 4}      # stars -> wealth
 STARTER_VP = -1                          # a staked Letter or Local Notice
-KEEP = {"Political story": 15, "Economic story": 16, "Social story": 13, "Negative story": 16, "Media event": 5}
+KEEP = {"Political story": 15, "Economic story": 16, "Social story": 13, "Negative story": 16}
 STEPS = 10
+STRIKERS = 10                            # stories per party whose bottom knocks out a plank
+# A plank's power by its cost: (ongoing neutral, ongoing draw, wealth).
+PLANK_TIER = {4: (1, 0, 1), 5: (0, 1, 1), 6: (2, 0, 3), 7: (1, 1, 3)}
+PLATFORM = {"rep": ("2024 Republican Platform", "https://www.presidency.ucsb.edu/documents/2024-republican-party-platform",
+                    "2024-07-08", 6),
+            "dem": ("2024 Democratic Platform", "https://www.presidency.ucsb.edu/documents/2024-democratic-party-platform",
+                    "2024-08-19", 8)}
+RIGHT = {"Fox News", "Fox Business", "Washington Examiner"}      # bottom outlets aimed at the Democrats
 
 
 PARTY = {"rep": "Republican", "dem": "Democratic"}
@@ -136,7 +151,9 @@ def top_text(r):
 
 
 def bottom_text(r):
-    """The oppositional framing: aimed at every rival."""
+    """The oppositional framing: aimed at every rival (or at one rival's plank)."""
+    if r["bottom_attack"] == "plank":
+        return "Knock out a %s plank a rival has in play; +1 neutral if you do." % PARTY[r["strike"]]
     hit = ("discards a card at random" if r["bottom_attack"] == "discard" else "gains a Scandal")
     return "Each rival outlet %s; +1 neutral if it hits any of them." % hit
 
@@ -166,10 +183,43 @@ def frame(r, heads):
         r[f] = h.get(f, "")
 
 
+def planks_2024():
+    """The 20 party planks (docs/planks-2024.csv) as deck rows."""
+    rows = []
+    for p in csv.DictReader(open(os.path.join(DOCS, "planks-2024.csv"), encoding="utf-8")):
+        gen, draw, vp = PLANK_TIER[int(p["cost"])]
+        source, url, date, step = PLATFORM[p["lean"]]
+        ongoing = " and ".join(x for x in ("+%d neutral" % gen if gen else "", "draw 1 card" if draw else "") if x)
+        rows.append(dict(key=p["key"], name=p["name"], type="Plank", theme=p["theme"], cost=p["cost"], vp=vp,
+                         ongoing_gen=gen, ongoing_draw=draw, others_bonus=1, copies=1, year=date[:4],
+                         card_text="No currency.", flavor=p["flavor"], stars="", lean=p["lean"], step=step,
+                         date=date, top_text="Stays in play until a rival knocks it out. Ongoing: at the start of "
+                         "each of your turns, %s. Every other outlet gets +1 %s at the start of each of its turns."
+                         % (ongoing, PARTY[p["lean"]]),
+                         top_title=p["platform_title"], top_outlet=source, top_url=url, top_date=date))
+    return rows
+
+
+def strikers(stories):
+    """Pick the stories whose bottom framing knocks out a plank: STRIKERS
+    aimed at each party, spread evenly across the costs."""
+    def target(r):
+        if r["bottom_outlet"]:
+            return "dem" if r["bottom_outlet"] in RIGHT else "rep"
+        return r["lean"]                 # no headline yet: the oppositional view of the story's own party
+    for party in ("rep", "dem"):
+        group = sorted((r for r in stories if target(r) == party), key=lambda r: (int(r["cost"]), r["date"], r["key"]))
+        assert len(group) >= STRIKERS, (party, len(group))
+        for i in range(STRIKERS):
+            r = group[round(i * (len(group) - 1) / (STRIKERS - 1))]
+            r["bottom_attack"], r["strike"] = "plank", party
+            r["bottom_text"] = bottom_text(r)
+
+
 def main():
     src = list(csv.DictReader(open(os.path.join(DOCS, "deck-dc.csv"), encoding="utf-8-sig")))
     fields = list(src[0].keys()) + ["stars", "lean", "step", "date", "bottom_attack", "top_party", "top_text", "bottom_text"]
-    fields += HEADLINE_FIELDS
+    fields += HEADLINE_FIELDS + ["strike"]
     news = stories_2024()
     heads = frames_2024()
     for r in src:
@@ -205,6 +255,8 @@ def main():
             frame(row, heads)
             out.append(row)
         flip += k            # alternate which party a kind starts with
+    strikers([r for r in out if r["step"] != ""])
+    out += planks_2024()
     with open(os.path.join(DOCS, "deck-2024.csv"), "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
@@ -212,8 +264,9 @@ def main():
     stories = [r for r in out if r["step"] != ""]
     kinds = sorted({r["type"] for r in stories})
     print("%d stories: %s" % (len(stories), {k: sum(1 for r in stories if r["type"] == k) for k in kinds}))
-    print("bottom framings:", {a: sum(1 for r in stories if r["bottom_attack"] == a) for a in ("discard", "scandal")},
-          " headlines found:", sum(1 for r in stories if r["top_title"]) + sum(1 for r in stories if r["bottom_title"]), "of", 2 * len(stories))
+    print("bottom framings:", {a: sum(1 for r in stories if r.get("bottom_attack") == a) for a in ("discard", "scandal", "plank")},
+          "plank strikes:", {p: sum(1 for r in stories if r.get("strike") == p) for p in ("rep", "dem")},
+          " headlines found:", sum(1 for r in stories if r.get("top_title")) + sum(1 for r in stories if r.get("bottom_title")), "of", 2 * len(stories) - sum(1 for r in stories if r["type"] == "Plank"))
     print("lean:", {l: sum(1 for r in stories if r["lean"] == l) for l in ("rep", "dem")},
           " by step:", [sum(1 for r in stories if int(r["step"]) == s) for s in range(STEPS)])
 
