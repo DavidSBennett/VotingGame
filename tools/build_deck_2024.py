@@ -12,8 +12,11 @@ For now the stories keep the variant's mechanics, names and flavor (the
   that party's currency (`lean`), half of each kind each way.
 - `theme` stays as the story's KIND (Political / Economic / Social) for the
   rules that count kinds (compounding, chains, per office).
-- `step`: the calendar step (0-9) the story is released on, from its year
-  (the variant's 17 election years spread over the 10 big-state calls).
+- `era`: no calendar (the user, 2026-10-05). The main deck is two sets
+  stacked: the Biden set on top (stories before 2024-07-21, where Biden is
+  the Democratic figure), the switch card (Biden Steps Aside), then the
+  Harris set (stories from 2024-07-21, plus HARRIS_SET). Each set gets five
+  planks of each party.
 - `vp` is PRESTIGE on the game's 1-12 scale (the user, 2026-10-03: every
   card has a prestige value; California, the biggest state, is 12): stars
   become 1 / 3 / 4 (one old star was 6 EV, and 12 prestige is 54 EV);
@@ -36,6 +39,10 @@ For now the stories keep the variant's mechanics, names and flavor (the
   bottom framings knock out a plank (STRIKERS per party): the party whose
   planks a story hits is the one its oppositional headline is aimed at
   (a Fox bottom hits a Democratic plank, an MSNBC bottom a Republican one).
+- The bottom framing pays the OTHER party's currency (the user, 2026-10-05:
+  every card has a positive and a negative side, split evenly between the
+  parties), in place of the old discard / Scandal attacks: +1 at cost 4 or
+  less, +2 above. The plank knockouts stay on their twenty bottoms.
 
 WARNING: this OVERWRITES docs/deck-2024.csv.
 
@@ -50,15 +57,22 @@ DOCS = os.path.join(ROOT, "docs")
 PRESTIGE = {0: 1, 1: 1, 2: 3, 3: 4}      # stars -> wealth
 STARTER_VP = -1                          # a staked Letter or Local Notice
 KEEP = {"Political story": 15, "Economic story": 16, "Social story": 13, "Negative story": 16}
-STEPS = 10
+SWITCH = "biden_steps_aside"              # the card between the two sets
+HARRIS_FROM = "2024-07-21"
+HARRIS_SET = {"the_coconut_tree", "project_2025"}      # earlier, but Harris-era stories
+# The planks: five of each party in each set, at matching costs (Biden 4 4 5 6 7, Harris 4 5 5 6 7).
+PLANK_SET = {"seal_the_border": "biden", "energy_dominance": "biden", "end_inflation": "biden",
+             "mass_deportation": "biden", "end_the_weaponization": "biden",
+             "protect_social_security": "biden", "gun_safety": "biden", "drug_prices": "biden",
+             "voting_rights": "biden", "reproductive_freedom": "biden"}
+OTHER = {"rep": "dem", "dem": "rep"}
 STRIKERS = 10                            # stories per party whose bottom knocks out a plank
 # A plank's power by its cost: (ongoing neutral, ongoing draw, wealth).
 PLANK_TIER = {4: (1, 0, 1), 5: (0, 1, 1), 6: (2, 0, 3), 7: (1, 1, 3)}
 PLATFORM = {"rep": ("2024 Republican Platform", "https://www.presidency.ucsb.edu/documents/2024-republican-party-platform",
-                    "2024-07-08", 6),
+                    "2024-07-08"),
             "dem": ("2024 Democratic Platform", "https://www.presidency.ucsb.edu/documents/2024-democratic-party-platform",
-                    "2024-08-19", 8)}
-RIGHT = {"Fox News", "Fox Business", "Washington Examiner"}      # bottom outlets aimed at the Democrats
+                    "2024-08-19")}
 
 
 PARTY = {"rep": "Republican", "dem": "Democratic"}
@@ -151,26 +165,25 @@ def top_text(r):
 
 
 def bottom_text(r):
-    """The oppositional framing: aimed at every rival (or at one rival's plank)."""
+    """The oppositional framing: the other party's currency (and maybe a plank knockout)."""
+    text = "+%d %s." % (n(r, "bottom_party"), PARTY[OTHER[r["lean"]]])
     if r["bottom_attack"] == "plank":
-        return "Knock out a %s plank a rival has in play; +1 neutral if you do." % PARTY[r["strike"]]
-    hit = ("discards a card at random" if r["bottom_attack"] == "discard" else "gains a Scandal")
-    return "Each rival outlet %s; +1 neutral if it hits any of them." % hit
+        text += " Knock out a %s plank a rival has in play." % PARTY[r["strike"]]
+    return text
 
 
 def frame(r, heads):
     """Two framings on every story (the user, 2026-10-04): the top is the
     positive one (the card's own ability), the bottom the oppositional one
-    (an attack on every rival). Negative stories stop being a kind: their
-    attack is their bottom framing, and their top draws a card."""
+    (the other party's currency). Negative stories stop being a kind: their
+    attack goes, and their top draws a card."""
+    r["bottom_attack"] = ""
+    r["bottom_party"] = 1 if n(r, "cost") <= 4 else 2
     if r["type"] == "Negative story":
-        r["bottom_attack"] = r["attack"]
         r["attack"] = ""
         r["type"] = r["theme"] + " story"
         if not any(n(r, f) for f in ("draw", "trash", "gain_upto", "chain", "per_same", "retract")):
             r["draw"] = 1
-    else:
-        r["bottom_attack"] = "discard" if n(r, "cost") <= 4 else "scandal"
     # A story with no ability of its own frames positively for +1 of its party.
     r["top_party"] = 0
     if r["type"] != "Media event" and not any(n(r, f) for f in ("draw", "trash", "gain_upto", "chain", "per_same", "retract")):
@@ -188,11 +201,11 @@ def planks_2024():
     rows = []
     for p in csv.DictReader(open(os.path.join(DOCS, "planks-2024.csv"), encoding="utf-8")):
         gen, draw, vp = PLANK_TIER[int(p["cost"])]
-        source, url, date, step = PLATFORM[p["lean"]]
+        source, url, date = PLATFORM[p["lean"]]
         ongoing = " and ".join(x for x in ("+%d neutral" % gen if gen else "", "draw 1 card" if draw else "") if x)
         rows.append(dict(key=p["key"], name=p["name"], type="Plank", theme=p["theme"], cost=p["cost"], vp=vp,
                          ongoing_gen=gen, ongoing_draw=draw, others_bonus=1, copies=1, year=date[:4],
-                         card_text="No currency.", flavor=p["flavor"], stars="", lean=p["lean"], step=step,
+                         card_text="No currency.", flavor=p["flavor"], stars="", lean=p["lean"], era=PLANK_SET.get(p["key"], "harris"),
                          date=date, top_text="Stays in play until a rival knocks it out. Ongoing: at the start of "
                          "each of your turns, %s. Every other outlet gets +1 %s at the start of each of its turns."
                          % (ongoing, PARTY[p["lean"]]),
@@ -203,10 +216,8 @@ def planks_2024():
 def strikers(stories):
     """Pick the stories whose bottom framing knocks out a plank: STRIKERS
     aimed at each party, spread evenly across the costs."""
-    def target(r):
-        if r["bottom_outlet"]:
-            return "dem" if r["bottom_outlet"] in RIGHT else "rep"
-        return r["lean"]                 # no headline yet: the oppositional view of the story's own party
+    def target(r):                       # the oppositional view of the story's own party
+        return r["lean"]
     for party in ("rep", "dem"):
         group = sorted((r for r in stories if target(r) == party), key=lambda r: (int(r["cost"]), r["date"], r["key"]))
         assert len(group) >= STRIKERS, (party, len(group))
@@ -218,7 +229,7 @@ def strikers(stories):
 
 def main():
     src = list(csv.DictReader(open(os.path.join(DOCS, "deck-dc.csv"), encoding="utf-8-sig")))
-    fields = list(src[0].keys()) + ["stars", "lean", "step", "date", "bottom_attack", "top_party", "top_text", "bottom_text"]
+    fields = list(src[0].keys()) + ["stars", "lean", "era", "date", "bottom_attack", "top_party", "bottom_party", "top_text", "bottom_text"]
     fields += HEADLINE_FIELDS + ["strike"]
     news = stories_2024()
     heads = frames_2024()
@@ -228,11 +239,10 @@ def main():
             r["vp"] = STARTER_VP
         elif r["type"] != "Scandal":
             r["vp"] = PRESTIGE[int(r["vp"])]
-    years = sorted({int(r["released"]) for r in src if r["released"]})
     out = []
     for r in src:
         if not r["released"]:
-            row = dict(r, lean="", step="", date="", bottom_attack="", top_party="", top_text="", bottom_text="",
+            row = dict(r, lean="", era="", date="", bottom_attack="", top_party="", top_text="", bottom_text="",
                        **{f: "" for f in HEADLINE_FIELDS})
             row["card_text"] = text_2024(row)
             row["flavor"] = STARTER_FLAVOR[row["key"]]
@@ -246,29 +256,38 @@ def main():
         assert len({r["key"] for r in picked}) == k, kind
         for i, r in enumerate(picked):
             lean = ("rep", "dem")[(i + flip) % 2]
-            step = years.index(int(r["released"])) * STEPS // len(years)
-            row = dict(r, lean=lean, step=step)
+            row = dict(r, lean=lean)
             row["card_text"] = text_2024(row)
             s = news[r["key"]]              # the 2024 story on this slot
             row.update(key=s["key"], name=s["name"], date=s["date"], year=s["date"][:4], flavor=s["flavor"],
                        released="")
+            row["era"] = "harris" if s["date"] >= HARRIS_FROM or s["key"] in HARRIS_SET else "biden"
             frame(row, heads)
+            if s["key"] == SWITCH:
+                row.update(type="Switch", era="switch", cost=0, vp=0, card_text="", top_party=0, bottom_party=0,
+                           draw=0, gen=0, themed=0, campaign=0, trash=0, gain_upto=0, chain=0, per_same=0,
+                           per_office=0, defense=0, retract=0,
+                           top_text="The switch. When this card comes up, set it aside: every story below it "
+                           "is a Harris story.", bottom_text="")
             out.append(row)
         flip += k            # alternate which party a kind starts with
-    strikers([r for r in out if r["step"] != ""])
+    strikers([r for r in out if r["era"] in ("biden", "harris")])
     out += planks_2024()
     with open(os.path.join(DOCS, "deck-2024.csv"), "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
         w.writerows(out)
-    stories = [r for r in out if r["step"] != ""]
+    stories = [r for r in out if r["era"]]
     kinds = sorted({r["type"] for r in stories})
     print("%d stories: %s" % (len(stories), {k: sum(1 for r in stories if r["type"] == k) for k in kinds}))
-    print("bottom framings:", {a: sum(1 for r in stories if r.get("bottom_attack") == a) for a in ("discard", "scandal", "plank")},
-          "plank strikes:", {p: sum(1 for r in stories if r.get("strike") == p) for p in ("rep", "dem")},
+    print("plank strikes:", {p: sum(1 for r in stories if r.get("strike") == p) for p in ("rep", "dem")},
           " headlines found:", sum(1 for r in stories if r.get("top_title")) + sum(1 for r in stories if r.get("bottom_title")), "of", 2 * len(stories) - sum(1 for r in stories if r["type"] == "Plank"))
-    print("lean:", {l: sum(1 for r in stories if r["lean"] == l) for l in ("rep", "dem")},
-          " by step:", [sum(1 for r in stories if int(r["step"]) == s) for s in range(STEPS)])
+    for era in ("biden", "harris"):
+        st = [r for r in stories if r["era"] == era and r["type"] != "Plank"]
+        pl = [r for r in stories if r["era"] == era and r["type"] == "Plank"]
+        print("%s set: %d stories, positive side R %d / D %d; planks R %d / D %d" % (
+            era, len(st), sum(r["lean"] == "rep" for r in st), sum(r["lean"] == "dem" for r in st),
+            sum(r["lean"] == "rep" for r in pl), sum(r["lean"] == "dem" for r in pl)))
 
 
 

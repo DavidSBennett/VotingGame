@@ -1026,3 +1026,25 @@ until the engine catches up).
   Republican one. A knocked-out plank goes to its owner's discard pile.
 - Functional check only (30 three-outlet games): planks are bought and
   played, 7 knocked out, 19 still in play at the end. Not tuned.
+
+### 2026-10-05: no calendar; a Biden set and a Harris set; bottoms pay the other party (the user; work in progress)
+
+- **No calendar.** The main deck is two sets stacked: the **Biden set** on
+  top (stories before 2024-07-21, Biden as the Democratic figure), the
+  **switch card** (Biden Steps Aside: set aside when it comes up), then the
+  **Harris set** (stories from 2024-07-21, plus the Coconut Tree and
+  Project 2025). Big-state buys no longer release stories.
+- **Planks split between the sets**: five of each party in each set, at
+  matching costs (Biden set 4, 4, 5, 6, 7; Harris set 4, 5, 5, 6, 7).
+- **Every story's bottom pays the other party's currency** (+1 at cost 4 or
+  less, +2 above) in place of the discard / Scandal attacks; the twenty
+  plank knockouts stay on their bottoms. So each card is positive for one
+  party (its top: Fox on top for Republican cards, MSNBC for Democratic
+  ones) and pays the other on its bottom. Scandals now come only from the
+  large states' reveals.
+- Balance of the positive sides: Biden set 20 R / 21 D (41 stories),
+  Harris set 10 R / 8 D (18). Not yet even; options: cut Virginia Flips
+  the House (a near-duplicate of Beshear) and add two Democratic Harris-era
+  stories (the Walz pick, the convention).
+- Functional check (30 three-outlet games): the switch came up in every
+  game, in rounds 6-11; 31 plank knockouts. Not tuned.

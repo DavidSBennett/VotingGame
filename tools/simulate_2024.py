@@ -10,9 +10,11 @@ Democratic story); Campaign only on calling a big state. THE ELECTIONS
 DECK: the ten biggest states, shuffled, one up at a time; an outlet may
 call it once a turn, for Trump or Harris (flipping a state costs 1 more per
 6 points of its 2024 margin, so the swing states cost the same either way),
-and gains that side's card. Each call moves the calendar on a step,
-releasing that step's stories. THE MAIN DECK: the other 41 states (all from the
-start) and 65 stories; 5 lie face up on the exchange. A state is bought
+and gains that side's card. THE MAIN DECK (no calendar, the user
+2026-10-05): stories and party planks in two sets, the Biden set on top,
+then the switch card (set aside when it comes up), then the Harris set;
+5 lie face up on the exchange. Each story is used top (its ability) or
+bottom (the other party's currency). A state is bought
 for a side at that side's threshold and is the strongest card at its
 price. STAKE: instead of playing its hand, an outlet may spend its turn
 setting one card from its hand aside, face down, on Trump or Harris. A
@@ -46,7 +48,8 @@ SIDE = {"rep": "trump", "dem": "harris"}
 OTHER = {"rep": "dem", "dem": "rep"}
 ONGOING = ("Media event", "Plank")       # cards that stay in play (the planks replaced the media events)
 INT = ("cost", "vp", "gen", "themed", "campaign", "draw", "trash", "gain_upto", "chain", "per_same",
-       "per_office", "defense", "ongoing_gen", "ongoing_draw", "others_bonus", "copies", "retract", "top_party")
+       "per_office", "defense", "ongoing_gen", "ongoing_draw", "others_bonus", "copies", "retract", "top_party",
+       "bottom_party")
 
 
 def load():
@@ -58,7 +61,7 @@ def load():
                 c[f] = int(r.get(f) or 0)
             c["kind"] = r["theme"] or None
             c["lean"] = r["lean"] or None
-            c["step"] = int(r["step"]) if r["step"] else None
+            c["era"] = r.get("era") or None
             c["bottom_attack"] = r.get("bottom_attack") or ""
             c["strike"] = r.get("strike") or ""          # the party whose plank a 'plank' bottom knocks out
             c["knock"] = ""
@@ -82,11 +85,11 @@ CARDS, STATES = load()
 with open(os.path.join(DOCS, "outlets-2024.csv"), encoding="utf-8-sig") as fh:
     PAPERS = {r["key"]: r for r in csv.DictReader(fh)}      # the eight 2024 outlets (one ability each)
 assert len(STATES) == 51 and sum(s["ev"] for s in STATES.values()) == 538
-STORIES = [k for k, c in CARDS.items() if c["step"] is not None]
+STORIES = [k for k, c in CARDS.items() if c["era"] in ("biden", "harris")]     # stories and planks
+SWITCH = next(k for k, c in CARDS.items() if c["era"] == "switch")
 DECKS = ("large", "medium", "small")                            # three state decks, one state face up on each
 BIG = [k for k, s in STATES.items() if s["deck"] == "large"]     # priced 8+: buying one moves the calendar
 SMALL = [k for k, s in STATES.items() if s["deck"] != "large"]
-STEPS = 1 + max(CARDS[k]["step"] for k in STORIES)                # the calendar
 
 
 def card(cid):
@@ -96,7 +99,7 @@ def card(cid):
         key, _, side = cid[3:].partition(":")
         s = STATES[key]
         c = dict(key=cid, name=s["state"], type="State", kind=None, lean=PARTY.get(side), vp=int(s["vp"]), cost=0,
-                 others_theme="", step=None, attack="", bottom_attack="", strike="", knock="",
+                 others_theme="", era=None, attack="", bottom_attack="", strike="", knock="",
                  **{f: 0 for f in INT if f not in ("vp", "cost")})
         if side:
             c.update(name=s[side + "_name"], gen=s[side + "_gen"],
@@ -124,7 +127,6 @@ DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=80,
                 argus_vp=1,                 # the Argus: prestige per big state it called (stand-in)
                 herald_cost=2,
                 aurora_per=1,
-                attack_reward=1,
                 finish_round=True,          # when a candidate reaches 270, the round is played out
                 win_at=270,
                 smart_end=True,             # bots cross 270 only when it pays them, and block when it would not
@@ -189,9 +191,12 @@ class Game:
             self.rng.shuffle(d)
         self.up = {d: self.decks[d].pop() for d in self.decks}
         self.big_bought = 0
-        self.step = 0
-        self.main = []                  # the main deck: stories only
-        self.release(0)
+        # The main deck: the Biden set on top (the end of the list), the switch, the Harris set.
+        sets = {e: [k for k in STORIES if CARDS[k]["era"] == e] for e in ("biden", "harris")}
+        for v in sets.values():
+            self.rng.shuffle(v)
+        self.main = sets["harris"] + [SWITCH] + sets["biden"]
+        self.switched = None            # the round the switch came up
         self.exchange = []
         self.refill()
         self.editorials = CARDS["editorial"]["copies"]
@@ -200,13 +205,13 @@ class Game:
         self.trigger = self.current = None
         self.log = []                   # (state, seat, side, round, 'call' / 'buy')
 
-    def release(self, step):
-        self.main += [k for k in STORIES if CARDS[k]["step"] == step]
-        self.rng.shuffle(self.main)
-
     def refill(self):
         while len(self.exchange) < self.cfg["exchange_size"] and self.main:
-            self.exchange.append(self.main.pop())
+            c = self.main.pop()
+            if c == SWITCH:             # set aside: the Harris set begins
+                self.switched = self.rounds
+                continue
+            self.exchange.append(c)
 
     def draw(self, p, n):
         got = []
@@ -309,16 +314,15 @@ class Game:
                 party[c["lean"]] += c["themed"]
             campaign += c["campaign"]
             # A story is used in one framing: the top (positive: its own
-            # ability) or the bottom (oppositional: an attack on every rival).
-            framing = bot.frame(self, p, c) if c.get("bottom_attack") else "top"
+            # ability) or the bottom (oppositional: the other party's currency,
+            # and on twenty stories a plank knockout).
+            framing = bot.frame(self, p, c) if c["bottom_party"] else "top"
             frames[cid] = framing
             if framing == "bottom":
-                p.stats["attacks"] += 1
+                party[OTHER[c["lean"]]] += c["bottom_party"]
                 if c["bottom_attack"] == "plank":
-                    hits = self.knock(p, c["strike"])
-                else:
-                    hits = sum(self.attack(q, c["bottom_attack"]) for q in self.players if q is not p)
-                gen += self.cfg["attack_reward"] * min(1, hits)
+                    p.stats["attacks"] += 1
+                    self.knock(p, c["strike"])
                 continue
             if c["top_party"] and c["lean"]:
                 party[c["lean"]] += c["top_party"]
@@ -384,10 +388,6 @@ class Game:
                 if deck == "large":
                     p.stats["called"] += 1
                     self.big_bought += 1
-                    while self.step < min(STEPS - 1, self.big_bought):
-                        self.step += 1
-                        self.release(self.step)
-                        self.refill()
                 p.stats["states_bought"] += 1
                 p.stats["ev"] += c["vp"]
                 p.stats["unhistorical"] += side != STATES[state_key(pick)]["winner"]
@@ -570,8 +570,9 @@ def value(c):
     elif c["attack"] == "discard":
         v += 1.0
     v += 0.8 * c.get("top_party", 0)
-    if c.get("bottom_attack"):              # the oppositional framing is an option on top of the ability
-        v += 0.5 * {"scandal": 1.5, "discard": 1.0, "plank": 1.2}[c["bottom_attack"]]
+    v += 0.3 * c.get("bottom_party", 0)     # the oppositional framing is an option on top of the ability
+    if c.get("bottom_attack") == "plank":
+        v += 0.6
     return v
 
 
@@ -586,18 +587,20 @@ class Bot:
         return max(ev.values()) >= game.cfg["win_at"] - 70
 
     def frame(self, game, p, c):
-        """Top (the card's own ability) or bottom (an attack on every rival)."""
+        """Top (the card's own ability) or bottom (the other party's currency,
+        worth less to an outlet staked on this card's own party; and maybe a
+        plank knockout)."""
         if c["type"] in ONGOING:
             top = 3 * (c["ongoing_gen"] + 1.3 * c["ongoing_draw"])
         else:
             top = (1.3 * c["draw"] + 0.8 * c["trash"] + 0.4 * c["gain_upto"] + 0.6 * c["chain"]
                    + 0.8 * c["per_same"] + 0.8 * c["retract"] + 0.8 * c["top_party"])
-        rivals = sum(1 for q in game.players if q is not p)
-        if c["bottom_attack"] == "plank":     # worth it only with a plank of that party to hit
+        side = self.leaning(game, p)
+        bottom = 0.8 * c["bottom_party"] * (0.5 if side == SIDE[c["lean"]] else 1.0)
+        if c["bottom_attack"] == "plank":     # a knockout, if a plank of that party is there to hit
             hit = game.planks(p, c["strike"])
-            bottom = self.attack_w * 0.5 * max(value(card(loc)) for _, loc in hit) + 0.5 if hit else -1
-            return "top" if top >= bottom else "bottom"
-        bottom = self.attack_w * (1.5 if c["bottom_attack"] == "scandal" else 1.0) * (0.5 + 0.25 * rivals) + 0.5
+            if hit:
+                bottom += self.attack_w * 0.5 * max(value(card(loc)) for _, loc in hit)
         return "top" if top >= bottom else "bottom"
 
     def leaning(self, game, p):
