@@ -147,6 +147,7 @@ class Player:
         self.paper = self.paper or None
         self.deck = ["letter#%d.%d" % (seat, i) for i in range(7)] + ["notice#%d.%d" % (seat, i) for i in range(3)]
         self.hand, self.discard, self.locations, self.held = [], [], [], []
+        self.playing = []           # the cards played this turn (they still count: a state played is still held)
         self.staked = []            # (card, side), face down
         self.last_stake = -99       # the turn of the last stake
         self.stats = dict(turns=0, called=0, bought=0, states_bought=0, attacks=0, scandals=0, trashed=0, knocks=0,
@@ -154,7 +155,7 @@ class Player:
                           stake_vp=0)
 
     def owned(self):
-        return self.deck + self.hand + self.discard + self.locations + self.held
+        return self.deck + self.hand + self.discard + self.locations + self.held + self.playing
 
     def states(self):
         return [c for c in self.owned() if c.startswith("st#")]
@@ -293,7 +294,7 @@ class Game:
                 p.discard.append(junk[0])
                 p.stats["draws"] += len(self.draw(p, self.cfg["sun_draw"]))
 
-        played = []
+        played = p.playing = []
         frames = {}
         count = {t: 0 for t in KINDS}
         star_done = False
@@ -417,6 +418,7 @@ class Game:
         for cid in played:
             stays = card(cid)["type"] in ONGOING and frames.get(cid) == "top"
             (p.locations if stays else p.discard).append(cid)
+        p.playing = []
         self.draw(p, self.cfg["hand"])
         p.hand += p.held                # the Herald's scoop joins the next hand
         p.held = []
@@ -543,6 +545,10 @@ class Game:
                 if self.ended and not self.cfg["finish_round"]:
                     break
                 self.turn(p)
+                self.check_270()
+                if not self.ended and not any(self.up.values()):
+                    self.ended = "deadlock"      # every state claimed, neither side at 270: nothing can finish
+                    break
         if not self.ended:
             self.ended = "stalled"
         return self

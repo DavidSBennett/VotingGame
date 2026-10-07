@@ -26,13 +26,18 @@ OUT = os.path.join(ROOT, "backend", "cards_2024.php")
 
 CARD_FIELDS = ["key", "name", "type", "kind", "lean", "cost", "vp", "stars", "gen", "themed", "campaign", "draw",
                "trash", "gain_upto", "chain", "per_same", "per_office", "attack", "defense", "retract",
-               "ongoing_gen", "ongoing_draw", "others_bonus", "step", "year", "date", "copies", "card_text", "flavor"]
+               "ongoing_gen", "ongoing_draw", "others_bonus", "era", "year", "date", "copies", "card_text", "flavor",
+               # the two framings (the user, 2026-10-04/05): top = positive (the ability), bottom = oppositional
+               "top_party", "bottom_party", "bottom_attack", "strike", "top_text", "bottom_text",
+               "top_title", "top_outlet", "top_url", "top_date", "bottom_title", "bottom_outlet", "bottom_url",
+               "bottom_date"]
 STATE_FIELDS = ["key", "abbr", "state", "ev", "vp", "trump_name", "harris_name", "flavor", "trump_pct", "harris_pct", "margin", "winner", "tier",
                 "order", "deck"]
 for _side in sim.SIDES:
-    STATE_FIELDS += ["%s_%s" % (_side, f) for f in ("threshold", "gen", "party", "draw", "trash", "text")]
-INTS = set(sim.INT) | {"stars", "step", "year", "ev", "vp", "order"} | {
-    "%s_%s" % (s, f) for s in sim.SIDES for f in ("threshold", "gen", "party", "draw", "trash")}
+    STATE_FIELDS += ["%s_%s" % (_side, f) for f in ("threshold", "gen", "party", "draw", "trash", "strike", "text")]
+STATE_FIELDS += ["reveal_kind", "reveal_n", "reveal_title", "reveal_outlet", "reveal_url", "reveal_date", "reveal_text"]
+INTS = set(sim.INT) | {"stars", "year", "ev", "vp", "order", "reveal_n"} | {
+    "%s_%s" % (s, f) for s in sim.SIDES for f in ("threshold", "gen", "party", "draw", "trash", "strike")}
 FLOATS = {"trump_pct", "harris_pct", "margin"}
 OUTLET_FIELDS = ["key", "name", "ability_name", "ability", "flavor"]
 
@@ -83,8 +88,9 @@ def write():
         " * docs/deck-2024.csv, docs/states-2024.csv and docs/outlets-2024.csv.",
         " * DO NOT EDIT BY HAND: edit the spreadsheets and rerun the exporter.",
         " *",
-        " * The 2024 game (VARIANT.md revision 5): stories, starters, Editorial and",
-        " * Scandal; the 51 contests of the 2024 electoral college; the eight outlets.",
+        " * The 2024 game (VARIANT.md revision 5): stories, planks, the switch, starters,",
+        " * Editorial and Scandal; the 51 contests of the 2024 electoral college in three",
+        " * decks, each with its reveal; the eight outlets.",
         " */",
         "",
         "/** Every card kind, keyed by card key. 'copies' is how many exist. */",
@@ -96,7 +102,7 @@ def write():
     for c in cards:
         lines.append("    '%s' => %s," % (c["key"], php_array(c, CARD_FIELDS)))
     lines += ["  ];", "  return $cards;", "}", "",
-              "/** The 51 contests, keyed by state key, safest first; deck 'elections' = the big ten. */",
+              "/** The 51 contests, keyed by state key, safest first; deck = 'large' / 'medium' / 'small'. */",
               "function e24_states() {",
               "  static $states = null;",
               "  if ($states !== null) return $states;",

@@ -8,9 +8,10 @@
  * Rule tests build a position, act, and check the result. Random games
  * play legal moves at 2-5 seats (people making random moves, and bots) and
  * check the invariants after every action: every card exists exactly once
- * (staked cards included), every claimed state's card exists and the tally
- * is their votes, currency never goes negative, public counts match, one
- * big state a turn, stakes never leak, and the game ends properly.
+ * (staked cards and planks in play included), every state is face down,
+ * face up or claimed exactly once, the tally is the claimed votes, currency
+ * never goes negative, public counts match, stakes never leak, and the game
+ * ends properly.
  */
 
 require __DIR__ . '/../backend/engine_2024.php';
@@ -64,38 +65,41 @@ function check_invariants($game, $players, $where) {
     eq($p['public_state']['deck_count'], count($ps['deck']), "$where: seat $s deck_count");
     eq($p['public_state']['discard_count'], count($ps['discard']), "$where: seat $s discard_count");
     eq($p['public_state']['stakes'], count($ps['staked'] ?? []), "$where: seat $s stake count");
+    foreach ($p['public_state']['locations'] ?? [] as $loc) ok(in_array(e24_view($loc)['type'], E24_ONGOING, true), "$where: only planks stay in play");
   }
   $st = $game['state'];
   $add($st['main'], 'main');
   $add($st['exchange'], 'exchange');
   $add($st['trash'], 'trash');
   ok(!$dup, "$where: no card in two places " . implode('; ', array_slice($dup, 0, 3)));
-  // Stories: released through the current step, and nowhere before.
+  // Stories and planks: each exists exactly once; the switch is in the main deck until it comes up.
   foreach (e24_cards() as $k => $c) {
-    if ($c['step'] === null) continue;
-    $in = isset($seen[$k]);
-    if ((int) $c['step'] <= (int) $st['step']) ok($in, "$where: released story $k is somewhere");
-    else ok(!$in, "$where: unreleased story $k is nowhere");
+    if ($c['era'] === 'switch') {
+      ok(($st['switched'] === null) === isset($seen[$k]), "$where: the switch is in the main deck until it comes up");
+      ok(!in_array($k, $st['exchange'], true), "$where: the switch is never on the exchange");
+    } elseif ($c['era']) {
+      ok(isset($seen[$k]), "$where: $k is somewhere");
+    }
   }
-  // States: an unclaimed main-deck state is in the main deck or on the
-  // exchange; a claimed one exists exactly once, for its side; the big
-  // states not yet called exist nowhere.
+  // States: each face down, face up, or claimed for its side -- exactly once.
   $tally = ['trump' => 0, 'harris' => 0];
   foreach (e24_states() as $k => $s) {
     $cl = $st['claims'][$k] ?? null;
+    $down = in_array($k, $st['decks'][$s['deck']], true);
+    $up = ($st['up'][$s['deck']] ?? null) === $k;
     if ($cl) {
       $tally[$cl['side']] += (int) $s['ev'];
       ok(isset($seen['st#' . $k . ':' . $cl['side']]), "$where: claimed $k exists for its side");
-      ok(!isset($seen['st#' . $k]) && !isset($seen['st#' . $k . ':' . e24_other($cl['side'])]), "$where: claimed $k exists once");
-    } elseif ($s['deck'] === 'main') {
-      ok(isset($seen['st#' . $k]) && in_array($seen['st#' . $k], ['main', 'exchange'], true), "$where: unclaimed $k is for sale");
+      ok(!isset($seen['st#' . $k . ':' . e24_other($cl['side'])]) && !$down && !$up, "$where: claimed $k exists once");
     } else {
-      foreach (['st#' . $k, 'st#' . $k . ':trump', 'st#' . $k . ':harris'] as $id) ok(!isset($seen[$id]), "$where: uncalled big $k is nowhere");
+      ok($down xor $up, "$where: unclaimed $k is face down or face up");
+      foreach (['st#' . $k, 'st#' . $k . ':trump', 'st#' . $k . ':harris'] as $id) ok(!isset($seen[$id]), "$where: unclaimed $k is in no zone");
     }
   }
+  foreach (E24_DECKS as $d) ok($st['up'][$d] !== null || empty($st['decks'][$d]), "$where: deck $d has a state up while any are left");
   eq(e24_tally($game), $tally, "$where: the tally is the claimed votes");
   foreach ($players as $s => $p) {
-    for ($i = 0; $i < 7; $i++) ok(isset($seen["letter#$s.$i"]), "$where: letter#$s.$i exists");
+    for ($i = 0; $i < 7; $i++) ok(isset($seen["letter#$s.$i"]) || in_array("letter#$s.$i", $st['trash'], true), "$where: letter#$s.$i exists");
     for ($i = 0; $i < 3; $i++) ok(isset($seen["notice#$s.$i"]) || in_array("notice#$s.$i", $st['trash'], true), "$where: notice#$s.$i exists");
   }
   $ed = 0; $sc = 0;
@@ -105,8 +109,8 @@ function check_invariants($game, $players, $where) {
   }
   eq($ed + $st['editorials'], 16, "$where: Editorials conserved");
   eq($sc + $st['scandals'], 20, "$where: Scandals conserved");
-  eq(count($st['history']), (int) $st['e'], "$where: one history line per big state called");
   ok(count($st['exchange']) <= 5, "$where: exchange holds at most five");
+  foreach ($st['exchange'] as $x) ok(!e24_is_state($x), "$where: no state on the exchange");
   if ($game['status'] === 'active') {
     foreach (e24_pools($game, $players) as $k => $v) ok($v >= 0, "$where: pool $k not negative ($v)");
     ok(empty($players[$st['turn']['seat']]['conceded']), "$where: the outlet on turn is still playing");
@@ -133,11 +137,20 @@ function set_hand(&$game, &$players, $s, $cards) {
     $p['private_state']['hand'][] = $c;
   }
   unset($p);
+  e24_refill($game);
   foreach ($players as $q => $_) e24_count($players[$q]);
 }
 
 function give_hand(&$game, &$players, $cards) {
   set_hand($game, $players, $game['state']['turn']['seat'], $cards);
+}
+
+/** A fresh turn's hand: these cards only, and their currency counted. */
+function fresh_hand(&$game, &$players, $cards) {
+  give_hand($game, $players, $cards);
+  $game['state']['turn']['base'] = ['gen' => 0, 'rep' => 0, 'dem' => 0, 'campaign' => 0];
+  $game['state']['turn']['counted'] = [];
+  e24_count_hand($game, $players);
 }
 
 function act(&$game, &$players, $action, $params = []) {
@@ -158,6 +171,31 @@ function to_exchange(&$game, $id) {
   $game['state']['exchange'][0] = $id;
 }
 
+/** Put a state face up on its deck (the one up goes back face down), and make $next the one under it. */
+function face_up(&$game, $key, $next = null) {
+  $d = e24_state($key)['deck'];
+  $deck = &$game['state']['decks'][$d];
+  foreach ([$key, $next] as $k) {
+    if ($k === null) continue;
+    $i = array_search($k, $deck, true);
+    if ($i !== false) array_splice($deck, $i, 1);
+  }
+  if ($game['state']['up'][$d] !== $key) $deck[] = $game['state']['up'][$d];
+  if ($next !== null) $deck[] = $next;
+  $game['state']['up'][$d] = $key;
+  unset($deck);
+}
+
+/** Put a plank in play for a seat. */
+function in_play(&$game, &$players, $seat, $plank) {
+  foreach (['main', 'exchange'] as $z) {
+    $i = array_search($plank, $game['state'][$z], true);
+    if ($i !== false) array_splice($game['state'][$z], $i, 1);
+  }
+  e24_refill($game);
+  $players[$seat]['public_state']['locations'][] = $plank;
+}
+
 function find_card($fn) {
   foreach (e24_cards() as $k => $c) if ($fn($c)) return $k;
   return null;
@@ -166,30 +204,44 @@ function find_card($fn) {
 echo "Rule tests\n";
 
 // ---- content ---------------------------------------------------------------
-$ev = 0; $big = 0;
-foreach (e24_states() as $s) { $ev += (int) $s['ev']; if ($s['deck'] === 'elections') $big++; }
-eq([count(e24_states()), $ev, $big], [51, 538, 10], 'content: 51 contests, 538 votes, ten big states');
-eq((int) e24_state('ca')['vp'], 12, 'content: California is worth 12 prestige');
+$ev = 0; $decks = ['large' => 0, 'medium' => 0, 'small' => 0]; $swing = 0;
+foreach (e24_states() as $s) {
+  $ev += (int) $s['ev'];
+  $decks[$s['deck']]++;
+  if ((int) $s['trump_strike'] && (int) $s['harris_strike']) $swing++;
+}
+eq([count(e24_states()), $ev], [51, 538], 'content: 51 contests, 538 votes');
+eq($decks, ['large' => 11, 'medium' => 18, 'small' => 22], 'content: three state decks');
+eq($swing, 7, 'content: seven swing states knock out planks');
+eq((int) e24_state('ca')['vp'], 12, 'content: California is worth 12 wealth');
 eq([(int) e24_state('pa')['trump_threshold'], (int) e24_state('pa')['harris_threshold']], [9, 9], 'content: Pennsylvania costs the same either way');
 ok((int) e24_state('dc')['trump_threshold'] > (int) e24_state('dc')['harris_threshold'] + 10, 'content: flipping D.C. is dear');
+$count = ['story' => 0, 'plank' => 0, 'switch' => 0, 'strike' => 0];
+$planks = ['biden' => ['rep' => 0, 'dem' => 0], 'harris' => ['rep' => 0, 'dem' => 0]];
+foreach (e24_cards() as $c) {
+  if ($c['type'] === 'Plank') { $count['plank']++; $planks[$c['era']][$c['lean']]++; }
+  elseif ($c['type'] === 'Switch') $count['switch']++;
+  elseif ($c['era']) {
+    $count['story']++;
+    ok((int) $c['bottom_party'] > 0, "content: {$c['key']} has an oppositional side");
+    if ($c['bottom_attack'] === 'plank') $count['strike']++;
+  }
+}
+eq($count, ['story' => 59, 'plank' => 20, 'switch' => 1, 'strike' => 20], 'content: 59 stories, 20 planks, the switch, 20 plank knockouts');
+eq($planks, ['biden' => ['rep' => 5, 'dem' => 5], 'harris' => ['rep' => 5, 'dem' => 5]], 'content: five planks of each party in each set');
 
 // ---- setup ----------------------------------------------------------------
 list($g, $P) = new_game(3, [], [0 => 'globe']);
 eq(count($P[0]['private_state']['hand']), 5, 'setup: hand of five');
 eq(count($g['state']['exchange']), 5, 'setup: exchange of five');
-eq(count($g['state']['big']), 10, 'setup: ten big states in the elections deck');
+foreach (E24_DECKS as $d) ok($g['state']['up'][$d] !== null && e24_state($g['state']['up'][$d])['deck'] === $d, "setup: a $d state face up");
+foreach ($g['state']['exchange'] as $x) eq(e24_card($x)['era'], 'biden', 'setup: the exchange comes from the Biden set');
+eq($g['state']['switched'], null, 'setup: the switch has not come up');
 eq($P[0]['public_state']['paper'], 'globe', 'setup: a chosen paper is kept');
 eq(e24_tally($g), ['trump' => 0, 'harris' => 0], 'setup: no votes claimed');
 check_invariants($g, $P, 'setup');
 
 // ---- currency from the hand; playing uses abilities -------------------------
-/** A fresh turn's hand: these cards only, and their currency counted. */
-function fresh_hand(&$game, &$players, $cards) {
-  give_hand($game, $players, $cards);
-  $game['state']['turn']['base'] = ['gen' => 0, 'rep' => 0, 'dem' => 0, 'campaign' => 0];
-  $game['state']['turn']['counted'] = [];
-  e24_count_hand($game, $players);
-}
 list($g, $P) = new_game(2);
 $want = 0;
 foreach ($P[0]['private_state']['hand'] as $id) $want += (int) e24_view($id)['gen'];
@@ -201,13 +253,14 @@ ok(throws(function () use (&$g, &$P) { act($g, $P, 'play', ['card' => 'letter#0.
 ok(throws(function () use (&$g, &$P) { act($g, $P, 'play', ['card' => 'letter#1.0']); }) !== false, 'play: a card not in hand is refused');
 ok(throws(function () use (&$g, &$P) { engine_apply_action($g, $P, 1, 'end_turn', [], null); }) !== false, 'turn: an outlet not on turn is refused');
 
-$repStory = find_card(function ($c) { return $c['lean'] === 'rep' && (int) $c['themed'] > 0 && (int) $c['step'] === 0 && !(int) $c['per_office'] && $c['type'] !== 'Media event'; });
+$story = function ($fn) { return find_card(function ($c) use ($fn) { return $c['era'] && $c['type'] !== 'Plank' && $c['type'] !== 'Switch' && $fn($c); }); };
+$repStory = $story(function ($c) { return $c['lean'] === 'rep' && (int) $c['themed'] > 0 && !(int) $c['per_office']; });
 list($g, $P) = new_game(2);
 fresh_hand($g, $P, [$repStory]);
 eq(e24_pools($g, $P)['rep'], (int) e24_card($repStory)['themed'], 'hand: a Republican story pays Republican from the hand');
 eq(e24_pools($g, $P)['dem'], 0, '... and no Democratic');
 
-$drawer = find_card(function ($c) { return (int) $c['draw'] > 0 && (int) $c['step'] === 0 && !(int) $c['trash'] && !$c['attack'] && !(int) $c['chain']; });
+$drawer = $story(function ($c) { return (int) $c['draw'] > 0 && !(int) $c['trash'] && !(int) $c['chain'] && $c['bottom_attack'] !== 'plank'; });
 list($g, $P) = new_game(2);
 fresh_hand($g, $P, [$drawer]);
 $before = e24_pools($g, $P);
@@ -217,11 +270,25 @@ foreach (['deck', 'discard'] as $z) {                          // the next draw 
 $P[0]['private_state']['deck'][] = 'letter#0.0';
 e24_count($P[0]);
 act($g, $P, 'play', ['card' => $drawer]);
-eq(e24_pools($g, $P)['gen'], $before['gen'] + 1, 'ability: a drawn Letter counts at once; the played card is not counted twice');
+eq(e24_pools($g, $P)['gen'], $before['gen'] + 1, 'top: a drawn Letter counts at once; the played card is not counted twice');
+eq($g['state']['turn']['frames'][$drawer], 'top', 'top: recorded as used on its top');
 check_invariants($g, $P, 'draw ability');
 
+// ---- the bottom: the other party's currency, no ability ----------------------
+list($g, $P) = new_game(2);
+fresh_hand($g, $P, [$drawer]);
+$before = e24_pools($g, $P);
+$c = e24_card($drawer);
+$other = e24_other_party($c['lean']);
+eq(engine_available_actions($g, $P, 0)['framings'][$drawer], ['top', 'bottom'], 'bottom: a story offers both framings');
+act($g, $P, 'play', ['card' => $drawer, 'framing' => 'bottom']);
+eq(e24_pools($g, $P)[$other], $before[$other] + (int) $c['bottom_party'], 'bottom: pays the other party\'s currency');
+eq(count($P[0]['private_state']['hand']), 0, 'bottom: no card drawn (the top\'s ability is not used)');
+ok(throws(function () use (&$g, &$P) { act($g, $P, 'play', ['card' => 'letter#0.2', 'framing' => 'sideways']); }) !== false, 'bottom: an unknown framing is refused');
+check_invariants($g, $P, 'bottom');
+
 // ---- buying a story ---------------------------------------------------------
-$demStory = find_card(function ($c) { return $c['lean'] === 'dem' && (int) $c['step'] === 0 && (int) $c['cost'] >= 3; });
+$demStory = $story(function ($c) { return $c['lean'] === 'dem' && $c['era'] === 'biden' && (int) $c['cost'] >= 3; });
 list($g, $P) = new_game(2);
 give_hand($g, $P, []);
 to_exchange($g, $demStory);
@@ -234,64 +301,132 @@ eq($g['state']['turn']['spent']['rep'], 0, 'buy story: never the other party');
 ok(in_array($demStory, $P[0]['private_state']['discard'], true), 'buy story: to the discard pile');
 check_invariants($g, $P, 'buy story');
 
-// ---- buying a state for a side ---------------------------------------------
+// ---- buying a face-up state for a side; the next turns up --------------------
 list($g, $P) = new_game(2);
-ok(!in_array('st#tx', array_merge($g['state']['main'], $g['state']['exchange']), true), 'state: a big state is never in the main deck');
 give_hand($g, $P, []);
-to_exchange($g, 'st#wi');
+face_up($g, 'wi', 'mn');
 $wi = e24_state('wi');
-set_pools($g, ['gen' => 4, 'dem' => 2, 'rep' => 7]);
+set_pools($g, ['gen' => 0, 'dem' => 2, 'rep' => 6, 'campaign' => 1]);
 ok(throws(function () use (&$g, &$P) { act($g, $P, 'buy', ['card' => 'st#wi']); }) !== false, 'buy state: needs a side');
+ok(throws(function () use (&$g, &$P) { act($g, $P, 'buy', ['card' => 'st#mn', 'side' => 'trump']); }) !== false, 'buy state: only the face-up state');
 ok(throws(function () use (&$g, &$P) { act($g, $P, 'buy', ['card' => 'st#wi', 'side' => 'harris']); }) !== false, 'buy state: Republican cannot pay for Harris');
 act($g, $P, 'buy', ['card' => 'st#wi', 'side' => 'trump']);
-eq($g['state']['turn']['spent']['rep'], (int) $wi['trump_threshold'], 'buy state: paid in Republican');
+eq($g['state']['turn']['spent']['rep'], 6, 'buy state: Republican first');
+eq($g['state']['turn']['spent']['campaign'], 1, 'buy state: then Campaign');
+eq($g['state']['turn']['spent']['gen'], (int) $wi['trump_threshold'] - 7, 'buy state: then neutral');
 ok(in_array('st#wi:trump', $P[0]['private_state']['discard'], true), 'buy state: its Trump card to the discard pile');
 eq(e24_tally($g), ['trump' => 10, 'harris' => 0], 'buy state: 10 votes for Trump');
 eq($g['state']['claims']['wi']['seat'], 0, 'buy state: claimed by the buyer');
+eq($g['state']['up']['medium'], 'mn', 'buy state: the next state turns up');
+eq($g['state']['last_reveal']['key'], 'mn', 'buy state: and is revealed');
 check_invariants($g, $P, 'buy state');
 
-// Flipping costs by margin.
-list($g, $P) = new_game(2);
+// A large state's reveal: every outlet takes a Scandal (the New York Times never does).
+list($g, $P) = new_game(3, [], [0 => 'sun', 1 => 'intelligencer', 2 => 'journal']);
 give_hand($g, $P, []);
-to_exchange($g, 'st#wy');
-$wy = e24_state('wy');
-set_pools($g, ['gen' => (int) $wy['trump_threshold']]);
-ok(throws(function () use (&$g, &$P) { act($g, $P, 'buy', ['card' => 'st#wy', 'side' => 'harris']); }) !== false, 'flip: Wyoming for Harris costs more');
-act($g, $P, 'buy', ['card' => 'st#wy', 'side' => 'trump']);
-eq(e24_tally($g)['trump'], 3, 'flip: Wyoming for Trump at history\'s price');
+eq(e24_state('mi')['reveal_kind'], 'scandal', '(Michigan reveals a Scandal)');
+face_up($g, 'pa', 'mi');
+set_pools($g, ['gen' => 20]);
+act($g, $P, 'buy', ['card' => 'st#pa', 'side' => 'harris']);
+$sc = function ($p) { $n = 0; foreach (array_merge($p['private_state']['discard'], $p['private_state']['hand']) as $id) if (strpos($id, 'scandal#') === 0) $n++; return $n; };
+eq([$sc($P[0]), $sc($P[1]), $sc($P[2])], [1, 0, 1], 'reveal: a Scandal for every outlet but the Times');
+eq((int) $P[0]['public_state']['called'], 1, 'reveal: a large state bought counts for the AP');
+check_invariants($g, $P, 'reveal scandal');
 
-// ---- calling the big state --------------------------------------------------
+// A small state's reveal sweeps the exchange.
 list($g, $P) = new_game(2);
-$key = $g['state']['big'][0];
-$s = e24_state($key);
 give_hand($g, $P, []);
-set_pools($g, ['gen' => (int) $s['harris_threshold'], 'dem' => 1, 'campaign' => 1, 'rep' => 30]);
-act($g, $P, 'call', ['side' => 'harris']);
-eq($g['state']['turn']['spent']['dem'], 1, 'call: party currency first');
-eq($g['state']['turn']['spent']['campaign'], 1, 'call: then Campaign');
-eq($g['state']['turn']['spent']['gen'], (int) $s['harris_threshold'] - 2, 'call: then neutral');
-eq($g['state']['turn']['spent']['rep'], 0, 'call: never the other party');
-eq($g['state']['e'], 1, 'call: the next big state is up');
-eq($g['state']['step'], 1, 'call: the calendar moves on');
-eq(e24_tally($g)['harris'], (int) $s['ev'], 'call: its votes for Harris');
-ok(in_array('st#' . $key . ':harris', $P[0]['private_state']['discard'], true), 'call: the card to the discard pile');
-ok(throws(function () use (&$g, &$P) { act($g, $P, 'call', ['side' => 'trump']); }) !== false, 'call: once a turn');
-$rel = find_card(function ($c) { return (int) $c['step'] === 1; });
-ok(in_array($rel, array_merge($g['state']['main'], $g['state']['exchange']), true), 'call: the next stories are released');
-check_invariants($g, $P, 'call');
+$small = null;
+foreach (e24_states() as $k => $s) if ($s['deck'] === 'small' && $s['reveal_kind'] === 'sweep' && $k !== 'wy') { $small = $k; break; }
+face_up($g, 'wy', $small);
+$oldEx = $g['state']['exchange'];
+set_pools($g, ['gen' => 20]);
+act($g, $P, 'buy', ['card' => 'st#wy', 'side' => 'trump']);
+ok(!array_intersect($oldEx, $g['state']['exchange']), 'reveal: a sweep deals a fresh exchange');
+eq(count($g['state']['exchange']), 5, 'reveal: ... of five');
+check_invariants($g, $P, 'reveal sweep');
 
 // The Globe: either party's currency counts for either side.
 list($g, $P) = new_game(2, [], [0 => 'globe', 1 => 'sun']);
 give_hand($g, $P, []);
-to_exchange($g, 'st#mi');
+face_up($g, 'mi');
 set_pools($g, ['dem' => 20]);
 act($g, $P, 'buy', ['card' => 'st#mi', 'side' => 'trump']);
 eq(e24_tally($g)['trump'], 15, 'Globe: Democratic currency buys Michigan for Trump');
 list($g, $P) = new_game(2, [], [0 => 'sun', 1 => 'globe']);
 give_hand($g, $P, []);
-to_exchange($g, 'st#mi');
+face_up($g, 'mi');
 set_pools($g, ['dem' => 20]);
 ok(throws(function () use (&$g, &$P) { act($g, $P, 'buy', ['card' => 'st#mi', 'side' => 'trump']); }) !== false, 'without the Globe it cannot');
+
+// ---- planks: into play, paying each turn, knocked out ----------------------------
+$repPlank = find_card(function ($c) { return $c['type'] === 'Plank' && $c['lean'] === 'rep' && (int) $c['ongoing_gen'] === 2; });
+$demPlank = find_card(function ($c) { return $c['type'] === 'Plank' && $c['lean'] === 'dem' && (int) $c['ongoing_gen'] === 1 && !(int) $c['ongoing_draw']; });
+list($g, $P) = new_game(2);
+fresh_hand($g, $P, [$repPlank]);
+eq(engine_available_actions($g, $P, 0)['framings'][$repPlank], ['top'], 'plank: one side only');
+act($g, $P, 'play', ['card' => $repPlank]);
+act($g, $P, 'end_turn');
+eq($P[0]['public_state']['locations'], [$repPlank], 'plank: stays in play');
+ok(e24_pools($g, $P)['rep'] >= 1, 'plank: a rival gets +1 Republican at the start of its turn');
+$rivalRep = e24_pools($g, $P)['rep'];
+act($g, $P, 'end_turn');
+$gen0 = 0;
+foreach ($P[0]['private_state']['hand'] as $id) $gen0 += (int) e24_view($id)['gen'];
+eq(e24_pools($g, $P)['gen'], $gen0 + 2, 'plank: its owner gets +2 neutral at the start of each turn');
+check_invariants($g, $P, 'plank in play');
+
+// A story's bottom knocks out a rival's plank of its party.
+$striker = $story(function ($c) { return $c['bottom_attack'] === 'plank' && $c['strike'] === 'rep'; });
+list($g, $P) = new_game(2);
+in_play($g, $P, 1, $repPlank);
+fresh_hand($g, $P, [$striker]);
+act($g, $P, 'play', ['card' => $striker, 'framing' => 'bottom']);
+$pend = $g['state']['turn']['pending'];
+ok($pend && $pend['type'] === 'knock' && $pend['options'] === [$repPlank], 'knock: the rival\'s Republican plank is the target');
+eq(engine_public_state($g, $P, 0)['you']['pending']['options'][0]['owner']['seat'], 1, 'knock: the view names its owner');
+act($g, $P, 'choose', ['card' => $repPlank]);
+eq($P[1]['public_state']['locations'], [], 'knock: the plank leaves play');
+ok(in_array($repPlank, $P[1]['private_state']['discard'], true), 'knock: to its owner\'s discard pile');
+eq((int) $P[0]['public_state']['knocks'], 1, 'knock: counted');
+check_invariants($g, $P, 'knock');
+// No plank of that party in play: no prompt; a plank of the other party is safe.
+list($g, $P) = new_game(2);
+in_play($g, $P, 1, $demPlank);
+fresh_hand($g, $P, [$striker]);
+act($g, $P, 'play', ['card' => $striker, 'framing' => 'bottom']);
+eq($g['state']['turn']['pending'], null, 'knock: nothing to hit, no prompt');
+eq($P[1]['public_state']['locations'], [$demPlank], 'knock: the other party\'s plank is safe');
+// A swing state played for Trump knocks out a Democratic plank.
+list($g, $P) = new_game(2);
+in_play($g, $P, 1, $demPlank);
+$P[0]['private_state']['discard'][] = 'st#pa:trump';
+$g['state']['claims']['pa'] = ['side' => 'trump', 'seat' => 0, 'how' => 'buy', 'round' => 1];
+$i = array_search('pa', $g['state']['decks']['large'], true);
+if ($i !== false) array_splice($g['state']['decks']['large'], $i, 1);
+if ($g['state']['up']['large'] === 'pa') $g['state']['up']['large'] = array_pop($g['state']['decks']['large']);
+fresh_hand($g, $P, ['st#pa:trump']);
+act($g, $P, 'play', ['card' => 'st#pa:trump']);
+ok($g['state']['turn']['pending'] && $g['state']['turn']['pending']['options'] === [$demPlank], 'swing state: Pennsylvania for Trump targets a Democratic plank');
+act($g, $P, 'choose', ['card' => $demPlank]);
+eq($P[1]['public_state']['locations'], [], 'swing state: knocked out');
+check_invariants($g, $P, 'swing knock');
+
+// ---- the switch -------------------------------------------------------------------
+list($g, $P) = new_game(2);
+$switch = find_card(function ($c) { return $c['era'] === 'switch'; });
+$at = array_search($switch, $g['state']['main'], true);
+$biden = array_slice($g['state']['main'], $at + 1);
+foreach ($biden as $b) eq(e24_card($b)['era'], 'biden', 'switch: everything above it is the Biden set');
+foreach (array_slice($g['state']['main'], 0, $at) as $h) eq(e24_card($h)['era'], 'harris', 'switch: everything below it is the Harris set');
+$g['state']['main'] = array_slice($g['state']['main'], 0, $at + 1);   // the Biden set used up (set aside)
+$g['state']['trash'] = array_merge($g['state']['trash'], $biden);
+give_hand($g, $P, []);
+$g['state']['exchange'] = [];
+e24_refill($g);
+ok($g['state']['switched'] !== null, 'switch: it comes up');
+foreach ($g['state']['exchange'] as $x) eq(e24_card($x)['era'], 'harris', 'switch: the Harris set follows');
+eq(engine_public_state($g, $P, 0)['set'], 'harris', 'switch: the view says the Harris set');
 
 // ---- stake --------------------------------------------------------------------
 list($g, $P) = new_game(3);
@@ -317,33 +452,29 @@ eq(engine_available_actions($g, $P, 0)['stake'], [], 'stake: not offered after p
 
 // ---- the race to 270 and the score -------------------------------------------
 list($g, $P) = new_game(3);
-// Seat 0 stakes California-sized prestige on Trump, seat 1 on Harris.
 $P[0]['private_state']['staked'][] = ['card' => 'editorial#99', 'side' => 'trump', 'round' => 1];
 $g['state']['editorials'] = 15;
 $P[1]['private_state']['staked'][] = ['card' => 'letter#1.6', 'side' => 'harris', 'round' => 1];
 $P[1]['private_state']['hand'] = array_values(array_diff($P[1]['private_state']['hand'], ['letter#1.6']));
 $P[1]['private_state']['deck'] = array_values(array_diff($P[1]['private_state']['deck'], ['letter#1.6']));
 foreach ($P as $s => $_) e24_count($P[$s]);
-// Trump 265 claimed (by hand), then Nevada (6) takes him to 271.
+// Trump 264-269 claimed by hand (none of them face up), then Nevada (6) takes him past 270.
+face_up($g, 'nv');
 $claimed = 0;
 foreach (e24_states() as $k => $st) {
-  if ($st['deck'] !== 'main' || $k === 'nv' || $claimed + (int) $st['ev'] > 265) continue;
-  $i = array_search('st#' . $k, $g['state']['main'], true);
-  if ($i !== false) array_splice($g['state']['main'], $i, 1);
-  else { $i = array_search('st#' . $k, $g['state']['exchange'], true); if ($i === false) continue; array_splice($g['state']['exchange'], $i, 1); }
+  if ($k === 'nv' || in_array($k, $g['state']['up'], true) || $claimed + (int) $st['ev'] > 269) continue;
+  $i = array_search($k, $g['state']['decks'][$st['deck']], true);
+  array_splice($g['state']['decks'][$st['deck']], $i, 1);
   $P[2]['private_state']['discard'][] = 'st#' . $k . ':trump';
   $g['state']['claims'][$k] = ['side' => 'trump', 'seat' => 2, 'how' => 'buy', 'round' => 1];
   $claimed += (int) $st['ev'];
 }
-e24_refill($g);
 foreach ($P as $s => $_) e24_count($P[$s]);
 check_invariants($g, $P, 'race setup');
-$need = 270 - $claimed;
 give_hand($g, $P, []);
-to_exchange($g, 'st#nv');
 set_pools($g, ['gen' => 20]);
 act($g, $P, 'buy', ['card' => 'st#nv', 'side' => 'trump']);
-ok(e24_tally($g)['trump'] >= 270 || 6 < $need, 'race: Nevada takes Trump to 270');
+ok(e24_tally($g)['trump'] >= 270, 'race: Nevada takes Trump to 270 (' . e24_tally($g)['trump'] . ')');
 if (e24_tally($g)['trump'] >= 270) {
   ok($g['state']['final'], 'race: the final round begins');
   eq($g['state']['winner_side'], 'trump', 'race: Trump wins');
@@ -364,18 +495,17 @@ if (e24_tally($g)['trump'] >= 270) {
   eq(engine_available_actions($g, $P, 0), [], 'end: no actions after the end');
 }
 
-// ---- trash spares states; the Herald skips states; the news cycle -------------
-$trashCard = find_card(function ($c) { return (int) $c['trash'] > 0 && (int) $c['step'] === 0; });
+// ---- trash spares states; Politico skips the switch; the news cycle -------------
+$trashCard = $story(function ($c) { return (int) $c['trash'] > 0; });
 list($g, $P) = new_game(2);
-$P[0]['private_state']['discard'][] = 'st#' . $g['state']['big'][0] . ':trump';
-$g['state']['claims'][$g['state']['big'][0]] = ['side' => 'trump', 'seat' => 0, 'how' => 'call', 'round' => 1];
-$g['state']['history'][] = ['index' => 0];
-$g['state']['e'] = 1;
-$g['state']['step'] = 1;
-e24_release($g, 1);
+$P[0]['private_state']['discard'][] = 'st#tx:trump';
+$g['state']['claims']['tx'] = ['side' => 'trump', 'seat' => 0, 'how' => 'buy', 'round' => 1];
+$i = array_search('tx', $g['state']['decks']['large'], true);
+if ($i !== false) array_splice($g['state']['decks']['large'], $i, 1);
+if ($g['state']['up']['large'] === 'tx') $g['state']['up']['large'] = array_pop($g['state']['decks']['large']);
 give_hand($g, $P, [$trashCard, 'notice#0.0']);
 act($g, $P, 'play', ['card' => $trashCard]);
-ok($g['state']['turn']['pending'] && !in_array('st#' . $g['state']['big'][0] . ':trump', $g['state']['turn']['pending']['options'], true), 'trash: a claimed state cannot be destroyed');
+ok($g['state']['turn']['pending'] && !in_array('st#tx:trump', $g['state']['turn']['pending']['options'], true), 'trash: a claimed state cannot be destroyed');
 act($g, $P, 'choose', ['card' => 'notice#0.0']);
 ok(in_array('notice#0.0', $g['state']['trash'], true), 'trash: the chosen card is destroyed');
 check_invariants($g, $P, 'trash');
@@ -383,17 +513,13 @@ check_invariants($g, $P, 'trash');
 list($g, $P) = new_game(2, [], [0 => 'herald', 1 => 'globe']);
 give_hand($g, $P, []);
 set_pools($g, ['gen' => 3]);
-foreach (['main', 'exchange'] as $z) {                 // Wyoming to the top of the main deck
-  $i = array_search('st#wy', $g['state'][$z], true);
-  if ($i !== false) array_splice($g['state'][$z], $i, 1);
-}
-$g['state']['main'][] = 'st#wy';
-e24_refill($g);
-ok(end($g['state']['main']) === 'st#wy' || in_array('st#wy', $g['state']['exchange'], true), 'Herald: (a state near the top)');
+$i = array_search($switch, $g['state']['main'], true);           // the switch to the top of the main deck
+array_splice($g['state']['main'], $i, 1);
+$g['state']['main'][] = $switch;
 $top = $g['state']['main'][e24_top_story($g)];
 act($g, $P, 'paper');
-eq($P[0]['private_state']['held'], [$top], 'Herald: the topmost story is scooped, states passed over');
-ok(!e24_is_state($top), 'Herald: never a state');
+eq($P[0]['private_state']['held'], [$top], 'Politico: the topmost card is scooped');
+ok($top !== $switch, 'Politico: never the switch');
 check_invariants($g, $P, 'herald');
 
 list($g, $P) = new_game(2);
@@ -419,9 +545,12 @@ list($g, $P) = new_game(3, [2]);
 $view = engine_public_state($g, $P, 0);
 ok(count($view['you']['hand']) === 5, 'view: my hand is shown');
 foreach ($view['players'] as $pv) ok(!isset($pv['hand']) && !isset($pv['deck']) && !isset($pv['private_state']), 'view: no seat shows a hand or deck');
-ok($view['big']['ev'] > 0 && $view['big']['trump']['threshold'] > 0, 'view: the big state up');
+foreach (E24_DECKS as $d) ok($view['state_decks'][$d]['up']['ev'] > 0 && $view['state_decks'][$d]['left'] > 0, "view: the $d state up, and how many are left");
+ok(isset($view['state_decks']['large']['up']['reveal']['kind']), 'view: the face-up state carries its reveal');
+eq($view['set'], 'biden', 'view: the Biden set');
 eq(count($view['map']), 51, 'view: the map has every contest');
 eq($view['race']['win_at'], 270, 'view: the race to 270');
+ok(!isset($view['state_decks']['large']['cards']), 'view: the face-down states are not listed');
 
 echo "  $CHECKS checks, $FAILS failed\n\n";
 
@@ -433,8 +562,9 @@ $games = (int) ($argv[1] ?? 300);
 echo "Random games: $games (2-5 seats, people making random legal moves, some bot seats)\n";
 $ended = [];
 $rounds = [];
-$calls = 0;
-$maxPerTurn = 0;
+$bought = 0;
+$knocks = 0;
+$switched = 0;
 $actions = 0;
 $errors = 0;
 $startFails = $FAILS;
@@ -446,8 +576,6 @@ for ($gi = 0; $gi < $games; $gi++) {
   while ($g['status'] === 'active' && ++$guard < 20000) {
     $seat = $g['state']['turn']['seat'];
     $av = engine_available_actions($g, $P, $seat);
-    $before = count($g['state']['history']);
-    $turnsBefore = (int) $g['state']['turns'];
     try {
       if (isset($av['choose'])) {
         $opts = $av['choose'];
@@ -457,9 +585,11 @@ for ($gi = 0; $gi < $games; $gi++) {
         act($g, $P, 'stake', ['card' => $av['stake'][mt_rand(0, count($av['stake']) - 1)], 'side' => mt_rand(0, 1) ? 'trump' : 'harris']);
       } elseif (!empty($av['play']) && mt_rand(0, 4) > 0) {
         if (mt_rand(0, 3) === 0) act($g, $P, 'play_all');
-        else act($g, $P, 'play', ['card' => $av['play'][mt_rand(0, count($av['play']) - 1)]]);
-      } elseif (!empty($av['call']) && mt_rand(0, 3) > 0) {
-        act($g, $P, 'call', ['side' => $av['call'][mt_rand(0, count($av['call']) - 1)]]);
+        else {
+          $card = $av['play'][mt_rand(0, count($av['play']) - 1)];
+          $fr = $av['framings'][$card];
+          act($g, $P, 'play', ['card' => $card, 'framing' => $fr[mt_rand(0, count($fr) - 1)]]);
+        }
       } elseif (!empty($av['buy']) && mt_rand(0, 4) > 0) {
         $b = $av['buy'][mt_rand(0, count($av['buy']) - 1)];
         if (e24_is_state($b)) act($g, $P, 'buy', ['card' => 'st#' . e24_state_key($b), 'side' => e24_card_side($b)]);
@@ -477,14 +607,14 @@ for ($gi = 0; $gi < $games; $gi++) {
       act($g, $P, 'end_turn');
     }
     $actions++;
-    // At most one big state per turn (an action can run several bot turns).
-    $maxPerTurn = max($maxPerTurn, (count($g['state']['history']) - $before) - max(1, (int) $g['state']['turns'] - $turnsBefore + 1) + 1);
     check_invariants($g, $P, "game $gi, action $guard");
     if ($FAILS - $startFails > 20) break 2;
   }
   $ended[$g['ended_reason'] ?? 'unfinished'] = ($ended[$g['ended_reason'] ?? 'unfinished'] ?? 0) + 1;
   $rounds[] = $g['round_number'];
-  $calls += count($g['state']['history']);
+  $bought += count($g['state']['claims']);
+  $switched += $g['state']['switched'] !== null ? 1 : 0;
+  foreach ($P as $p) $knocks += (int) ($p['public_state']['knocks'] ?? 0);
   if ($g['status'] === 'ended') {
     $left = array_filter($P, function ($p) { return !$p['conceded']; });
     if (!$left) {
@@ -492,7 +622,7 @@ for ($gi = 0; $gi < $games; $gi++) {
     } else {
       $best = max(array_map(function ($p) { return $p['final_score']; }, $left));
       ok($g['winner_seat'] !== null && empty($P[$g['winner_seat']]['conceded'])
-         && $P[$g['winner_seat']]['final_score'] === $best, "game $gi: the winner has the most prestige");
+         && $P[$g['winner_seat']]['final_score'] === $best, "game $gi: the winner has the most wealth");
     }
     $w = $g['state']['winner_side'];
     if ($g['ended_reason'] === 'race_called') ok(e24_tally($g)[$w] >= 270, "game $gi: the winner side has 270");
@@ -505,9 +635,9 @@ for ($gi = 0; $gi < $games; $gi++) {
   }
 }
 ok($errors === 0, "no legal action refused ($errors)");
-ok($maxPerTurn <= 1, 'at most one big state called in any action');
 echo "  ended: " . json_encode($ended) . "\n";
 echo "  mean rounds " . round(array_sum($rounds) / max(1, count($rounds)), 1)
-   . ", big states called " . $calls . ", actions " . $actions . "\n";
+   . ", states claimed " . $bought . ", planks knocked out " . $knocks . ", switch came up in " . $switched . " of " . $games
+   . ", actions " . $actions . "\n";
 echo "  $CHECKS checks in all, $FAILS failed\n";
 exit($FAILS ? 1 : 0);

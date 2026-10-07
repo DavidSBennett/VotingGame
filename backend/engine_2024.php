@@ -17,45 +17,56 @@
  *
  * Outlets take TURNS. Each starts with 7 Letters to the Editor (+1) and 3
  * Local Notices (nothing), shuffled; draws 5. Three currencies: NEUTRAL
- * spends on anything; REPUBLICAN only on Trump (calling or buying a state
- * for him, or a Republican story); DEMOCRATIC only on Harris (or a
- * Democratic story); CAMPAIGN only on calling a big state.
+ * spends on anything; REPUBLICAN only on Trump (buying a state for him, or
+ * a Republican story); DEMOCRATIC only on Harris (or a Democratic story);
+ * CAMPAIGN only on states.
  *
  * CURRENCY COUNTS FROM THE HAND (the user, 2026-10-03): every card's
  * currency (neutral, party, Campaign, per 3 states) counts as soon as it is
  * in the hand on the outlet's turn -- at the start, and when drawn -- once
  * a turn, even if the card later leaves the hand. Playing a card only USES
- * ITS ABILITY (draw, destroy, gain, attack, Retraction, chain, compounding,
- * a media event into play); a card with none is never played.
+ * ITS ABILITY; a card with none is never played.
+ *
+ * TWO FRAMINGS (the user, 2026-10-04/05): every story is used one way or
+ * the other. Its TOP is the positive framing: the card's ability (draw,
+ * destroy, gain, Retraction, chain, compounding, or +1 of its party). Its
+ * BOTTOM is the oppositional framing: +1 or +2 of the OTHER party's
+ * currency, and on twenty stories a plank knockout.
+ * PARTY PLANKS (20, ten from each 2024 platform) are played into play and
+ * stay there, paying their owner each turn while every other outlet gets
+ * +1 of the plank's party, until a rival KNOCKS one out (a story's bottom,
+ * or a swing state played for the other side): it goes to its owner's
+ * discard pile.
  *
  * On its turn an outlet either STAKES -- sets one card from its hand aside,
  * face down, on Trump or Harris, discards the rest and draws 5 -- or plays:
  *   - USES the abilities of cards in its hand, one at a time;
- *   - may CALL the big state up, once: the ten biggest states, shuffled,
- *     one at a time. Either side's threshold claims it for that side, and
- *     the outlet gains that side's card. Each call moves the calendar on a
- *     step, releasing that step's stories;
- *   - BUYS off the exchange (5 face up from the main deck: the other 41
- *     states and the stories) -- a state for a side at that side's
- *     threshold -- or Editorials;
- *   - ENDS the turn: everything played and left in hand is discarded (media
- *     events stay in play), it draws 5, and the oldest card on the exchange
- *     goes to the bottom of the main deck (the news cycle).
+ *   - BUYS a STATE for a side at that side's threshold: three state decks
+ *     (large, medium, small), one state face up on each. Buying it turns up
+ *     the next, and that state's REVEAL (a real article from its own press)
+ *     hits every outlet: a Scandal, a discard, or a fresh exchange;
+ *   - BUYS off the exchange (5 face up from the main deck: the stories and
+ *     planks) or Editorials. The main deck is two sets stacked, no calendar:
+ *     the Biden set on top, the SWITCH card (set aside when it comes up),
+ *     then the Harris set;
+ *   - ENDS the turn: everything played and left in hand is discarded (planks
+ *     stay in play), it draws 5, and the oldest card on the exchange goes to
+ *     the bottom of the main deck (the news cycle).
  * Flipping a state costs 1 more per 6 points of its 2024 margin. A state
  * counts for its side once claimed. When a side reaches 270 the round is
  * played out and the game ends. The score is the wealth (-1 to 12) of the
  * cards an outlet staked on the winner; nothing else scores.
- * Negative stories attack every rival (discard at random, or a Scandal); a
- * Defense card in hand is used automatically; an attack that hits gives +1
- * neutral. Retraction: draw a card and destroy a Scandal.
+ * Retraction: draw a card and destroy a Scandal.
  * ---------------------------------------------------------------------
  */
 
 require_once __DIR__ . '/cards_2024.php';     // cards, states and the eight outlets (e24_outlets)
 
-define('ENGINE_STATE_VERSION', 24);
+define('ENGINE_STATE_VERSION', 25);
 define('E24_SIDES', ['trump', 'harris']);
 define('E24_KINDS', ['Political', 'Economic', 'Social']);
+define('E24_DECKS', ['large', 'medium', 'small']);
+define('E24_ONGOING', ['Media event', 'Plank']);     // cards that stay in play
 
 // ---------------------------------------------------------------------
 // Configuration -- mirrors DEFAULTS in tools/simulate_2024.py
@@ -104,6 +115,14 @@ function e24_party($side) {
   return $side === 'trump' ? 'rep' : 'dem';
 }
 
+function e24_other_party($party) {
+  return $party === 'rep' ? 'dem' : 'rep';
+}
+
+function e24_party_name($party) {
+  return $party === 'rep' ? 'Republican' : 'Democratic';
+}
+
 function e24_side_name($side) {
   return $side === 'trump' ? 'Trump' : 'Harris';
 }
@@ -131,7 +150,7 @@ function e24_view($id) {
       $sides[$sd] = [
         'cost' => (int) $s[$sd . '_threshold'], 'gen' => (int) $s[$sd . '_gen'], 'party' => (int) $s[$sd . '_party'],
         'draw' => (int) $s[$sd . '_draw'], 'trash' => (int) $s[$sd . '_trash'], 'text' => $s[$sd . '_text'],
-        'historical' => $s['winner'] === $sd,
+        'historical' => $s['winner'] === $sd, 'knock' => (int) $s[$sd . '_strike'] ? e24_party(e24_other($sd)) : null,
       ];
     }
     $v = [
@@ -141,7 +160,12 @@ function e24_view($id) {
       'half_names' => ['trump' => $s['trump_name'], 'harris' => $s['harris_name']],
       'state_name' => $s['state'], 'side' => $side, 'lean' => $side ? e24_party($side) : null, 'story_kind' => null,
       'ev' => (int) $s['ev'], 'vp' => (int) $s['vp'], 'tier' => $s['tier'], 'margin' => (float) $s['margin'],
-      'winner_2024' => $s['winner'], 'big' => $s['deck'] === 'elections', 'sides' => $sides,
+      'winner_2024' => $s['winner'], 'deck' => $s['deck'], 'big' => $s['deck'] === 'large', 'sides' => $sides,
+      'knock' => $side ? $sides[$side]['knock'] : null,
+      'reveal' => ['kind' => $s['reveal_kind'], 'n' => (int) ($s['reveal_n'] ?? 1), 'title' => $s['reveal_title'],
+                   'outlet' => $s['reveal_outlet'], 'url' => $s['reveal_url'], 'date' => $s['reveal_date'],
+                   'text' => $s['reveal_text']],
+      'top_party' => 0, 'bottom_party' => 0, 'bottom_attack' => null, 'strike' => null, 'era' => null,
       'cost' => $side ? (int) $s[$side . '_threshold'] : min((int) $s['trump_threshold'], (int) $s['harris_threshold']),
       'gen' => $side ? (int) $s[$side . '_gen'] : 0, 'themed' => $side ? (int) $s[$side . '_party'] : 0,
       'campaign' => 0, 'draw' => $side ? (int) $s[$side . '_draw'] : 0, 'trash' => $side ? (int) $s[$side . '_trash'] : 0,
@@ -162,6 +186,7 @@ function e24_view($id) {
   $c['kind'] = $c['key'];
   $c['key'] = $id;
   $c['side'] = null;
+  $c['knock'] = null;
   return $c;
 }
 
@@ -207,19 +232,31 @@ function engine_setup(&$game, &$players, $mysqli = null) {
   $game['winner_seat'] = null;
   $game['ended_reason'] = null;
 
-  $big = [];
-  $main = [];
-  foreach (e24_states() as $k => $s) {
-    if ($s['deck'] === 'elections') $big[] = $k;
-    else $main[] = 'st#' . $k;
+  // Three state decks, one state face up on each (the end of each list is its top).
+  $decks = ['large' => [], 'medium' => [], 'small' => []];
+  foreach (e24_states() as $k => $s) $decks[$s['deck']][] = $k;
+  $up = [];
+  foreach (E24_DECKS as $d) {
+    shuffle($decks[$d]);
+    $up[$d] = array_pop($decks[$d]);
   }
-  shuffle($big);
+  // The main deck: the Biden set on top (the end), the switch, the Harris set.
+  $sets = ['biden' => [], 'harris' => []];
+  $switch = null;
   $cards = e24_cards();
+  foreach ($cards as $k => $c) {
+    if ($c['era'] === 'switch') $switch = $k;
+    elseif (isset($sets[$c['era']])) $sets[$c['era']][] = $k;
+  }
+  shuffle($sets['biden']);
+  shuffle($sets['harris']);
+  $main = array_merge($sets['harris'], $switch ? [$switch] : [], $sets['biden']);
   $game['state'] = [
     'engine_version' => ENGINE_STATE_VERSION,
-    'big'        => $big,                    // the elections deck, in the order it comes up
-    'e'          => 0,                       // the big state up
-    'step'       => 0,                       // the calendar
+    'decks'      => $decks,                  // the state decks still face down
+    'up'         => $up,                     // the state face up on each deck (null when it is empty)
+    'switched'   => null,                    // the round the switch card came up: the Harris set has begun
+    'last_reveal' => null,                   // the last state turned up: [key, deck, round]
     'main'       => $main,
     'exchange'   => [],
     'editorials' => (int) $cards['editorial']['copies'],
@@ -228,14 +265,13 @@ function engine_setup(&$game, &$players, $mysqli = null) {
     'order'      => engine_seat_list($players),
     'turns'      => 0,
     'claims'     => [],                      // state key => [side, seat, how, round]
-    'history'    => [],                      // big states called
+    'reveals'    => [],                      // states turned up, in order
     'final'      => false,                   // a side reached 270: the round plays out
     'winner_side' => null,
     'trigger_seat' => null,
     'last_turn'  => null,
     'turn'       => null,
   ];
-  e24_release($game, 0);
   e24_refill($game);
 
   $taken = [];
@@ -280,7 +316,7 @@ function engine_setup(&$game, &$players, $mysqli = null) {
   }
 
   e24_start_turn($game, $players, $game['state']['order'][0], $mysqli);
-  if ($mysqli) engine_log($mysqli, $game, null, 'campaign_begins', e24_big_text($game));
+  if ($mysqli) engine_log($mysqli, $game, null, 'campaign_begins', e24_decks_text($game));
   engine_run_bots($game, $players, $mysqli);
 }
 
@@ -344,20 +380,21 @@ function e24_states_held($player) {
   return $n;
 }
 
-function e24_release(&$game, $step) {
-  $fresh = [];
-  foreach (e24_cards() as $k => $c) {
-    if ($c['step'] !== null && (int) $c['step'] === (int) $step) $fresh[] = $k;
-  }
-  $game['state']['main'] = array_merge($game['state']['main'], $fresh);
-  shuffle($game['state']['main']);
-  $game['state']['last_released'] = $fresh;
+function e24_is_switch($id) {
+  $c = e24_card(explode('#', (string) $id)[0]);
+  return $c && $c['era'] === 'switch';
 }
 
+/** Deal the exchange back up to size; the switch card is set aside when it comes up. */
 function e24_refill(&$game) {
   $size = (int) ($game['config']['exchange_size'] ?? 5);
   while (count($game['state']['exchange']) < $size && !empty($game['state']['main'])) {
-    $game['state']['exchange'][] = array_pop($game['state']['main']);
+    $c = array_pop($game['state']['main']);
+    if (e24_is_switch($c)) {
+      $game['state']['switched'] = (int) ($game['round_number'] ?? 1);
+      continue;
+    }
+    $game['state']['exchange'][] = $c;
   }
 }
 
@@ -417,6 +454,7 @@ function e24_new_turn($seat) {
     'seat' => (int) $seat, 'base' => $zero, 'spent' => $zero, 'played' => [],
     'counts' => ['Political' => 0, 'Economic' => 0, 'Social' => 0],
     'called' => null, 'bought' => [], 'hits' => 0, 'attacks' => 0, 'staked' => false,
+    'frames' => [],      // card => 'top' / 'bottom': how each story was used
     'used' => ['sun' => false, 'herald' => false], 'star_done' => false, 'pending' => null, 'queue' => [],
     'counted' => [],     // cards whose currency counts this turn (they have been in the hand)
   ];
@@ -474,8 +512,14 @@ function e24_count_hand(&$game, &$players) {
 
 /** Does playing this card do anything? (Currency alone counts from the hand.) */
 function e24_has_ability($c) {
-  return (int) $c['draw'] || (int) $c['trash'] || (int) $c['gain_upto'] || $c['attack'] || (int) $c['retract']
-      || (int) $c['chain'] || (int) $c['per_same'] || $c['type'] === 'Media event';
+  return (int) $c['draw'] || (int) $c['trash'] || (int) $c['gain_upto'] || (int) $c['retract']
+      || (int) $c['chain'] || (int) $c['per_same'] || (int) ($c['top_party'] ?? 0) || (int) ($c['bottom_party'] ?? 0)
+      || in_array($c['type'], E24_ONGOING, true) || !empty($c['knock']);
+}
+
+/** The framings a card can be used in: a story with an oppositional side has both. */
+function e24_framings($c) {
+  return (int) ($c['bottom_party'] ?? 0) > 0 ? ['top', 'bottom'] : ['top'];
 }
 
 /** Currency available right now: what was made (with every bonus) less what was spent. */
@@ -483,16 +527,18 @@ function e24_pools($game, $players) {
   $t = $game['state']['turn'];
   $p = $players[$t['seat']];
   $total = $t['base'];
-  $negatives = [];
+  $bottoms = [];
   foreach ($t['played'] as $id) {
     $c = e24_view($id);
     $k = $c['story_kind'];
     $n = $k ? (int) ($t['counts'][$k] ?? 0) : 0;
-    if ((int) $c['per_same']) $total['gen'] += (int) $c['per_same'] * max(0, $n - 1);
-    if ((int) $c['chain'] && $n >= 2) $total['gen'] += (int) $c['chain'];
-    if ($c['type'] === 'Negative story') $negatives[$c['kind']] = true;
+    $top = ($t['frames'][$id] ?? 'top') === 'top';
+    if ((int) $c['per_same'] && $top) $total['gen'] += (int) $c['per_same'] * max(0, $n - 1);
+    if ((int) $c['chain'] && $n >= 2 && $top) $total['gen'] += (int) $c['chain'];
+    if (!$top) $bottoms[$c['kind']] = true;
   }
-  if (($p['public_state']['paper'] ?? null) === 'aurora') $total['gen'] += count($negatives);
+  // CNN's Debate Stage: +1 neutral for each different story used on its bottom side.
+  if (($p['public_state']['paper'] ?? null) === 'aurora') $total['gen'] += count($bottoms);
   $out = [];
   foreach ($total as $k => $v) $out[$k] = $v - (int) $t['spent'][$k];
   return $out;
@@ -530,7 +576,7 @@ function e24_have($pools, $order) {
   return $have;
 }
 
-function e24_play(&$game, &$players, $cardId, $mysqli) {
+function e24_play(&$game, &$players, $cardId, $mysqli, $framing = 'top') {
   $t = &$game['state']['turn'];
   if ($t['staked']) throw new Exception('You staked this turn.');
   $seat = $t['seat'];
@@ -539,12 +585,15 @@ function e24_play(&$game, &$players, $cardId, $mysqli) {
   if ($at === false) throw new Exception('That card is not in your hand.');
   $c = e24_view($cardId);
   if (!e24_has_ability($c)) throw new Exception($c['name'] . ' has no ability to use: its currency already counts from your hand.');
+  $framing = $framing ?: 'top';
+  if (!in_array($framing, e24_framings($c), true)) throw new Exception($c['name'] . ' has no ' . $framing . ' side to use.');
   unset($p, $t);
   e24_count_hand($game, $players);            // its currency counts whether or not it is played
   $t = &$game['state']['turn'];
   $p = &$players[$seat];
   array_splice($p['private_state']['hand'], $at, 1);
   $t['played'][] = $cardId;
+  $t['frames'][$cardId] = $framing;
   $p['private_state']['played'][] = $cardId;
   $paper = $p['public_state']['paper'] ?? null;
 
@@ -558,30 +607,24 @@ function e24_play(&$game, &$players, $cardId, $mysqli) {
       e24_draw($game, $p, (int) $game['config']['north_star_draw']);
     }
   }
-  if ((int) $c['draw']) e24_draw($game, $p, (int) $c['draw']);
-  for ($i = 0; $i < (int) $c['retract']; $i++) e24_retract($game, $p);
-  if ((int) $c['trash']) e24_push_prompt($t, ['type' => 'trash', 'card' => $cardId, 'left' => (int) $c['trash']]);
-  if ((int) $c['gain_upto']) e24_push_prompt($t, ['type' => 'gain', 'card' => $cardId, 'max_cost' => (int) $c['gain_upto'], 'left' => 1]);
+  if ($framing === 'bottom') {
+    // The oppositional framing: the other party's currency, and maybe a plank knockout.
+    $t['base'][e24_other_party($c['lean'])] += (int) $c['bottom_party'];
+    if ($c['bottom_attack'] === 'plank') {
+      e24_push_prompt($t, ['type' => 'knock', 'card' => $cardId, 'party' => $c['strike'], 'left' => 1]);
+      $t['attacks'] += 1;
+      $p['public_state']['attacks'] = 1 + (int) $p['public_state']['attacks'];
+    }
+  } else {
+    if ((int) ($c['top_party'] ?? 0) && $c['lean']) $t['base'][$c['lean']] += (int) $c['top_party'];
+    if (!empty($c['knock'])) e24_push_prompt($t, ['type' => 'knock', 'card' => $cardId, 'party' => $c['knock'], 'left' => 1]);
+    if ((int) $c['draw']) e24_draw($game, $p, (int) $c['draw']);
+    for ($i = 0; $i < (int) $c['retract']; $i++) e24_retract($game, $p);
+    if ((int) $c['trash']) e24_push_prompt($t, ['type' => 'trash', 'card' => $cardId, 'left' => (int) $c['trash']]);
+    if ((int) $c['gain_upto']) e24_push_prompt($t, ['type' => 'gain', 'card' => $cardId, 'max_cost' => (int) $c['gain_upto'], 'left' => 1]);
+  }
   unset($p, $t);
   if (!$game['state']['turn']['pending']) e24_next_prompt($game, $players);
-  if ($c['attack']) {
-    $hits = 0;
-    foreach ($game['state']['order'] as $s) {
-      if ((int) $s === (int) $seat || !empty($players[$s]['conceded'])) continue;
-      if (e24_attack($game, $players[$s], $c['attack'])) $hits++;
-    }
-    $game['state']['turn']['attacks'] += 1;
-    $game['state']['turn']['hits'] += $hits;
-    $players[$seat]['public_state']['attacks'] = 1 + (int) $players[$seat]['public_state']['attacks'];
-    if ($hits > 0) $game['state']['turn']['base']['gen'] += (int) $game['config']['attack_reward'];
-    if ($mysqli) {
-      engine_log($mysqli, $game, $seat, 'attack',
-        $players[$seat]['player_name'] . ' ran ' . $c['name'] . ': '
-        . ($c['attack'] === 'scandal' ? 'a Scandal for every rival' : 'every rival discards a card')
-        . ' (' . $hits . ' hit).', ['card' => $cardId, 'kind' => $c['attack'], 'hits' => $hits],
-        $players[$seat]['player_name']);
-    }
-  }
   e24_count_hand($game, $players);            // cards drawn count at once
   e24_count($players[$seat]);
 }
@@ -599,14 +642,19 @@ function e24_retract(&$game, &$p) {
   }
 }
 
-function e24_attack(&$game, &$q, $kind) {
-  foreach ($q['private_state']['hand'] as $i => $id) {
-    if ((int) e24_view($id)['defense']) {
-      array_splice($q['private_state']['hand'], $i, 1);
-      $q['private_state']['discard'][] = $id;
-      e24_draw($game, $q, 1);
-      return false;
+/** One hit of a reveal on one outlet: a discard at random, its dearest card, or a Scandal. */
+function e24_hit(&$game, &$q, $kind) {
+  if ($kind === 'discard_dearest') {
+    if (!$q['private_state']['hand']) return false;
+    $best = 0;
+    foreach ($q['private_state']['hand'] as $i => $id) {
+      if ((int) e24_view($id)['cost'] > (int) e24_view($q['private_state']['hand'][$best])['cost']) $best = $i;
     }
+    $id = $q['private_state']['hand'][$best];
+    array_splice($q['private_state']['hand'], $best, 1);
+    $q['private_state']['discard'][] = $id;
+    e24_count($q);
+    return true;
   }
   if ($kind === 'discard') {
     if (!$q['private_state']['hand']) return false;
@@ -629,13 +677,84 @@ function e24_attack(&$game, &$q, $kind) {
   return false;
 }
 
+/**
+ * A state turns face up: its reveal (a real article from its own press)
+ * hits every outlet at the table. 'sweep' sends the exchange to the bottom of
+ * the main deck and deals it fresh.
+ */
+function e24_reveal(&$game, &$players, $key, $deck, $mysqli) {
+  $s = e24_state($key);
+  $kind = $s['reveal_kind'];
+  $n = max(1, (int) ($s['reveal_n'] ?? 1));
+  $game['state']['last_reveal'] = ['key' => $key, 'deck' => $deck, 'round' => (int) $game['round_number']];
+  $game['state']['reveals'][] = $key;
+  if ($kind === 'sweep') {
+    $game['state']['main'] = array_merge($game['state']['exchange'], $game['state']['main']);
+    $game['state']['exchange'] = [];
+    e24_refill($game);
+  } else {
+    foreach ($game['state']['order'] as $seat) {
+      if (!empty($players[$seat]['conceded'])) continue;
+      for ($i = 0; $i < $n; $i++) e24_hit($game, $players[$seat], $kind);
+    }
+  }
+  if ($mysqli) {
+    engine_log($mysqli, $game, null, 'reveal',
+      $s['state'] . ' turns up' . ($s['reveal_title'] ? ': "' . $s['reveal_title'] . '" (' . $s['reveal_outlet'] . ').' : '.')
+      . ' ' . e24_reveal_effect($kind, $n),
+      ['state' => $key, 'deck' => $deck, 'kind' => $kind, 'n' => $n]);
+  }
+}
+
+function e24_reveal_effect($kind, $n) {
+  if ($kind === 'scandal') return $n > 1 ? "Every outlet takes $n Scandals." : 'Every outlet takes a Scandal.';
+  if ($kind === 'discard') return $n > 1 ? "Every outlet discards $n cards at random." : 'Every outlet discards a card at random.';
+  if ($kind === 'discard_dearest') return 'Every outlet discards its dearest card.';
+  if ($kind === 'sweep') return 'The stories on the exchange are swept away and dealt fresh.';
+  return '';
+}
+
+/** The planks of a party that seat's rivals have in play, as plank card ids. */
+function e24_rival_planks($players, $seat, $party) {
+  $out = [];
+  foreach ($players as $s => $q) {
+    if ((int) $s === (int) $seat) continue;
+    foreach ($q['public_state']['locations'] ?? [] as $loc) {
+      $c = e24_view($loc);
+      if ($c['type'] === 'Plank' && $c['lean'] === $party) $out[] = $loc;
+    }
+  }
+  return $out;
+}
+
+/** Knock a plank out of play: to its owner's discard pile. */
+function e24_knock(&$game, &$players, $seat, $loc, $mysqli) {
+  foreach ($players as $s => $q) {
+    $i = array_search($loc, $q['public_state']['locations'] ?? [], true);
+    if ($i === false) continue;
+    array_splice($players[$s]['public_state']['locations'], $i, 1);
+    $players[$s]['private_state']['discard'][] = $loc;
+    e24_count($players[$s]);
+    $players[$seat]['public_state']['knocks'] = 1 + (int) ($players[$seat]['public_state']['knocks'] ?? 0);
+    if ($mysqli) {
+      engine_log($mysqli, $game, $seat, 'knock',
+        $players[$seat]['player_name'] . ' knocks ' . e24_view($loc)['name'] . ' out of ' . $players[$s]['player_name']
+        . "'s play.", ['plank' => $loc, 'owner' => (int) $s], $players[$seat]['player_name']);
+    }
+    return true;
+  }
+  return false;
+}
+
 function e24_push_prompt(&$t, $prompt) {
   if (!isset($t['queue'])) $t['queue'] = [];
   $t['queue'][] = $prompt;
 }
 
-/** What a prompt can choose from. A claimed state is never destroyed: it stays called. */
-function e24_prompt_options($game, $player, $pend) {
+/** What a prompt can choose from. A claimed state is never destroyed: it stays claimed. */
+function e24_prompt_options($game, $players, $seat, $pend) {
+  $player = $players[$seat];
+  if ($pend['type'] === 'knock') return e24_rival_planks($players, $seat, $pend['party']);
   if ($pend['type'] === 'trash') {
     $opts = [];
     foreach (array_merge($player['private_state']['hand'], $player['private_state']['discard']) as $id) {
@@ -658,12 +777,12 @@ function e24_next_prompt(&$game, &$players) {
   $t['pending'] = null;
   while (!empty($t['queue'])) {
     $next = array_shift($t['queue']);
-    $next['options'] = e24_prompt_options($game, $players[$t['seat']], $next);
+    $next['options'] = e24_prompt_options($game, $players, $t['seat'], $next);
     if ($next['options']) { $t['pending'] = $next; return; }
   }
 }
 
-function e24_choose(&$game, &$players, $pick) {
+function e24_choose(&$game, &$players, $pick, $mysqli = null) {
   $pend = $game['state']['turn']['pending'];
   if (!$pend) throw new Exception('Nothing to choose.');
   $seat = $game['state']['turn']['seat'];
@@ -671,7 +790,11 @@ function e24_choose(&$game, &$players, $pick) {
   $done = true;
   if ($pick !== null && $pick !== '') {
     if (!in_array($pick, $pend['options'], true)) throw new Exception('That is not one of the choices.');
-    if ($pend['type'] === 'trash') {
+    if ($pend['type'] === 'knock') {
+      unset($p);
+      e24_knock($game, $players, $seat, $pick, $mysqli);
+      $p = &$players[$seat];
+    } elseif ($pend['type'] === 'trash') {
       foreach (['hand', 'discard'] as $pile) {
         $i = array_search($pick, $p['private_state'][$pile], true);
         if ($i !== false) { array_splice($p['private_state'][$pile], $i, 1); break; }
@@ -687,7 +810,7 @@ function e24_choose(&$game, &$players, $pick) {
     $left = (int) ($pend['left'] ?? 1) - 1;
     if ($left > 0 && $pend['type'] === 'trash') {
       $pend['left'] = $left;
-      $pend['options'] = e24_prompt_options($game, $p, $pend);
+      $pend['options'] = e24_prompt_options($game, $players, $seat, $pend);
       if ($pend['options']) { $game['state']['turn']['pending'] = $pend; $done = false; }
     }
   }
@@ -697,48 +820,7 @@ function e24_choose(&$game, &$players, $pick) {
   e24_count_hand($game, $players);
 }
 
-/** Call the big state up for a side (once a turn). */
-function e24_call(&$game, &$players, $side, $mysqli) {
-  $t = $game['state']['turn'];
-  if ($t['staked']) throw new Exception('You staked this turn.');
-  if ($t['called']) throw new Exception('You have already called a big state this turn.');
-  if (!in_array($side, E24_SIDES, true)) throw new Exception('Name the side: trump or harris.');
-  if ((int) $game['state']['e'] >= count($game['state']['big'])) throw new Exception('Every big state has been called.');
-  $seat = $t['seat'];
-  $key = $game['state']['big'][$game['state']['e']];
-  $s = e24_state($key);
-  $need = (int) $s[$side . '_threshold'];
-  if (!e24_pay($game, e24_pools($game, $players), $need, e24_side_order($players[$seat], $side, true))) {
-    throw new Exception($s['state'] . ' for ' . e24_side_name($side) . ' needs ' . $need . ' ('
-      . ($side === 'trump' ? 'Republican' : 'Democratic') . ', Campaign or neutral).');
-  }
-  $card = 'st#' . $key . ':' . $side;
-  $players[$seat]['private_state']['discard'][] = $card;
-  $players[$seat]['public_state']['called'] = 1 + (int) $players[$seat]['public_state']['called'];
-  $game['state']['turn']['called'] = $key;
-  $game['state']['history'][] = [
-    'index' => (int) $game['state']['e'], 'key' => $key, 'state' => $s['state'], 'ev' => (int) $s['ev'],
-    'side' => $side, 'seat' => (int) $seat, 'matched_history' => ($side === $s['winner']),
-    'round' => (int) $game['round_number'],
-  ];
-  if ($mysqli) {
-    engine_log($mysqli, $game, $seat, 'call',
-      $players[$seat]['player_name'] . ' calls ' . $s['state'] . ' (' . $s['ev'] . ') for ' . e24_side_name($side)
-      . ($side === $s['winner'] ? '.' : ', and history is rewritten.'),
-      ['state' => $key, 'side' => $side, 'ev' => (int) $s['ev']], $players[$seat]['player_name']);
-  }
-  e24_claim($game, $players, $seat, $key, $side, 'call', $mysqli);
-  $game['state']['e'] += 1;
-  if ($game['state']['e'] < count($game['state']['big'])) {
-    $game['state']['step'] += 1;
-    e24_release($game, $game['state']['step']);
-    e24_refill($game);
-    if ($mysqli) engine_log($mysqli, $game, null, 'campaign_begins', e24_big_text($game));
-  }
-  e24_count($players[$seat]);
-}
-
-/** Buy a story or a state (for a side) off the exchange, or an Editorial. */
+/** Buy a story or plank off the exchange, a face-up state (for a side), or an Editorial. */
 function e24_buy(&$game, &$players, $cardId, $side, $mysqli) {
   $t = $game['state']['turn'];
   if ($t['staked']) throw new Exception('You staked this turn.');
@@ -752,20 +834,20 @@ function e24_buy(&$game, &$players, $cardId, $side, $mysqli) {
     $game['state']['editorials'] -= 1;
     $id = 'editorial#' . $game['state']['editorials'];
   } else {
-    $at = array_search($cardId, $game['state']['exchange'], true);
-    if ($at === false) throw new Exception('That card is not on the exchange.');
     if (e24_is_state($cardId)) {
       if (!in_array($side, E24_SIDES, true)) throw new Exception('Buy a state for a side: trump or harris.');
       $key = e24_state_key($cardId);
       $s = e24_state($key);
+      $deck = $s ? $s['deck'] : null;
+      if (!$s || ($game['state']['up'][$deck] ?? null) !== $key) throw new Exception('That state is not face up.');
       $need = (int) $s[$side . '_threshold'];
-      if (!e24_pay($game, e24_pools($game, $players), $need, e24_side_order($players[$seat], $side, false))) {
+      if (!e24_pay($game, e24_pools($game, $players), $need, e24_side_order($players[$seat], $side, true))) {
         throw new Exception($s['state'] . ' for ' . e24_side_name($side) . ' costs ' . $need . ' ('
-          . ($side === 'trump' ? 'Republican' : 'Democratic') . ' or neutral).');
+          . ($side === 'trump' ? 'Republican' : 'Democratic') . ', Campaign or neutral).');
       }
-      array_splice($game['state']['exchange'], $at, 1);
       $id = 'st#' . $key . ':' . $side;
       $players[$seat]['public_state']['states_bought'] = 1 + (int) $players[$seat]['public_state']['states_bought'];
+      if ($deck === 'large') $players[$seat]['public_state']['called'] = 1 + (int) $players[$seat]['public_state']['called'];
       if ($mysqli) {
         engine_log($mysqli, $game, $seat, 'claim',
           $players[$seat]['player_name'] . ' buys ' . $s['state'] . ' (' . $s['ev'] . ') for ' . e24_side_name($side)
@@ -774,7 +856,13 @@ function e24_buy(&$game, &$players, $cardId, $side, $mysqli) {
       }
       $players[$seat]['private_state']['discard'][] = $id;
       e24_claim($game, $players, $seat, $key, $side, 'buy', $mysqli);
+      // The next state on that deck turns up, and its reveal hits everyone.
+      $next = $game['state']['decks'][$deck] ? array_pop($game['state']['decks'][$deck]) : null;
+      $game['state']['up'][$deck] = $next;
+      if ($next) e24_reveal($game, $players, $next, $deck, $mysqli);
     } else {
+      $at = array_search($cardId, $game['state']['exchange'], true);
+      if ($at === false) throw new Exception('That card is not on the exchange.');
       $c = e24_view($cardId);
       if (!e24_pay($game, e24_pools($game, $players), (int) $c['cost'], e24_story_order($c))) {
         throw new Exception($c['name'] . ' costs ' . $c['cost']
@@ -793,7 +881,7 @@ function e24_buy(&$game, &$players, $cardId, $side, $mysqli) {
 /** Stake: in place of the whole turn, set one card from the hand aside on a side. */
 function e24_stake(&$game, &$players, $cardId, $side, $mysqli) {
   $t = $game['state']['turn'];
-  if ($t['played'] || $t['called'] || $t['bought'] || $t['used']['sun'] || $t['used']['herald'] || $t['staked']) {
+  if ($t['played'] || $t['bought'] || $t['used']['sun'] || $t['used']['herald'] || $t['staked']) {
     throw new Exception('Stake in place of your turn: before you play or buy anything.');
   }
   if (!in_array($side, E24_SIDES, true)) throw new Exception('Stake on a side: trump or harris.');
@@ -840,7 +928,7 @@ function e24_use_paper(&$game, &$players, $mysqli) {
   if ($paper === 'herald') {
     if ($t['used']['herald']) throw new Exception('The Herald has already scooped this turn.');
     $at = e24_top_story($game);
-    if ($at === null) throw new Exception('There is no story left in the main deck.');
+    if ($at === null) throw new Exception('There is no card left in the main deck.');
     $cost = (int) $game['config']['herald_cost'];
     if (!e24_pay($game, e24_pools($game, $players), $cost, ['gen'])) throw new Exception('The scoop costs ' . $cost . ' neutral.');
     $story = $game['state']['main'][$at];
@@ -853,15 +941,15 @@ function e24_use_paper(&$game, &$players, $mysqli) {
   throw new Exception('Your outlet has no ability to use now.');
 }
 
-/** The Herald's scoop: the topmost story in the main deck (states are passed over). */
+/** Politico's scoop: the topmost card of the main deck (the switch card is passed over). */
 function e24_top_story($game) {
   for ($i = count($game['state']['main']) - 1; $i >= 0; $i--) {
-    if (!e24_is_state($game['state']['main'][$i])) return $i;
+    if (!e24_is_switch($game['state']['main'][$i])) return $i;
   }
   return null;
 }
 
-/** End the turn: discard, media events into play, draw, the news cycle, the next outlet. */
+/** End the turn: discard, planks into play, draw, the news cycle, the next outlet. */
 function e24_end_turn(&$game, &$players, $mysqli) {
   $game['state']['turn']['pending'] = null;
   $game['state']['turn']['queue'] = [];
@@ -869,7 +957,9 @@ function e24_end_turn(&$game, &$players, $mysqli) {
   $seat = $t['seat'];
   $p = &$players[$seat];
   foreach ($t['played'] as $id) {
-    if (e24_view($id)['type'] === 'Media event') $p['public_state']['locations'][] = $id;
+    if (in_array(e24_view($id)['type'], E24_ONGOING, true) && ($t['frames'][$id] ?? 'top') === 'top') {
+      $p['public_state']['locations'][] = $id;
+    }
     else $p['private_state']['discard'][] = $id;
   }
   foreach ($p['private_state']['hand'] as $id) $p['private_state']['discard'][] = $id;
@@ -888,7 +978,7 @@ function e24_end_turn(&$game, &$players, $mysqli) {
   foreach ($t['base'] as $k => $v) $made += $pools[$k] + (int) $t['spent'][$k];
   $game['state']['last_turn'] = [
     'seat' => (int) $seat, 'played' => $t['played'], 'influence' => $made, 'staked' => $t['staked'],
-    'called' => $t['called'], 'bought' => $t['bought'], 'attacks' => $t['attacks'], 'hits' => $t['hits'],
+    'bought' => $t['bought'], 'attacks' => $t['attacks'], 'frames' => $t['frames'] ?? [],
   ];
   if ($mysqli && !$t['staked']) {
     engine_log($mysqli, $game, $seat, 'turn', e24_turn_text($game, $players, $t, $made),
@@ -898,6 +988,11 @@ function e24_end_turn(&$game, &$players, $mysqli) {
   $next = e24_next_seat($game, $players, $seat);
   if ($next === null) {
     engine_end_game($game, $players, 'all_humans_left', $mysqli);
+    return;
+  }
+  // Deadlock: every state is claimed and neither side has 270 (a 269-269 split): nothing can finish the race.
+  if (!$game['state']['final'] && !array_filter($game['state']['up'])) {
+    engine_end_game($game, $players, 'deadlock', $mysqli);
     return;
   }
   $order = $game['state']['order'];
@@ -935,11 +1030,10 @@ function e24_next_seat($game, $players, $seat) {
  * The single mutating entry point. Throw Exception with a player-facing
  * message to reject an illegal action.
  *
- *   play      {card}          play one card from your hand
- *   play_all  {}              play every card in your hand (stops at a prompt)
- *   choose    {card|null}     answer the pending prompt (destroy / gain); null declines
- *   call      {side}          the big state up, for 'trump' or 'harris'
- *   buy       {card, side?}   a story or state on the exchange (a state needs a side), or 'editorial'
+ *   play      {card, framing?}  use one card from your hand: framing 'top' (default) or 'bottom'
+ *   play_all  {}              use every card in your hand on its top (stops at a prompt)
+ *   choose    {card|null}     answer the pending prompt (destroy / gain / knock out); null declines
+ *   buy       {card, side?}   a story or plank on the exchange, a face-up state ('st#pa', with a side), or 'editorial'
  *   stake     {card, side}    in place of the turn: one card from your hand, face down, on a side
  *   paper     {}              your outlet's ability (the Sun, the Herald)
  *   end_turn  {}
@@ -955,13 +1049,14 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
   if ($action === 'concede') return engine_concede($game, $players, $seat, $mysqli);
   if ((int) $game['state']['turn']['seat'] !== (int) $seat) throw new Exception('It is not your turn.');
   if ($game['state']['turn']['pending'] && $action !== 'choose') {
-    throw new Exception('Finish your choice first: ' . ($game['state']['turn']['pending']['type'] === 'trash'
-      ? 'destroy a card, or decline.' : 'gain a story, or decline.'));
+    $pt = $game['state']['turn']['pending']['type'];
+    throw new Exception('Finish your choice first: ' . ($pt === 'trash' ? 'destroy a card, or decline.'
+      : ($pt === 'knock' ? 'knock out a plank, or decline.' : 'gain a story, or decline.')));
   }
   $name = $players[$seat]['player_name'];
   switch ($action) {
     case 'play':
-      e24_play($game, $players, (string) ($params['card'] ?? ''), $mysqli);
+      e24_play($game, $players, (string) ($params['card'] ?? ''), $mysqli, (string) ($params['framing'] ?? 'top'));
       $msg = $name . ' played ' . e24_view((string) $params['card'])['name'] . '.';
       break;
     case 'play_all':
@@ -975,12 +1070,8 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
       break;
     case 'choose':
       $pick = $params['card'] ?? null;
-      e24_choose($game, $players, $pick === null ? null : (string) $pick);
+      e24_choose($game, $players, $pick === null ? null : (string) $pick, $mysqli);
       $msg = 'Done.';
-      break;
-    case 'call':
-      e24_call($game, $players, (string) ($params['side'] ?? ''), $mysqli);
-      $msg = 'Called.';
       break;
     case 'buy':
       e24_buy($game, $players, (string) ($params['card'] ?? ''), (string) ($params['side'] ?? ''), $mysqli);
@@ -1064,7 +1155,7 @@ function e24_rand() {
 /** value() in the simulator: power, plus E24_VP_WEIGHT per prestige. */
 function e24_bot_value($c) {
   $vp = E24_VP_WEIGHT * (int) $c['vp'];
-  if ($c['type'] === 'Media event') {
+  if (in_array($c['type'], E24_ONGOING, true)) {
     return $vp + 3 * ($c['ongoing_gen'] + 1.3 * $c['ongoing_draw']) - 0.5 * $c['others_bonus'];
   }
   $v = $vp + $c['gen'] + 0.8 * $c['themed'] + 0.6 * $c['campaign'] + 1.3 * $c['draw']
@@ -1072,11 +1163,49 @@ function e24_bot_value($c) {
      + 1.0 * $c['per_office'] + 0.3 * $c['defense'] + 0.8 * $c['retract'];
   if ($c['attack'] === 'scandal') $v += 1.5;
   elseif ($c['attack'] === 'discard') $v += 1.0;
+  $v += 0.8 * (int) ($c['top_party'] ?? 0);
+  $v += 0.3 * (int) ($c['bottom_party'] ?? 0);      // the oppositional framing is an option on top of the ability
+  if (($c['bottom_attack'] ?? null) === 'plank') $v += 0.6;
   return $v;
 }
 
+/** Bot.frame: the top (the card's own ability) or the bottom (the other party's currency, worth less to an
+ *  outlet staked on this card's own party; and maybe a plank knockout). */
+function e24_bot_frame($game, $players, $seat, $style, $c) {
+  if (!in_array('bottom', e24_framings($c), true)) return 'top';
+  if (in_array($c['type'], E24_ONGOING, true)) {
+    $top = 3 * ($c['ongoing_gen'] + 1.3 * $c['ongoing_draw']);
+  } else {
+    $top = 1.3 * $c['draw'] + 0.8 * $c['trash'] + 0.4 * $c['gain_upto'] + 0.6 * $c['chain']
+         + 0.8 * $c['per_same'] + 0.8 * $c['retract'] + 0.8 * (int) $c['top_party'];
+  }
+  $side = e24_bot_leaning($style, $players[$seat]);
+  $bottom = 0.8 * (int) $c['bottom_party'] * (($side !== null && $side === ($c['lean'] === 'rep' ? 'trump' : 'harris')) ? 0.5 : 1.0);
+  if ($c['bottom_attack'] === 'plank') {
+    $best = null;
+    foreach (e24_rival_planks($players, $seat, $c['strike']) as $loc) {
+      $v = e24_bot_value(e24_view($loc));
+      if ($best === null || $v > $best) $best = $v;
+    }
+    if ($best !== null) $bottom += $style['attack'] * 0.5 * $best;
+  }
+  return $top >= $bottom ? 'top' : 'bottom';
+}
+
+/** The most valuable plank among the options (the simulator's knock). */
+function e24_bot_knock_pick($options) {
+  $best = null;
+  $bestV = null;
+  foreach ($options as $loc) {
+    $v = e24_bot_value(e24_view($loc));
+    if ($bestV === null || $v > $bestV) { $best = $loc; $bestV = $v; }
+  }
+  return $best;
+}
+
 function e24_bot_late($game) {
-  return (int) $game['state']['e'] >= count($game['state']['big']) - 2;
+  $ev = e24_tally($game);
+  return max($ev) >= (int) $game['config']['win_at'] - 70;
 }
 
 /** The side this outlet has a stake in (most staked prestige), if any. */
@@ -1163,7 +1292,7 @@ function e24_bot_choose($game, $players, $seat, $style, $options, $buying, $pool
     $c = ($id === 'editorial') ? e24_card('editorial') : e24_view($id);
     $v = e24_bot_score($game, $players, $seat, $style, $id);
     if ($pools !== null && e24_is_state($id)) {
-      $v -= $game['config']['power_choice'] * 0.3 * e24_bot_neutral_needed($players[$seat], $pools, $c['side'], (int) $c['cost'], false);
+      $v -= $game['config']['power_choice'] * 0.3 * e24_bot_neutral_needed($players[$seat], $pools, $c['side'], (int) $c['cost'], true);
     }
     $key = [$v, $id === 'editorial' ? 3 : (int) $c['cost'], e24_rand()];
     if ($bestKey === null || $key > $bestKey) { $best = $id; $bestKey = $key; }
@@ -1238,30 +1367,15 @@ function e24_bot_turn(&$game, &$players, $mysqli) {
     $t = $game['state']['turn'];
     if ($t['pending']) {
       $pend = $t['pending'];
-      $pick = $pend['type'] === 'trash' ? e24_bot_trash_pick($players[$seat], $pend['options'])
-                                        : e24_bot_choose($game, $players, $seat, $style, $pend['options'], false);
-      e24_choose($game, $players, $pick);
+      if ($pend['type'] === 'trash') $pick = e24_bot_trash_pick($players[$seat], $pend['options']);
+      elseif ($pend['type'] === 'knock') $pick = e24_bot_knock_pick($pend['options']);
+      else $pick = e24_bot_choose($game, $players, $seat, $style, $pend['options'], false);
+      e24_choose($game, $players, $pick, $mysqli);
       continue;
     }
     $next = e24_first_usable($players[$seat]);
     if ($next === null) break;
-    e24_play($game, $players, $next, $mysqli);
-  }
-  // Call the big state up: weigh each side's card against the neutral it costs.
-  $sides = e24_callable($game, $players);
-  if ($sides) {
-    $pools = e24_pools($game, $players);
-    $key = $game['state']['big'][$game['state']['e']];
-    $best = null;
-    foreach ($sides as $side) {
-      if (!e24_bot_will_claim($game, $players, $seat, $key, $side)) continue;
-      $need = (int) e24_state($key)[$side . '_threshold'];
-      $rank = [e24_bot_score($game, $players, $seat, $style, 'st#' . $key . ':' . $side)
-               - $game['config']['power_choice'] * e24_bot_neutral_needed($players[$seat], $pools, $side, $need, true),
-               e24_rand()];
-      if ($best === null || $rank > $best[0]) $best = [$rank, $side];
-    }
-    if ($best) e24_call($game, $players, $best[1], $mysqli);
+    e24_play($game, $players, $next, $mysqli, e24_bot_frame($game, $players, $seat, $style, e24_view($next)));
   }
   // Buy while something is worth it (never the state that would end the game against it).
   $safety = 0;
@@ -1295,22 +1409,9 @@ function e24_first_usable($player) {
   return $u ? $u[0] : null;
 }
 
-/** Sides the outlet on turn can call the big state for right now. */
-function e24_callable($game, $players) {
-  $t = $game['state']['turn'];
-  if ($t['called'] || $t['staked'] || (int) $game['state']['e'] >= count($game['state']['big'])) return [];
-  $pools = e24_pools($game, $players);
-  $key = $game['state']['big'][$game['state']['e']];
-  $out = [];
-  foreach (E24_SIDES as $side) {
-    if (e24_have($pools, e24_side_order($players[$t['seat']], $side, true)) >= (int) e24_state($key)[$side . '_threshold']) $out[] = $side;
-  }
-  return $out;
-}
-
 /**
- * What the outlet on turn can buy right now: story keys, 'editorial', and
- * states as 'st#pa:trump' / 'st#pa:harris'.
+ * What the outlet on turn can buy right now: story and plank keys,
+ * 'editorial', and the face-up states as 'st#pa:trump' / 'st#pa:harris'.
  */
 function e24_affordable($game, $players) {
   $t = $game['state']['turn'];
@@ -1319,14 +1420,15 @@ function e24_affordable($game, $players) {
   $player = $players[$t['seat']];
   $out = [];
   foreach ($game['state']['exchange'] as $id) {
-    if (e24_is_state($id)) {
-      $s = e24_state(e24_state_key($id));
-      foreach (E24_SIDES as $side) {
-        if (e24_have($pools, e24_side_order($player, $side, false)) >= (int) $s[$side . '_threshold']) $out[] = $id . ':' . $side;
-      }
-    } else {
-      $c = e24_view($id);
-      if (e24_have($pools, e24_story_order($c)) >= (int) $c['cost']) $out[] = $id;
+    $c = e24_view($id);
+    if (e24_have($pools, e24_story_order($c)) >= (int) $c['cost']) $out[] = $id;
+  }
+  foreach (E24_DECKS as $d) {
+    $key = $game['state']['up'][$d] ?? null;
+    if (!$key) continue;
+    $s = e24_state($key);
+    foreach (E24_SIDES as $side) {
+      if (e24_have($pools, e24_side_order($player, $side, true)) >= (int) $s[$side . '_threshold']) $out[] = 'st#' . $key . ':' . $side;
     }
   }
   if ((int) $game['state']['editorials'] > 0 && max(0, $pools['gen']) >= (int) e24_card('editorial')['cost']) $out[] = 'editorial';
@@ -1373,6 +1475,7 @@ function engine_ended_text($reason) {
     'race_called'     => 'A candidate reached 270; the stakes are revealed.',
     'all_humans_left' => 'The last editor walked away.',
     'stalled'         => 'No one would finish the race; the game is called with no winner.',
+    'deadlock'        => 'Every state is claimed and neither side has 270: the election is deadlocked, and no stake scores.',
     'rules_changed'   => 'This game was started under other rules.',
   ];
   return $text[$reason] ?? 'The game ended.';
@@ -1400,9 +1503,11 @@ function engine_score_player($players, $seat, $game = null) {
     'winner_side' => $w,
     'paper' => $p['public_state']['paper'] ?? null,
     'called' => (int) ($p['public_state']['called'] ?? 0),
+    'large_bought' => (int) ($p['public_state']['called'] ?? 0),
     'states_bought' => (int) ($p['public_state']['states_bought'] ?? 0),
     'ev_claimed' => (int) ($p['public_state']['ev_claimed'] ?? 0),
     'bought' => (int) ($p['public_state']['bought'] ?? 0),
+    'knocks' => (int) ($p['public_state']['knocks'] ?? 0),
     'attacks' => (int) ($p['public_state']['attacks'] ?? 0),
     'scandals_taken' => (int) ($p['public_state']['scandals_taken'] ?? 0),
   ]];
@@ -1444,6 +1549,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'bought' => (int) ($p['public_state']['bought'] ?? 0),
       'attacks' => (int) ($p['public_state']['attacks'] ?? 0),
       'scandals_taken' => (int) ($p['public_state']['scandals_taken'] ?? 0),
+      'knocks' => (int) ($p['public_state']['knocks'] ?? 0),
       'hand_count' => (int) ($p['public_state']['hand_count'] ?? 0),
       'deck_count' => (int) ($p['public_state']['deck_count'] ?? 0),
       'discard_count' => (int) ($p['public_state']['discard_count'] ?? 0),
@@ -1453,16 +1559,22 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     ];
   }
 
-  $big = null;
-  if ($current && $status === 'active' && (int) ($state['e'] ?? 99) < count($state['big'] ?? [])) {
-    $key = $state['big'][$state['e']];
-    $s = e24_state($key);
-    $big = [
-      'index' => (int) $state['e'], 'key' => $key, 'state' => $s['state'], 'abbr' => $s['abbr'], 'ev' => (int) $s['ev'],
-      'vp' => (int) $s['vp'], 'tier' => $s['tier'], 'margin' => (float) $s['margin'], 'winner_2024' => $s['winner'],
-      'trump' => ['threshold' => (int) $s['trump_threshold'], 'card' => e24_view('st#' . $key . ':trump')],
-      'harris' => ['threshold' => (int) $s['harris_threshold'], 'card' => e24_view('st#' . $key . ':harris')],
+  // The three state decks: the state face up on each (its reveal, both halves) and how many are left.
+  $decksPublic = [];
+  foreach (E24_DECKS as $d) {
+    $key = $state['up'][$d] ?? null;
+    $decksPublic[$d] = [
+      'deck' => $d, 'left' => count($state['decks'][$d] ?? []),
+      'up' => $key ? e24_view('st#' . $key) : null,
     ];
+  }
+  $lastReveal = null;
+  if (!empty($state['last_reveal'])) {
+    $lr = $state['last_reveal'];
+    $lastReveal = array_merge(e24_view('st#' . $lr['key'])['reveal'], [
+      'key' => $lr['key'], 'state' => e24_state($lr['key'])['state'], 'deck' => $lr['deck'], 'round' => (int) $lr['round'],
+      'effect' => e24_reveal_effect(e24_state($lr['key'])['reveal_kind'], (int) (e24_state($lr['key'])['reveal_n'] ?? 1)),
+    ]);
   }
 
   $map = [];
@@ -1478,7 +1590,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
   if ($current && $turn && $status === 'active') {
     $turnPublic = [
       'seat' => (int) $turn['seat'], 'played' => e24_views($turn['played']),
-      'pools' => e24_pools($game, $players), 'called' => $turn['called'],
+      'pools' => e24_pools($game, $players), 'frames' => $turn['frames'] ?? [],
       'bought' => e24_views($turn['bought']), 'pending' => $turn['pending'] ? $turn['pending']['type'] : null,
     ];
   }
@@ -1491,7 +1603,17 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     $pending = null;
     if ($turn && (int) $turn['seat'] === (int) $viewerSeat && $turn['pending']) {
       $pending = ['type' => $turn['pending']['type'], 'card' => e24_view($turn['pending']['card']),
-                  'options' => e24_views($turn['pending']['options']), 'left' => (int) ($turn['pending']['left'] ?? 1)];
+                  'options' => e24_views($turn['pending']['options']), 'left' => (int) ($turn['pending']['left'] ?? 1),
+                  'party' => $turn['pending']['party'] ?? null];
+      if ($turn['pending']['type'] === 'knock') {
+        foreach ($pending['options'] as $i => $o) {
+          foreach ($players as $s2 => $q) {
+            if (in_array($o['key'], $q['public_state']['locations'] ?? [], true)) {
+              $pending['options'][$i]['owner'] = ['seat' => (int) $s2, 'name' => $q['player_name']];
+            }
+          }
+        }
+      }
     }
     $staked = [];
     foreach ($me['private_state']['staked'] ?? [] as $st) $staked[] = ['card' => e24_view($st['card']), 'side' => $st['side']];
@@ -1518,16 +1640,15 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     'race' => ['trump' => $ev['trump'], 'harris' => $ev['harris'], 'win_at' => (int) ($game['config']['win_at'] ?? 270),
                'final' => (bool) ($state['final'] ?? false), 'winner_side' => $state['winner_side'] ?? null,
                'trigger_seat' => $state['trigger_seat'] ?? null],
-    'big' => $big,
-    'big_total' => count($state['big'] ?? []),
-    'big_called' => $state['history'] ?? [],
-    'step' => (int) ($state['step'] ?? 0),
+    'state_decks' => $decksPublic,
+    'last_reveal' => $lastReveal,
+    'set' => ($state['switched'] ?? null) !== null ? 'harris' : 'biden',
+    'switched_round' => $state['switched'] ?? null,
     'map' => $map,
     'exchange' => e24_views($state['exchange'] ?? []),
     'editorial' => $current ? array_merge(e24_view('editorial#x'), ['left' => (int) $state['editorials']]) : null,
     'main_count' => count($state['main'] ?? []),
     'scandals_left' => (int) ($state['scandals'] ?? 0),
-    'news' => e24_views($state['last_released'] ?? []),
     'turn' => $turnPublic,
     'last_turn' => $state['last_turn'] ?? null,
     'players' => $seats,
@@ -1543,7 +1664,7 @@ function engine_available_actions($game, $players, $seat) {
   $t = $game['state']['turn'];
   if ((int) $t['seat'] !== (int) $seat) return ['concede' => true];
   if ($t['pending']) return ['choose' => $t['pending']['options'], 'concede' => true];
-  $fresh = !$t['played'] && !$t['called'] && !$t['bought'] && !$t['used']['sun'] && !$t['used']['herald'] && !$t['staked'];
+  $fresh = !$t['played'] && !$t['bought'] && !$t['used']['sun'] && !$t['used']['herald'] && !$t['staked'];
   $paper = $players[$seat]['public_state']['paper'] ?? null;
   $paperOk = false;
   if ($paper === 'sun' && !$t['used']['sun']) {
@@ -1551,10 +1672,12 @@ function engine_available_actions($game, $players, $seat) {
   }
   if ($paper === 'herald' && !$t['used']['herald'] && e24_top_story($game) !== null
       && max(0, e24_pools($game, $players)['gen']) >= (int) $game['config']['herald_cost']) $paperOk = true;
+  $framings = [];
+  foreach (e24_usable($players[$seat]) as $id) $framings[$id] = e24_framings(e24_view($id));
   return [
     'play' => e24_usable($players[$seat]),
+    'framings' => $framings,
     'play_all' => !empty(e24_usable($players[$seat])),
-    'call' => e24_callable($game, $players),
     'buy' => e24_affordable($game, $players),
     'stake' => $fresh ? array_values($players[$seat]['private_state']['hand']) : [],
     'paper' => $paperOk,
@@ -1573,20 +1696,18 @@ function engine_log($mysqli, $game, $seat, $type, $message = '', $data = null, $
     $playerName, (int) $game['round_number'], $game['phase']);
 }
 
-function e24_big_text($game) {
-  $key = $game['state']['big'][$game['state']['e']];
-  $s = e24_state($key);
-  return 'Up now: ' . $s['state'] . ' (' . $s['ev'] . ' electoral votes) -- Trump ' . $s['trump_threshold']
-       . ', Harris ' . $s['harris_threshold'] . '.';
+function e24_decks_text($game) {
+  $parts = [];
+  foreach (E24_DECKS as $d) {
+    $key = $game['state']['up'][$d] ?? null;
+    if ($key) $parts[] = e24_state($key)['state'] . ' (' . $d . ')';
+  }
+  return 'Face up: ' . implode(', ', $parts) . '.';
 }
 
 function e24_turn_text($game, $players, $t, $made) {
   $name = $players[$t['seat']]['player_name'];
   $parts = [$made . ' currency, ' . count($t['played']) . ' ' . (count($t['played']) === 1 ? 'ability' : 'abilities') . ' used'];
-  if ($t['called']) {
-    $h = end($game['state']['history']);
-    $parts[] = 'called ' . $h['state'] . ' for ' . e24_side_name($h['side']);
-  }
   if ($t['bought']) {
     $names = [];
     foreach ($t['bought'] as $id) $names[] = e24_view($id)['name'];
@@ -1615,11 +1736,11 @@ function engine_build_export($mysqli, $game, $players, $viewerSeat = null) {
   $board = $game['state'];
   if ($hide && is_array($board)) {
     $board['main'] = count($board['main'] ?? []);
-    $board['big'] = array_slice($board['big'] ?? [], 0, (int) ($board['e'] ?? 0) + 1);   // the order still to come is hidden
+    foreach (E24_DECKS as $d) $board['decks'][$d] = count($board['decks'][$d] ?? []);   // the order still to come is hidden
     if (isset($board['turn']) && (int) $board['turn']['seat'] !== (int) $viewerSeat) $board['turn']['pending'] = null;
   }
   return [
-    'export_version' => 6,
+    'export_version' => 7,
     'exported_at' => gmdate('c'),
     'summary' => [
       'game_id' => (int) $game['game_id'], 'join_code' => $game['join_code'] ?? null, 'variant' => $game['variant'] ?? null,
@@ -1629,7 +1750,7 @@ function engine_build_export($mysqli, $game, $players, $viewerSeat = null) {
       'winner_seat' => $game['winner_seat'], 'ended_reason' => $game['ended_reason'],
       'created_at' => $game['created_at'] ?? null, 'ended_at' => $game['ended_at'] ?? null, 'config' => $game['config'],
     ],
-    'big_called' => $game['state']['history'] ?? [],
+    'reveals' => $game['state']['reveals'] ?? [],
     'final_board' => $board,
     'players' => $seats,
     'events' => ($mysqli && function_exists('all_events')) ? all_events($mysqli, (int) $game['game_id']) : [],
