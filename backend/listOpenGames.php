@@ -6,11 +6,19 @@
  *
  * ?include_active=1 also lists games already in progress (spectating and
  * "rejoin from another device" both start here).
+ *
+ * ?engine=2024 (the default) or ?engine=dc (1796-1860): the launch page
+ * opens one game's lobby, which lists only that game's tables and outlets.
  */
 require_once __DIR__ . '/engine.php';   // for ENGINE_STATE_VERSION (the newsroom game's)
-require_once __DIR__ . '/cards_2024.php'; // the eight outlets
+require_once __DIR__ . '/cards_2024.php'; // the 2024 game's eight outlets
+require_once __DIR__ . '/cards_dc.php';   // the 1796-1860 game's newspapers
 
 require_method('GET');
+
+$engine = (($_GET['engine'] ?? '') === 'dc') ? 'dc' : '2024';
+// The engines' ENGINE_STATE_VERSIONs (they cannot be loaded in one request).
+$engineVersion = ['2024' => 24, 'dc' => 9][$engine];
 
 $includeActive = !empty($_GET['include_active']);
 $statusClause = $includeActive ? "g.status IN ('lobby','active')" : "g.status = 'lobby'";
@@ -35,11 +43,8 @@ while ($r = $res->fetch_assoc()) {
   // A game running under an older engine can no longer be played, so it
   // is not "in progress" in any sense a player cares about. Leave it out.
   $cfg = json_col($r['config']);
-  // The lobby plays the 2024 game now; other games' tables are no longer
-  // listed. 24 is engine_2024.php's ENGINE_STATE_VERSION (the engines
-  // cannot be loaded in one request).
-  if (vg_engine_of_config($cfg) !== '2024') continue;
-  if ($r['status'] === 'active' && (int) ($cfg['engine_version'] ?? 0) !== 24) continue;
+  if (vg_engine_of_config($cfg) !== $engine) continue;
+  if ($r['status'] === 'active' && (int) ($cfg['engine_version'] ?? 0) !== $engineVersion) continue;
   $games[] = [
     'game_id'     => (int) $r['game_id'],
     'join_code'   => $r['join_code'],
@@ -70,9 +75,16 @@ if ($ids) {
 foreach ($games as $i => $g) $games[$i]['papers_taken'] = $taken[(int) $g['game_id']] ?? [];
 
 $papers = [];
-foreach (e24_outlets() as $k => $p) {
-  $papers[] = ['key' => $k, 'name' => $p['name'], 'ability' => $p['ability'], 'ability_name' => $p['ability_name'],
-               'flavor' => $p['flavor']];
+if ($engine === 'dc') {
+  foreach (dc_papers() as $k => $p) {
+    $papers[] = ['key' => $k, 'name' => $p['name'], 'ability' => $p['ability'], 'ability_name' => $p['leans'],
+                 'flavor' => $p['flavor']];
+  }
+} else {
+  foreach (e24_outlets() as $k => $p) {
+    $papers[] = ['key' => $k, 'name' => $p['name'], 'ability' => $p['ability'], 'ability_name' => $p['ability_name'],
+                 'flavor' => $p['flavor']];
+  }
 }
 
 json(['ok' => true, 'games' => $games, 'papers' => $papers]);

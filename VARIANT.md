@@ -1048,3 +1048,15 @@ until the engine catches up).
   stories (the Walz pick, the convention).
 - Functional check (30 three-outlet games): the switch came up in every
   game, in rounds 6-11; 31 plank knockouts. Not tuned.
+
+### 2026-10-07: a launch page to choose the election (the user)
+
+- The site opens on a **launch page** (`frontend/src/views/Launch.jsx`):
+  choose **2024** (Trump v. Harris, the 2024 game) or **1796-1860** (Adams
+  to Lincoln, the variant's DC game, `engine_dc.php`). Each opens its own
+  lobby: wording, outlets (newspapers for 1796-1860), the rules, open
+  tables and the circulation board are that game's
+  (`listOpenGames.php?engine=dc`, `HighScores engine`). "Choose an
+  election" goes back. A seat already knows its game.
+- Tests: `engine_test.php` (the 1796-1860 engine) 7.6M checks, 0 failed;
+  `engine_test_2024.php` 11.5M checks, 0 failed; the frontend builds.

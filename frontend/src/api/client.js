@@ -86,8 +86,8 @@ export const playAction = (player_token, action, params = {}) =>
 export const concede = (player_token) => playAction(player_token, 'concede');
 
 export const fetchState = (params) => get('/getState.php', params);
-export const listOpenGames = (includeActive = false) =>
-  get('/listOpenGames.php', includeActive ? { include_active: 1 } : {});
+export const listOpenGames = (includeActive = false, engine = '2024') =>
+  get('/listOpenGames.php', { engine, ...(includeActive ? { include_active: 1 } : {}) });
 export const fetchHighScores = (params = {}) => get('/highScores.php', params);
 export const fetchExport = (player_token) => get('/exportGame.php', { player_token });
 export const submitReport = (payload) => post('/submitReport.php', payload);

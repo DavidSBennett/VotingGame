@@ -2,6 +2,25 @@ import { useEffect, useState } from 'react';
 import { createGame, joinGame, listOpenGames } from '../api/client.js';
 import HighScores from '../components/HighScores.jsx';
 import Rules24 from '../components/e24/Rules24.jsx';
+import RulesDc from '../components/dc/RulesDc.jsx';
+
+/** What each election's lobby says: the 2024 game and the 1796-1860 game. */
+const EDITION = {
+  2024: {
+    badge: '2024 edition · in development',
+    kicker: 'A card game of the press and the electoral college · 2024',
+    premise: 'Claim the states, stake your bets, and decide when the race reaches 270. Only what you staked on the winner scores.',
+    outlet: 'outlet',
+    Rules: Rules24,
+  },
+  dc: {
+    badge: '1796–1860 · the early republic',
+    kicker: 'A card game of the partisan press · 1796–1860',
+    premise: 'Buy the news, run the stories, make the presidents. Seventeen elections; the most honoured paper wins.',
+    outlet: 'paper',
+    Rules: RulesDc,
+  },
+};
 
 /**
  * Choose an outlet: each has an ability of its own. `taken` greys out
@@ -17,7 +36,7 @@ function PaperPicker({ papers, value, onChange, taken = [] }) {
         className={value === null ? 'border border-gold-300 bg-ink-800 px-2 py-1.5 text-left' : 'border border-gold-500/30 px-2 py-1.5 text-left hover:border-gold-300'}
       >
         <div className="font-display text-base text-cream-50">Deal me one</div>
-        <div className="font-serif text-[11px] italic text-cream-200/60">An outlet at random when the game starts.</div>
+        <div className="font-serif text-[11px] italic text-cream-200/60">One at random when the game starts.</div>
       </button>
       {papers.map((pp) => {
         const off = taken.includes(pp.key);
@@ -56,8 +75,12 @@ function PaperPicker({ papers, value, onChange, taken = [] }) {
  *
  * A table has a 4-character join code so a player at the same table can
  * join from their own phone without being sent a link.
+ *
+ * `engine` is the election chosen on the launch page ('2024' or 'dc', the
+ * 1796-1860 game): the lobby opens and lists only that game's tables.
  */
-export default function Lobby({ onSeated }) {
+export default function Lobby({ onSeated, engine = '2024', onBack }) {
+  const ed = EDITION[engine];
   const [playerName, setPlayerName] = useState(() => {
     try {
       return localStorage.getItem('votinggame.name') || '';
@@ -92,7 +115,7 @@ export default function Lobby({ onSeated }) {
 
   const refreshGames = async () => {
     try {
-      const data = await listOpenGames(true);
+      const data = await listOpenGames(true, engine);
       setGames(data.games || []);
       setPapers(data.papers || []);
     } catch (err) {
@@ -104,7 +127,7 @@ export default function Lobby({ onSeated }) {
     refreshGames();
     const timer = setInterval(refreshGames, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [engine]);
 
   const rememberName = (name) => {
     setPlayerName(name);
@@ -117,7 +140,7 @@ export default function Lobby({ onSeated }) {
 
   const guard = () => {
     if (!playerName.trim()) {
-      setError('Sign your name first — every outlet needs an editor.');
+      setError(`Sign your name first — every ${ed.outlet} needs an editor.`);
       return false;
     }
     return true;
@@ -143,7 +166,7 @@ export default function Lobby({ onSeated }) {
           max_players: 1,
           bots: rivals,
           bot_level: level,
-          engine: '2024',
+          engine,
           paper: paper || undefined,
         }),
       );
@@ -172,17 +195,18 @@ export default function Lobby({ onSeated }) {
   return (
     <div className="mx-auto max-w-5xl px-4 pb-16 pt-10">
       {/* Title page */}
+      {onBack && (
+        <button type="button" onClick={onBack} className="font-mono text-[10px] uppercase tracking-[0.3em] text-gold-500 hover:text-gold-300">
+          ← Choose an election
+        </button>
+      )}
       <header className="text-center animate-fade">
         <div className="mx-auto mb-4 inline-block border border-oxblood-500 bg-oxblood-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-oxblood-300">
-          2024 edition · in development
+          {ed.badge}
         </div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-gold-500">
-          A card game of the press and the electoral college · 2024
-        </div>
+        <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-gold-500">{ed.kicker}</div>
         <h1 className="mt-3 font-display text-6xl font-bold leading-none text-cream-50 sm:text-7xl">The Fourth Estate</h1>
-        <p className="mx-auto mt-4 max-w-2xl font-display text-xl italic text-gold-300">
-          Claim the states, stake your bets, and decide when the race reaches 270. Only what you staked on the winner scores.
-        </p>
+        <p className="mx-auto mt-4 max-w-2xl font-display text-xl italic text-gold-300">{ed.premise}</p>
         <div className="mx-auto mt-6 flex max-w-xs items-center gap-3">
           <span className="h-px flex-1 bg-gold-500/50" />
           <span className="text-xs text-gold-500">◆</span>
@@ -199,7 +223,7 @@ export default function Lobby({ onSeated }) {
       <div className="mt-10 grid gap-6 md:grid-cols-2">
         {/* Open a table */}
         <section className="panel p-6 animate-rise">
-          <div className="label">Solo · against rival outlets</div>
+          <div className="label">Solo · against rival {ed.outlet}s</div>
           <h2 className="mt-1 font-display text-3xl font-semibold text-cream-50">Open a table</h2>
 
           <label className="mt-5 block" htmlFor="name">
@@ -215,7 +239,7 @@ export default function Lobby({ onSeated }) {
           </label>
 
           <div className="mt-5">
-            <span className="label text-cream-200/60">Rival outlets</span>
+            <span className="label text-cream-200/60">Rival {ed.outlet}s</span>
             <div className="mt-2 inline-flex border border-gold-500/50">
               {[1, 2, 3, 4].map((n) => (
                 <button
@@ -233,7 +257,7 @@ export default function Lobby({ onSeated }) {
               ))}
             </div>
             <p className="mt-2 font-serif text-sm italic text-cream-200/50">
-              {rivals === 1 ? 'Head to head.' : `A field of ${rivals + 1} outlets.`}
+              {rivals === 1 ? 'Head to head.' : `A field of ${rivals + 1} ${ed.outlet}s.`}
             </p>
           </div>
 
@@ -259,12 +283,14 @@ export default function Lobby({ onSeated }) {
               ))}
             </div>
             <p className="mt-2 font-serif text-sm italic text-cream-200/50">
-              Both levels play the same rival for now: it stakes, triggers 270 when the finish pays it, and blocks when it would not.
+              {engine === 'dc'
+                ? 'Both levels play the balanced rival the game was tuned against, for now.'
+                : 'Both levels play the same rival for now: it stakes, triggers 270 when the finish pays it, and blocks when it would not.'}
             </p>
           </div>
 
           <div className="mt-5">
-            <span className="label text-cream-200/60">Your outlet</span>
+            <span className="label text-cream-200/60">Your {ed.outlet}</span>
             <PaperPicker papers={papers} value={paper} onChange={setPaper} />
           </div>
 
@@ -296,7 +322,7 @@ export default function Lobby({ onSeated }) {
           </div>
 
           <div className="mt-5">
-            <span className="label text-cream-200/60">Your outlet at that table</span>
+            <span className="label text-cream-200/60">Your {ed.outlet} at that table</span>
             <PaperPicker
               papers={papers}
               value={joinPaper}
@@ -346,12 +372,12 @@ export default function Lobby({ onSeated }) {
 
       {showRules && (
         <div className="mt-6 animate-rise">
-          <Rules24 inline />
+          <ed.Rules inline />
         </div>
       )}
 
       <div className="mt-12">
-        <HighScores papers={papers} />
+        <HighScores papers={papers} engine={engine} />
       </div>
     </div>
   );
