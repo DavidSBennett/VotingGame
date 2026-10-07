@@ -1060,3 +1060,13 @@ until the engine catches up).
   election" goes back. A seat already knows its game.
 - Tests: `engine_test.php` (the 1796-1860 engine) 7.6M checks, 0 failed;
   `engine_test_2024.php` 11.5M checks, 0 failed; the frontend builds.
+
+### 2026-10-07: the printable main deck (the user)
+
+- `tools/build_print_deck_2024.py` builds `docs/print/deck-2024.html` from
+  `docs/deck-2024.csv`: all 80 main-deck cards (Biden set, the switch,
+  Harris set) at poker size, nine to a US-letter page with cut lines. A
+  story card carries both headlines: the positive side on top with its
+  outlet at the lower right of the headline, the oppositional side below
+  with its outlet at the upper right, each with what that side does. Planks
+  show their platform wording. Rebuild after any change to the deck.
