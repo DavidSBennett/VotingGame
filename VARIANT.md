@@ -1070,3 +1070,9 @@ until the engine catches up).
   outlet at the lower right of the headline, the oppositional side below
   with its outlet at the upper right, each with what that side does. Planks
   show their platform wording. Rebuild after any change to the deck.
+- `tools/build_print_states_2024.py` builds `docs/print/states-2024.html`:
+  the 51 state cards in the same frame, by deck (large, medium, small).
+  On top, the reveal: the state's own-press headline with its outlet at the
+  lower right, a one-line summary and what it does to every outlet; below,
+  the card bought for Trump and for Harris (cost, name, power). New York
+  and South Dakota show "article to come".
