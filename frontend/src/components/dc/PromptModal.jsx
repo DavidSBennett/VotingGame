@@ -14,14 +14,16 @@ export default function PromptModal({ pending, act, busy }) {
     gain: 'Gain a story from the exchange',
     recover: left > 1 ? `Take a card back (up to ${left})` : 'Take a card back',
     scry: 'Keep one of the top stories',
+    knock: `Knock out a ${pending.party === 'rep' ? 'Republican' : 'Democratic'} plank`,
   };
   const NOTE = {
     trash: `It leaves your deck for good.${pending.draw_each ? ' You draw a card for each one.' : ''} Local Notices and Scandals are the usual choice.`,
     gain: 'It goes into your discard pile, free.',
     recover: 'From your discard pile into your hand, to play this turn.',
     scry: 'It goes into your hand; the others go to the bottom of the main deck.',
+    knock: "A rival's plank in play: it goes to its owner's discard pile.",
   };
-  const BUTTON = { trash: 'Destroy', gain: 'Gain', recover: 'Take', scry: 'Keep' };
+  const BUTTON = { trash: 'Destroy', gain: 'Gain', recover: 'Take', scry: 'Keep', knock: 'Knock out' };
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/80 p-4 backdrop-blur-sm animate-fade">
       <div className="my-8 w-full max-w-3xl border border-gold-700 p-5 text-center shadow-lift surface-paper animate-rise">
@@ -33,6 +35,7 @@ export default function PromptModal({ pending, act, busy }) {
             <Card
               key={c.key}
               card={c}
+              tag={c.owner ? c.owner.name : null}
               onOpen={busy ? undefined : () => act('choose', { card: c.key })}
               footer={
                 <button type="button" className="btn mt-1 w-28 border-ink-950/40 px-1 py-0.5 text-ink-950" disabled={busy} onClick={() => act('choose', { card: c.key })}>

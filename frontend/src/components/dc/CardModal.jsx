@@ -42,6 +42,72 @@ function CardArt({ card }) {
   );
 }
 
+/**
+ * The 2024 game's sides of a card: a story's two framings (its positive top,
+ * the outlet at the lower right of the headline; its oppositional bottom, the
+ * outlet at the upper right), a plank's platform wording, or a state's reveal
+ * and House delegation. Nothing for the other games' cards.
+ */
+function Framings({ card }) {
+  const party = (p) => (p === 'rep' ? 'Republican' : 'Democratic');
+  const tone = (p) => (p === 'rep' ? 'border-oxblood-700 bg-oxblood-300/15' : 'border-federal-700 bg-federal-300/15');
+  const outlet = (o) => <span className="block text-right font-mono text-[10px] uppercase tracking-[0.12em] text-ink-700">{o}</span>;
+  if (card.type === 'State' && card.reveal) {
+    const r = card.reveal;
+    return (
+      <div className="mx-auto mt-4 max-w-md space-y-2 text-left">
+        <div className="border-l-4 border-gold-700 bg-cream-200/50 px-3 py-2">
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold-700">When revealed{r.date ? ` · ${r.date}` : ''}</div>
+          {r.title ? (
+            <>
+              <p className="font-display text-lg italic leading-snug text-ink-900">“{r.title}”</p>
+              {outlet(r.outlet)}
+            </>
+          ) : (
+            <p className="font-serif italic text-ink-700">The state's own press: article to come.</p>
+          )}
+          {r.text && <p className="mt-1 font-serif text-sm text-ink-900">{r.text}</p>}
+        </div>
+        <p className="text-center font-mono text-[10px] uppercase tracking-[0.15em] text-ink-700">
+          {card.house_seats > 0
+            ? `House: ${card.house_seats} seat${card.house_seats === 1 ? '' : 's'} · +◆${card.house_cost} with the state (the 269-269 tiebreaker)`
+            : 'No House seats'}
+        </p>
+      </div>
+    );
+  }
+  if (!card.top_title && !card.top_text) return null;
+  if (card.type === 'Plank') {
+    return (
+      <div className={`mx-auto mt-4 max-w-md border-l-4 px-3 py-2 text-left ${tone(card.lean)}`}>
+        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-700">{party(card.lean)} plank · from the platform</div>
+        {card.top_title && <p className="font-display text-lg italic leading-snug text-ink-900">“{card.top_title}”</p>}
+        {card.top_outlet && outlet(card.top_outlet)}
+        {card.top_text && <p className="mt-1 font-serif text-sm text-ink-900">{card.top_text}</p>}
+      </div>
+    );
+  }
+  const other = card.lean === 'rep' ? 'dem' : 'rep';
+  return (
+    <div className="mx-auto mt-4 max-w-md space-y-2 text-left">
+      <div className={`border-l-4 px-3 py-2 ${tone(card.lean)}`}>
+        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-700">▲ Top · {party(card.lean)} side</div>
+        {card.top_title && <p className="font-display text-lg italic leading-snug text-ink-900">“{card.top_title}”</p>}
+        {card.top_outlet && outlet(card.top_outlet)}
+        {card.top_text && <p className="mt-1 font-serif text-sm text-ink-900">{card.top_text}</p>}
+      </div>
+      {card.bottom_text && (
+        <div className={`border-l-4 px-3 py-2 ${tone(other)}`}>
+          {card.bottom_outlet && outlet(card.bottom_outlet)}
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-700">▼ Bottom · {party(other)} side</div>
+          {card.bottom_title && <p className="font-display text-lg italic leading-snug text-ink-900">“{card.bottom_title}”</p>}
+          <p className="mt-1 font-serif text-sm text-ink-900">{card.bottom_text}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CardModal({ card, onClose, actions = null, onPrev = null, onNext = null, position = null }) {
   useEffect(() => {
     function handleKey(e) {
@@ -148,6 +214,7 @@ export default function CardModal({ card, onClose, actions = null, onPrev = null
 
             <Abilities card={card} size="md" />
             {card.card_text && <p className="mx-auto mt-4 max-w-md font-serif text-base leading-relaxed text-ink-900">{card.card_text}</p>}
+            <Framings card={card} />
             {card.flavor && <p className="mx-auto mt-4 max-w-md font-serif text-sm italic leading-relaxed text-ink-700">{card.flavor}</p>}
 
             {actions && <div className="mt-6 flex flex-wrap justify-center gap-2 border-t border-gold-500/30 pt-4">{actions}</div>}

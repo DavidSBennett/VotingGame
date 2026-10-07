@@ -44,7 +44,7 @@ export default function HandFan({ children, footerH = 0 }) {
   const offset = Math.max(0, (width - used) / 2);
 
   return (
-    <div ref={ref} style={{ position: 'relative', height: ROW_H + footerH, width: '100%' }}>
+    <div ref={ref} style={{ position: 'relative', isolation: 'isolate', height: ROW_H + footerH, width: '100%' }}>
       {items.map((child, i) => {
         const isActive = i === active;
         return (

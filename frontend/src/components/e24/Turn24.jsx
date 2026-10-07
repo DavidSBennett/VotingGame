@@ -5,9 +5,9 @@ import StakeModal from './StakeModal.jsx';
 
 const POOLS = [
   ['gen', 'Neutral', 'text-cream-50', 'border-cream-200/40', 'spends on anything'],
-  ['rep', 'Republican', 'text-oxblood-300', 'border-oxblood-500/60', 'Trump: calling or buying a state for him, or a Republican story'],
-  ['dem', 'Democratic', 'text-federal-300', 'border-federal-500/60', 'Harris: calling or buying a state for her, or a Democratic story'],
-  ['campaign', 'Campaign', 'text-gold-300', 'border-gold-500/60', 'calling a big state only'],
+  ['rep', 'Republican', 'text-oxblood-300', 'border-oxblood-500/60', 'Trump: buying a state for him, or a Republican story or plank'],
+  ['dem', 'Democratic', 'text-federal-300', 'border-federal-500/60', 'Harris: buying a state for her, or a Democratic story or plank'],
+  ['campaign', 'Campaign', 'text-gold-300', 'border-gold-500/60', 'states only'],
 ];
 
 /** The currency on hand this turn: four counters. */
@@ -34,12 +34,13 @@ export function Pools24({ pools, big = false }) {
 /**
  * Your desk. Every card's currency counts from your hand the moment your
  * turn starts (and when you draw), so the four counters are your budget at
- * once: spend it on the big state and the exchange. Playing a card only
- * USES ITS ABILITY -- draw, destroy, gain, attack, Retraction, a chain, a
- * media event into play -- so only cards with one carry a Use button.
- * Before you use or buy anything you may instead stake a card.
+ * once: spend it on the states and the exchange. Playing a card only USES
+ * IT: a story on its TOP (its ability) or its BOTTOM (the other party's
+ * currency, and on some a plank knockout); a plank into play; a swing
+ * state's knockout. Only cards with a use carry buttons. Before you use or
+ * buy anything you may instead stake a card.
  */
-export default function Turn24({ state, me, act, busy, open }) {
+export default function Turn24({ state, me, act, play, busy, open }) {
   const [staking, setStaking] = useState(false);
   const turn = state.turn;
   const you = state.you;
@@ -56,9 +57,25 @@ export default function Turn24({ state, me, act, busy, open }) {
   const footer = (c) => {
     if (!myTurn) return null;
     if (usable.includes(c.key)) {
+      const frames = (av.framings || {})[c.key] || ['top'];
+      if (frames.includes('bottom')) {
+        const other = c.lean === 'rep' ? 'Dem' : 'Rep';
+        return (
+          <div className="mt-1 flex w-28 gap-1">
+            <button type="button" disabled={!canUse} onClick={() => play(c.key, 'top')} title={c.top_text}
+              className="btn flex-1 border-gold-300 px-0.5 py-0.5 text-[10px] text-gold-300">
+              ▲ Top
+            </button>
+            <button type="button" disabled={!canUse} onClick={() => play(c.key, 'bottom')} title={c.bottom_text}
+              className={c.lean === 'rep' ? 'btn flex-1 border-federal-300 px-0.5 py-0.5 text-[10px] text-federal-300' : 'btn flex-1 border-oxblood-300 px-0.5 py-0.5 text-[10px] text-oxblood-300'}>
+              ▼ +{c.bottom_party} {other}
+            </button>
+          </div>
+        );
+      }
       return (
-        <button type="button" disabled={!canUse} onClick={() => act('play', { card: c.key })} className="btn mt-1 w-28 border-gold-300 px-1 py-0.5 text-gold-300">
-          Use
+        <button type="button" disabled={!canUse} onClick={() => play(c.key, 'top')} className="btn mt-1 w-28 border-gold-300 px-1 py-0.5 text-gold-300">
+          {c.type === 'Plank' ? 'Into play' : 'Use'}
         </button>
       );
     }
@@ -70,7 +87,7 @@ export default function Turn24({ state, me, act, busy, open }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="section-title">{myTurn ? 'Your desk' : onTurn ? `${onTurn.player_name} is on turn` : 'Waiting'}</div>
         {myTurn && (
-          <span className="font-serif text-[12px] italic text-cream-200/60">Your hand pays at once. Spend it, use abilities, or stake a card instead.</span>
+          <span className="font-serif text-[12px] italic text-cream-200/60">Your hand pays at once. Use each story on its top or its bottom, spend, or stake a card instead.</span>
         )}
       </div>
 
@@ -112,7 +129,7 @@ export default function Turn24({ state, me, act, busy, open }) {
                   dim={!myTurn}
                   lifted={myTurn && usable.includes(c.key)}
                   onOpen={() => open(you.hand, i, 'hand')}
-                  onMiddle={canUse && usable.includes(c.key) ? () => act('play', { card: c.key }) : null}
+                  onMiddle={canUse && usable.includes(c.key) ? () => play(c.key, 'top') : null}
                   footer={footer(c)}
                 />
               ))}
@@ -131,8 +148,8 @@ export default function Turn24({ state, me, act, busy, open }) {
               Stake a card instead…
             </button>
           )}
-          <button type="button" className="btn" disabled={busy || !av.play_all} onClick={() => act('play_all')}>
-            Use every ability
+          <button type="button" className="btn" disabled={busy || !av.play_all} onClick={() => act('play_all')} title="Every card with a use, each on its top">
+            Use every top
           </button>
           {paperLabel && (
             <button type="button" className="btn" disabled={busy || !av.paper} onClick={() => act('paper')}>

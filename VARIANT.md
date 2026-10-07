@@ -1085,3 +1085,32 @@ until the engine catches up).
   states bought (no calls any more); Politico's Scoop takes the topmost card
   of the main deck (states are no longer in it); CNN's Debate Stage pays for
   each different story used on its bottom side (no negative stories).
+
+### 2026-10-07: the redesign in the engine and on the screen; the House tiebreaker (the user)
+
+- `backend/engine_2024.php` (state version 25) plays the redesign: stories
+  used top or bottom, the twenty planks and their knockouts (stories'
+  bottoms, swing states), the Biden set / switch / Harris set, the three
+  state decks with reveals. Calls, the calendar and negative-story attacks
+  are gone. The card export carries both framings' headlines, plank
+  strikes, state reveals and House seats; the deploy check passes again.
+  Tables started under version 24 end ("other rules").
+- **The House tiebreaker** (the user): a state's House delegation (its
+  seats: electoral votes - 2, D.C. none, 435 in all) may be bought with the
+  state, for the same side, at 1 per 4 seats (at least 1), never later. If
+  every state is claimed and neither side has 270 (269-269), the side with
+  more House seats wins; a tied House is a deadlock and no stake scores
+  (before, a 269-269 game ran to the 80-round limit). Bots buy a delegation
+  late in the race for the side they back. Simulator, 600 three-outlet
+  games: all 26 269-269 games decided by the House.
+- Simulator fix: states played this turn still count in the tally (it
+  could miss a side reaching 270 mid-turn).
+- Tests: engine 5,244 rule checks + 300 random games (16.6M checks), 0
+  failed. Parity (400 games x 5 match-ups, before the House): rounds,
+  states, stories, stakes within noise; worst seat win-rate gap 6.4 points.
+- **Screen**: the three state decks with Buy per side and "+ House", the
+  last reveal; each story's Top / Bottom buttons; planks into play and in
+  each outlet's row; the knockout prompt; the card view shows both
+  headlines (top outlet at the lower right, bottom outlet at the upper
+  right), a plank's platform wording, a state's reveal and House seats;
+  the race bar shows House seats; the rules sheet is rewritten.

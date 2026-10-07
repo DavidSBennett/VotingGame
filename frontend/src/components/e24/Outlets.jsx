@@ -1,7 +1,7 @@
 /**
  * Every outlet at the table: its newspaper and ability, how many cards it
  * has staked (never which, or on whom), the votes it has claimed, its
- * cards, media events in play, and who is on turn.
+ * cards, its party planks in play, and who is on turn.
  */
 export default function Outlets({ players, botLevel }) {
   return (
@@ -34,19 +34,21 @@ export default function Outlets({ players, botLevel }) {
           )}
           <div className="mt-0.5 flex flex-wrap gap-x-3 font-mono text-[9px] uppercase tracking-[0.12em] text-cream-200/60">
             <span title="Electoral votes this outlet has claimed, for either side">claimed {p.ev_claimed} EV</span>
-            <span>big {p.called}</span>
+            <span title="Large states bought">large {p.called}</span>
             <span>states {p.states_bought}</span>
             <span>hand {p.hand_count}</span>
             <span>deck {p.deck_count}</span>
             <span>discard {p.discard_count}</span>
             {p.scandals_taken > 0 && <span className="text-oxblood-300">Scandals {p.scandals_taken}</span>}
+            {p.knocks > 0 && <span title="Planks knocked out">knocked out {p.knocks}</span>}
+            {p.house_seats > 0 && <span title="House seats bought">House {p.house_seats}</span>}
             {p.is_bot && <span className="text-cream-200/30">rival · {botLevel}</span>}
             {p.conceded && <span className="text-cream-200/30">left</span>}
           </div>
           {p.locations.length > 0 && (
             <div className="mt-0.5 flex flex-wrap gap-1">
               {p.locations.map((c) => (
-                <span key={c.key} className="bg-wood-700 px-1 font-mono text-[8px] uppercase tracking-[0.1em] text-cream-100" title={c.card_text}>
+                <span key={c.key} className={c.lean === 'rep' ? 'bg-oxblood-700 px-1 font-mono text-[8px] uppercase tracking-[0.1em] text-cream-100' : 'bg-federal-700 px-1 font-mono text-[8px] uppercase tracking-[0.1em] text-cream-100'} title={c.top_text || c.card_text}>
                   {c.name}
                 </span>
               ))}

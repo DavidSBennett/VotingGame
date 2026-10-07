@@ -7,10 +7,11 @@ after every action:
   - my hand / deck / discard match the public counts; my stake count too;
   - no seat's hand, deck, discard or stakes are ever in the public block;
   - currency pools never negative; the exchange holds at most five;
-  - the race tally is the votes of the claimed states on the map;
-  - at most one big state called per action of mine;
-  - the ending: a side has 270, the stakes are revealed, and my score is the
-    prestige I staked on the winner.
+  - the race tally is the votes of the claimed states on the map, and the
+    House tally the seats of the delegations bought;
+  - three state decks, each with a state face up while any are left;
+  - the ending: a side has 270 (or the House decides a 269-269 tie), the
+    stakes are revealed, and my score is the wealth I staked on the winner.
 
     py -X utf8 tools/smoke_2024.py                 # three solo games (2, 3, 4 seats)
     py -X utf8 tools/smoke_2024.py --games 5
@@ -55,6 +56,13 @@ def check_state(ck, st, where):
             ev[s["side"]] += s["ev"]
     ck.check(ev["trump"] == st["race"]["trump"] and ev["harris"] == st["race"]["harris"], where + ": tally is the claimed map",
              "%s vs %s" % (ev, st["race"]))
+    house = {"trump": 0, "harris": 0}
+    for s in st["map"]:
+        if s.get("house"):
+            house[s["house"]] += s["house_seats"]
+    ck.check(house == st["race"].get("house"), where + ": House tally is the delegations on the map", "%s vs %s" % (house, st["race"].get("house")))
+    for d, deck in (st.get("state_decks") or {}).items():
+        ck.check(deck["up"] is not None or deck["left"] == 0, where + ": deck %s has a state up while any are left" % d)
     if st["status"] != "active":
         return
     on = [p for p in st["players"] if p["on_turn"]]
@@ -73,14 +81,13 @@ def check_state(ck, st, where):
 
 
 def take_turn(base, token, st, ck, stats, rng):
-    """One whole turn for a person: sometimes stake; else play all, answer
-    prompts, call the big state, buy, end."""
+    """One whole turn for a person: sometimes stake; else use each card (a
+    story on its top or its bottom), answer prompts, buy, end."""
     guard = 0
     while st["status"] == "active" and st["turn"]["seat"] == st["you"]["seat"] and guard < 80:
         guard += 1
         av = st["available_actions"]
         you = st["you"]
-        called_before = len(st["big_called"])
         if av.get("stake") and (rng.random() < 0.18 or st["race"]["final"]):
             card = max(you["hand"], key=lambda c: c["vp"])
             side = st["race"]["winner_side"] or rng.choice(["trump", "harris"])
@@ -93,24 +100,29 @@ def take_turn(base, token, st, ck, stats, rng):
         if you["pending"]:
             opts = [c["key"] for c in you["pending"]["options"]]
             pick = None
-            if you["pending"]["type"] == "trash":
+            if you["pending"]["type"] == "knock":
+                pick = opts[0] if opts else None
+                stats["knocks"] += 1
+            elif you["pending"]["type"] == "trash":
                 pick = next((k for k in opts if k.startswith("scandal#")), None) or \
                        next((k for k in opts if k.startswith("notice#")), None)
             else:
                 pick = max(you["pending"]["options"], key=lambda c: c["cost"])["key"]
             act(base, token, "choose", {"card": pick})
             stats["prompts"] += 1
-        elif av.get("play_all"):
-            act(base, token, "play_all")
-        elif av.get("call"):
-            act(base, token, "call", {"side": rng.choice(av["call"])})
-            stats["called"] += 1
+        elif av.get("play"):
+            card = rng.choice(av["play"])
+            framing = rng.choice(av.get("framings", {}).get(card, ["top"]))
+            act(base, token, "play", {"card": card, "framing": framing})
+            stats["bottoms" if framing == "bottom" else "tops"] += 1
         elif av.get("buy"):
             pick = rng.choice(av["buy"])
             if ":" in pick:
                 card, side = pick.split(":")
-                act(base, token, "buy", {"card": card, "side": side})
+                house = pick in av.get("buy_house", []) and rng.random() < 0.5
+                act(base, token, "buy", {"card": card, "side": side, "house": house})
                 stats["states"] += 1
+                stats["house"] += 1 if house else 0
             else:
                 act(base, token, "buy", {"card": pick})
                 stats["bought"] += 1
@@ -122,8 +134,6 @@ def take_turn(base, token, st, ck, stats, rng):
             break
         st = state_of(base, token)
         check_state(ck, st, "turn %d action %d" % (stats["turns"], guard))
-        if st["status"] == "active" and st["turn"]["seat"] == st["you"]["seat"]:
-            ck.check(len(st["big_called"]) - called_before <= 1, "one big state per action")
     ck.check(guard < 80, "a turn finishes")
     return st
 
@@ -136,9 +146,12 @@ def refusals(base, token, st, ck):
         except ApiError as e:
             ck.check(needle.lower() in str(e).lower(), label, str(e))
     refused("a card not in hand is refused", "play", {"card": "no_such_card"}, "not in your hand")
-    refused("a state needs a side", "buy", {"card": next((c["key"] for c in st["exchange"] if c["type"] == "State"), "st#wy")},
-            "")
-    refused("an unaffordable call is refused", "call", {"side": "trump"}, "needs")
+    up = next((d["up"]["key"] for d in st["state_decks"].values() if d["up"]), "st#wy")
+    refused("a state needs a side", "buy", {"card": up}, "side")
+    down = next((s["key"] for s in st["map"] if not s["side"] and "st#" + s["key"] != up
+                 and all(not d["up"] or d["up"]["key"] != "st#" + s["key"] for d in st["state_decks"].values())), "wy")
+    refused("a face-down state cannot be bought", "buy", {"card": "st#" + down, "side": "trump"}, "not face up")
+    refused("an unknown framing is refused", "play", {"card": (st["available_actions"].get("play") or ["x"])[0], "framing": "sideways"}, "")
 
 
 def play_game(base, seats, ck, seed, quiet):
@@ -147,7 +160,7 @@ def play_game(base, seats, ck, seed, quiet):
     token = made["player_token"]
     st = state_of(base, token)
     check_state(ck, st, "start")
-    stats = dict(turns=0, stakes=0, called=0, states=0, bought=0, prompts=0)
+    stats = dict(turns=0, stakes=0, states=0, house=0, bought=0, prompts=0, tops=0, bottoms=0, knocks=0)
     if st["status"] == "active" and st["turn"]["seat"] == st["you"]["seat"]:
         refusals(base, token, st, ck)
         st = state_of(base, token)
@@ -160,6 +173,9 @@ def play_game(base, seats, ck, seed, quiet):
         w = st["race"]["winner_side"]
         if st["ended_reason"] == "race_called":
             ck.check(w is not None and st["race"][w] >= 270, "the winner side has 270", str(st["race"]))
+        if st["ended_reason"] == "house":
+            h = st["race"]["house"]
+            ck.check(w is not None and h[w] > h["harris" if w == "trump" else "trump"], "the House winner has more seats", str(st["race"]))
         me = [p for p in st["players"] if p["is_you"]][0]
         b = me["score_breakdown"] or {}
         ck.check(len(b.get("stakes", [])) == stats["stakes"], "my stakes are revealed", "%s vs %d" % (len(b.get("stakes", [])), stats["stakes"]))

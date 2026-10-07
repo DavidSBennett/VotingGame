@@ -22,6 +22,11 @@ export default function RaceBar({ race }) {
           {race.final
             ? `${name(race.winner_side)} has ${race.win_at}: the round plays out, then the stakes are revealed`
             : `${total - race.trump - race.harris} electoral votes unclaimed · ${race.win_at} to win`}
+          {race.house && (race.house.trump || race.house.harris) ? (
+            <span className="block normal-case tracking-normal" title="House seats bought with their states: they decide a 269-269 tie">
+              House: Trump {race.house.trump} · Harris {race.house.harris} seats
+            </span>
+          ) : null}
         </span>
         <span className="font-display text-2xl font-bold leading-none text-federal-300">
           <span className="font-mono text-xl">{race.harris}</span> Harris

@@ -7,7 +7,7 @@ import PromptModal from '../components/dc/PromptModal.jsx';
 import CardModal from '../components/dc/CardModal.jsx';
 import RaceBar from '../components/e24/RaceBar.jsx';
 import MapGrid from '../components/e24/MapGrid.jsx';
-import BigState from '../components/e24/BigState.jsx';
+import StateDecks24 from '../components/e24/StateDecks24.jsx';
 import Exchange24 from '../components/e24/Exchange24.jsx';
 import Turn24 from '../components/e24/Turn24.jsx';
 import Outlets, { StakePile } from '../components/e24/Outlets.jsx';
@@ -16,9 +16,10 @@ import Rules24 from '../components/e24/Rules24.jsx';
 
 /**
  * The game screen for the 2024 game (backend/engine_2024.php): the race to
- * 270 and the map, the exchange, the big state up, your turn (currencies,
- * the press, your hand, Stake), and at the side every outlet, your stake
- * pile and the wire.
+ * 270 and the map, the exchange (stories and planks), the three state decks,
+ * your turn (currencies, your hand: each story used on its top or its
+ * bottom, Stake), and at the side every outlet, its planks in play, your
+ * stake pile and the wire.
  *
  * Presentation only: it renders the state the server sent and offers the
  * actions the server lists in available_actions. GameShell routes here when
@@ -77,26 +78,40 @@ export default function Shell2024({ seat, state, events, error, refresh, onLeave
   const av = state.available_actions || {};
   const myTurn = active && state.turn && state.you && state.turn.seat === state.you.seat;
   const pending = state.you && state.you.pending;
-  const globe = me && me.paper && me.paper.key === 'globe';
-  const buy = (card, side) => act('buy', side ? { card, side } : { card });
+  const buy = (card, side, house) => act('buy', side ? { card, side, house: Boolean(house) } : { card });
+  const play = (card, framing) => act('play', { card, framing: framing || 'top' });
 
   // What the open card can do right now -- only what the server lists.
   const modalCard = modal ? modal.cards[modal.index] : null;
   let modalActions = null;
   if (modalCard && myTurn && !pending) {
     if (modal.source === 'hand' && (av.play || []).includes(modalCard.key)) {
+      const frames = (av.framings || {})[modalCard.key] || ['top'];
       modalActions = (
-        <button type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); act('play', { card: modalCard.key }); }}>
-          Use this card's ability
-        </button>
+        <div className="flex flex-wrap justify-center gap-2">
+          <button type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); play(modalCard.key, 'top'); }}>
+            {frames.length > 1 ? 'Use the top' : "Use this card's ability"}
+          </button>
+          {frames.includes('bottom') && (
+            <button type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); play(modalCard.key, 'bottom'); }}>
+              Use the bottom
+            </button>
+          )}
+        </div>
       );
-    } else if (modal.source === 'exchange' && modalCard.type === 'State') {
-      const sides = ['trump', 'harris'].filter((s) => (av.buy || []).includes(`${modalCard.key}:${s}`));
-      modalActions = sides.length ? (
-        <div className="flex gap-2">
-          {sides.map((s) => (
-            <button key={s} type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); buy(modalCard.key, s); }}>
-              Buy for {s === 'trump' ? 'Trump' : 'Harris'} ◆{modalCard.sides[s].cost}
+    } else if (modal.source === 'decks' && modalCard.type === 'State') {
+      const opts = [];
+      ['trump', 'harris'].forEach((s) => {
+        const id = `${modalCard.key}:${s}`;
+        if ((av.buy || []).includes(id)) opts.push([s, false]);
+        if ((av.buy_house || []).includes(id)) opts.push([s, true]);
+      });
+      modalActions = opts.length ? (
+        <div className="flex flex-wrap justify-center gap-2">
+          {opts.map(([s, h]) => (
+            <button key={s + h} type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); buy(modalCard.key, s, h); }}>
+              For {s === 'trump' ? 'Trump' : 'Harris'} ◆{modalCard.sides[s].cost + (h ? modalCard.house_cost : 0)}
+              {h ? ` with its House (${modalCard.house_seats})` : ''}
             </button>
           ))}
         </div>
@@ -111,12 +126,6 @@ export default function Shell2024({ seat, state, events, error, refresh, onLeave
       );
     } else if (modal.source === 'exchange') {
       modalActions = <span className="font-serif text-sm italic text-ink-700">Not enough currency to buy this yet.</span>;
-    } else if (modal.source === 'big' && modalCard.side && (av.call || []).includes(modalCard.side)) {
-      modalActions = (
-        <button type="button" className="btn-solid" disabled={busy} onClick={() => { setModal(null); act('call', { side: modalCard.side }); }}>
-          Call it for {modalCard.side === 'trump' ? 'Trump' : 'Harris'}
-        </button>
-      );
     }
   }
 
@@ -132,7 +141,7 @@ export default function Shell2024({ seat, state, events, error, refresh, onLeave
               </span>
             )}
             {active && <span>Round {state.round}</span>}
-            {active && state.big && <span>Big state {state.big.index + 1}/{state.big_total}</span>}
+            {active && <span className="text-gold-300">{state.set === 'harris' ? 'Harris set' : 'Biden set'}</span>}
             {state.you && <span>You staked <span className="text-gold-300">{state.you.staked.length}</span></span>}
             {me && me.paper && <span className="hidden text-gold-400 md:inline">{me.paper.name}</span>}
           </div>
@@ -188,9 +197,13 @@ export default function Shell2024({ seat, state, events, error, refresh, onLeave
             <Collapsible
               title="The map"
               storageKey="e24-map"
-              summary={`${state.map.filter((s) => s.side).length} of 51 claimed · ${state.big_called.length} of ${state.big_total} big states called`}
+              summary={`${state.map.filter((s) => s.side).length} of 51 claimed · House: Trump ${state.race.house ? state.race.house.trump : 0}, Harris ${state.race.house ? state.race.house.harris : 0} seats`}
             >
-              <MapGrid map={state.map} bigKey={active && state.big ? state.big.key : null} players={state.players} />
+              <MapGrid
+                map={state.map}
+                upKeys={active && state.state_decks ? Object.values(state.state_decks).map((d) => (d.up ? d.up.state : null)).filter(Boolean) : []}
+                players={state.players}
+              />
             </Collapsible>
           </>
         )}
@@ -206,6 +219,7 @@ export default function Shell2024({ seat, state, events, error, refresh, onLeave
                 editorial={state.editorial}
                 mainCount={state.main_count}
                 scandalsLeft={state.scandals_left}
+                set={state.set}
                 canBuy={av.buy || []}
                 onBuy={buy}
                 busy={busy}
@@ -217,18 +231,17 @@ export default function Shell2024({ seat, state, events, error, refresh, onLeave
           <div className="flex min-w-0 flex-col gap-2">
             {active && (
               <>
-                <BigState
-                  big={state.big}
-                  bigTotal={state.big_total}
-                  pools={state.turn ? state.turn.pools : null}
+                <StateDecks24
+                  decks={state.state_decks}
+                  lastReveal={state.last_reveal}
                   myTurn={myTurn}
-                  canCall={av.call || []}
-                  onCall={(side) => act('call', { side })}
+                  canBuy={av.buy || []}
+                  canHouse={av.buy_house || []}
+                  onBuy={buy}
                   busy={busy}
-                  globe={globe}
                   open={open}
                 />
-                <Turn24 state={state} me={me} act={act} busy={busy} open={open} />
+                <Turn24 state={state} me={me} act={act} play={play} busy={busy} open={open} />
               </>
             )}
           </div>

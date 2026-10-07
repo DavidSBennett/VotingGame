@@ -1,14 +1,14 @@
 import Card from '../dc/Card.jsx';
 
 /**
- * The exchange: five cards from the main deck -- stories and states -- and
- * the Editorial pile. A story has one Buy; a state has two, one per side,
- * each lit only when the server lists it as affordable ('st#pa:trump').
- * Each turn the oldest card slides to the bottom of the main deck.
+ * The exchange: five cards from the main deck -- stories and party planks,
+ * from the Biden set and then (after the switch) the Harris set -- and the
+ * Editorial pile. Each Buy is lit only when the server lists it. Each turn
+ * the oldest card slides to the bottom of the main deck.
  *
  *   open(cards, index, source)   opens the CardModal on this row
  */
-export default function Exchange24({ exchange, editorial, mainCount, scandalsLeft, canBuy = [], onBuy, busy, myTurn, open }) {
+export default function Exchange24({ exchange, editorial, mainCount, scandalsLeft, set, canBuy = [], onBuy, busy, myTurn, open }) {
   const row = editorial ? [...exchange, { ...editorial, key: 'editorial' }] : exchange;
   const footer = (c) => {
     if (!myTurn) return null;
@@ -41,7 +41,7 @@ export default function Exchange24({ exchange, editorial, mainCount, scandalsLef
       <div className="text-center">
         <div className="section-title">The exchange</div>
         <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.15em] text-cream-200/60">
-          main deck {mainCount} · Scandals {scandalsLeft}
+          {set === 'harris' ? 'Harris set' : 'Biden set'} · main deck {mainCount} · Scandals {scandalsLeft}
           {editorial ? ` · Editorials ${editorial.left}` : ''}
         </p>
       </div>

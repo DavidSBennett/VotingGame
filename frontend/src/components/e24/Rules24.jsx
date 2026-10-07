@@ -15,16 +15,37 @@ function Body() {
       <H>Three currencies</H>
       <p>
         <span className="font-semibold">Neutral</span> spends on anything. <span className="font-semibold text-oxblood-700">Republican</span> spends
-        only on Trump (calling or buying a state for him) and on Republican stories;{' '}
-        <span className="font-semibold text-federal-700">Democratic</span> only on Harris and Democratic stories.{' '}
-        <span className="font-semibold">Campaign</span> spends only on calling a big state.
+        only on Trump (buying a state for him) and on Republican stories and planks;{' '}
+        <span className="font-semibold text-federal-700">Democratic</span> only on Harris and Democratic cards.{' '}
+        <span className="font-semibold">Campaign</span> spends only on states.
       </p>
 
       <H>Your hand pays at once</H>
       <p>
         Every card's currency counts the moment it is in your hand on your turn: at the start, and whenever you draw. You never play a
-        card for money. <span className="font-semibold">Using</span> a card plays only its ability (draw, destroy, gain, attack, Retraction,
-        a chain, compounding, a media event into play); a card with no ability simply pays from your hand.
+        card for money. <span className="font-semibold">Using</span> a card plays only what it does; a card with nothing to use simply pays from
+        your hand.
+      </p>
+
+      <H>Two sides to every story</H>
+      <p>
+        Each story carries two real headlines. Use it on its <span className="font-semibold">top</span>, the positive framing, for its ability
+        (draw, destroy, gain, Retraction, a chain, compounding, or +1 of its party); or on its{' '}
+        <span className="font-semibold">bottom</span>, the oppositional framing, for +1 or +2 of the <em>other</em> party's currency. Twenty
+        bottoms also knock out a rival's plank.
+      </p>
+
+      <H>Party planks</H>
+      <p>
+        Twenty planks, ten from each party's 2024 platform. Use one to put it into play: it stays there, paying you each turn (neutral or a
+        card), while every other outlet gets +1 of its party's currency, until a rival <span className="font-semibold">knocks it out</span> (a
+        story's bottom, or a swing state used for the other side). A plank knocked out goes to its owner's discard pile.
+      </p>
+
+      <H>The main deck: Biden, then Harris</H>
+      <p>
+        The stories and planks come in two sets: the Biden set on top, then the switch card (Biden steps aside), then the Harris set. When the
+        switch comes up it is set aside, and the Harris stories begin.
       </p>
 
       <H>Your turn: use and spend, or stake</H>
@@ -34,19 +55,20 @@ function Body() {
           Discard the rest and draw five. Rivals see that you staked, never what or on whom.
         </li>
         <li>
-          Or <span className="font-semibold">use</span> the abilities of the cards in your hand, and spend your currency:
+          Or <span className="font-semibold">use</span> the cards in your hand, and spend your currency:
         </li>
         <li>
-          <span className="font-semibold">Call</span> the big state up (once a turn): the ten biggest states come up one at a time. Reach either
-          side's price and claim its electoral votes for that side; its card goes into your deck.
+          <span className="font-semibold">Buy a state</span> for a side: three decks (large, medium, small), one state face up on each. Buying it
+          claims its votes for that side and puts its card in your deck; the next state turns up, and its{' '}
+          <span className="font-semibold">reveal</span> (a real article from that state's own press) hits every outlet: a Scandal, a discard, or
+          a fresh exchange.
         </li>
         <li>
-          <span className="font-semibold">Buy</span> off the exchange: stories, Editorials, and the other 41 states, each bought for a side.
-          States are the strongest cards at their price.
+          <span className="font-semibold">Buy</span> off the exchange: stories, planks and Editorials.
         </li>
         <li>
-          <span className="font-semibold">End your turn</span>: discard, draw five. The oldest card on the exchange slides to the bottom of the
-          main deck.
+          <span className="font-semibold">End your turn</span>: discard (planks in play stay), draw five. The oldest card on the exchange slides to
+          the bottom of the main deck.
         </li>
       </ul>
 
@@ -54,22 +76,22 @@ function Body() {
       <p>
         A state costs more the more votes it has. Flipping it costs 1 more for every 6 points it was won by in 2024: Pennsylvania, Georgia, North
         Carolina, Michigan, Arizona, Wisconsin and Nevada (and New Hampshire, Minnesota, Virginia, New Jersey) cost the same either way; D.C. for
-        Trump is very dear.
+        Trump is very dear. The seven swing states also knock out a plank when used.
+      </p>
+
+      <H>The House</H>
+      <p>
+        When you buy a state you may also buy its <span className="font-semibold">House delegation</span> for the same side: its seats in the
+        House (electoral votes less 2; D.C. has none), at 1 per 4 seats. Only then, never later. If every state is claimed and neither side has
+        270 (269 to 269), the side with more House seats wins; with a tied House the election is deadlocked and no stake scores.
       </p>
 
       <H>The end, and the score</H>
       <p>
         A state counts for its side once claimed. When a side reaches 270, the round is played out (later outlets get one more turn, often
         a stake), then every outlet reveals its stakes. A card staked on the winner scores its <span className="font-semibold">wealth</span> ($,
-        1 to 12: California 12; a staked Letter or Local Notice costs 1); on the loser, nothing. Cards left in your deck never score. So claim the state that ends the race only when
-        the end pays you, and buy for the side behind when it does not.
-      </p>
-
-      <H>Stories</H>
-      <p>
-        Political stories pay Campaign and grow with the states you hold; Economic stories compound; Social stories draw. A{' '}
-        <span className="font-semibold text-oxblood-700">negative story</span> attacks every rival (a discard, or a Scandal); a Defense card
-        in hand stops it. Media events stay in play. New stories are released each time a big state is called.
+        1 to 12: California 12; a staked Letter or Local Notice costs 1); on the loser, nothing. Cards left in your deck never score. So claim the
+        state that ends the race only when the end pays you, and buy for the side behind when it does not.
       </p>
     </div>
   );

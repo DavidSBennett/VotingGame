@@ -51,6 +51,12 @@ function baseTypeStyle(card) {
       return { stripe: 'bg-oxblood-700', eyebrow: 'text-oxblood-700', label: 'Negative · ' + (card.theme || '') };
     case 'Media event':
       return { stripe: 'bg-wood-700', eyebrow: 'text-wood-700', label: 'Media event' };
+    case 'Plank':
+      return card.lean === 'rep'
+        ? { stripe: 'bg-oxblood-700', eyebrow: 'text-oxblood-700', label: 'Plank' }
+        : { stripe: 'bg-federal-700', eyebrow: 'text-federal-700', label: 'Plank' };
+    case 'Switch':
+      return { stripe: 'bg-ink-700', eyebrow: 'text-ink-700', label: 'The switch' };
     case 'Editorial':
       return { stripe: 'bg-ink-700', eyebrow: 'text-ink-700', label: 'Editorial' };
     case 'Scandal':
@@ -74,7 +80,7 @@ export function effects(card) {
   const out = [];
   const plain = 'bg-ink-950/85 text-cream-50';
   const note = 'border border-ink-950/30 text-ink-950/80';
-  if (card.type === 'Media event') {
+  if (card.type === 'Media event' || card.type === 'Plank') {
     const own = [];
     if (card.ongoing_gen) own.push(`+${card.ongoing_gen}`);
     if (card.ongoing_draw) own.push(`draw ${card.ongoing_draw}`);
@@ -107,6 +113,13 @@ export function effects(card) {
   if (card.attack === 'scandal') out.push(['attack: Scandal', 'bg-oxblood-700 text-cream-50']);
   if (card.attack === 'discard') out.push(['attack: discard', 'bg-oxblood-700 text-cream-50']);
   if (card.defense) out.push(['Defense', 'bg-emerald-900 text-emerald-300']);
+  if (card.top_party && card.lean) out.push([`▲ +${card.top_party} ${PARTY[card.lean].label}`, PARTY[card.lean].chip]);
+  if (card.bottom_party && card.lean) {
+    const other = card.lean === 'rep' ? 'dem' : 'rep';
+    out.push([`▼ +${card.bottom_party} ${PARTY[other].label}`, PARTY[other].chip]);
+  }
+  if (card.bottom_attack === 'plank') out.push([`▼ knock out ${card.strike === 'rep' ? 'Rep' : 'Dem'} plank`, 'bg-wood-700 text-cream-50']);
+  if (card.knock) out.push([`knock out ${card.knock === 'rep' ? 'Rep' : 'Dem'} plank`, 'bg-wood-700 text-cream-50']);
   return out;
 }
 
