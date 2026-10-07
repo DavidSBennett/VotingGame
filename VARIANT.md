@@ -1076,3 +1076,12 @@ until the engine catches up).
   lower right, a one-line summary and what it does to every outlet; below,
   the card bought for Trump and for Harris (cost, name, power). New York
   and South Dakota show "article to come".
+- `tools/build_print_outlets_2024.py` builds `docs/print/outlets-starters-2024.html`:
+  the eight outlet cards (name, ability, flavor) and the starters for a
+  table of five (35 Letters to the Editor, 15 Local Notices), 16 Editorials
+  and 20 Scandals: 94 cards.
+- Three outlet abilities reworded for the redesign (`docs/outlets-2024.csv`,
+  as the simulator already plays them): the AP's Race Calls counts large
+  states bought (no calls any more); Politico's Scoop takes the topmost card
+  of the main deck (states are no longer in it); CNN's Debate Stage pays for
+  each different story used on its bottom side (no negative stories).
