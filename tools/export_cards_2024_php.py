@@ -32,11 +32,11 @@ CARD_FIELDS = ["key", "name", "type", "kind", "lean", "cost", "vp", "stars", "ge
                "top_title", "top_outlet", "top_url", "top_date", "bottom_title", "bottom_outlet", "bottom_url",
                "bottom_date"]
 STATE_FIELDS = ["key", "abbr", "state", "ev", "vp", "trump_name", "harris_name", "flavor", "trump_pct", "harris_pct", "margin", "winner", "tier",
-                "order", "deck"]
+                "order", "deck", "house_seats", "house_cost"]
 for _side in sim.SIDES:
     STATE_FIELDS += ["%s_%s" % (_side, f) for f in ("threshold", "gen", "party", "draw", "trash", "strike", "text")]
 STATE_FIELDS += ["reveal_kind", "reveal_n", "reveal_title", "reveal_outlet", "reveal_url", "reveal_date", "reveal_text"]
-INTS = set(sim.INT) | {"stars", "year", "ev", "vp", "order", "reveal_n"} | {
+INTS = set(sim.INT) | {"stars", "year", "ev", "vp", "order", "reveal_n", "house_seats", "house_cost"} | {
     "%s_%s" % (s, f) for s in sim.SIDES for f in ("threshold", "gen", "party", "draw", "trash", "strike")}
 FLOATS = {"trump_pct", "harris_pct", "margin"}
 OUTLET_FIELDS = ["key", "name", "ability_name", "ability", "flavor"]

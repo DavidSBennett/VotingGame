@@ -99,7 +99,7 @@ display:flex;flex-direction:column;overflow:hidden;position:relative;box-shadow:
 .tag{font-family:'JetBrains Mono',monospace;font-size:4.4pt;letter-spacing:.14em;text-transform:uppercase}
 .rep .tag{color:var(--rep)} .dem .tag{color:var(--dem)}
 .row{display:flex;justify-content:space-between;align-items:baseline;gap:1mm}
-.headline{flex:0 1 auto;min-height:0;font-family:'Cormorant Garamond',serif;font-weight:600;font-style:italic;font-size:9.5pt;line-height:1.08;overflow:hidden}
+.headline{flex:none;font-family:'Cormorant Garamond',serif;font-weight:600;font-style:italic;font-size:9.5pt;line-height:1.08;overflow:hidden}
 .outlet{font-family:'JetBrains Mono',monospace;font-size:5pt;letter-spacing:.06em;text-transform:uppercase;text-align:right;font-weight:500}
 .top .outlet{margin-top:.3mm} .bottom .headline{margin-top:.3mm}
 .rep .outlet{color:var(--rep5)} .dem .outlet{color:var(--dem5)}

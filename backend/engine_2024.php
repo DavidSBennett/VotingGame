@@ -49,6 +49,10 @@
  *     planks) or Editorials. The main deck is two sets stacked, no calendar:
  *     the Biden set on top, the SWITCH card (set aside when it comes up),
  *     then the Harris set;
+ *     A state may be bought WITH ITS HOUSE DELEGATION, for the same side, at
+ *     1 per 4 seats (at least 1); never later. If every state is claimed and
+ *     neither side has 270 (269-269), the side with more House seats wins;
+ *     with no House majority the election is deadlocked and no stake scores;
  *   - ENDS the turn: everything played and left in hand is discarded (planks
  *     stay in play), it draws 5, and the oldest card on the exchange goes to
  *     the bottom of the main deck (the news cycle).
@@ -161,6 +165,7 @@ function e24_view($id) {
       'state_name' => $s['state'], 'side' => $side, 'lean' => $side ? e24_party($side) : null, 'story_kind' => null,
       'ev' => (int) $s['ev'], 'vp' => (int) $s['vp'], 'tier' => $s['tier'], 'margin' => (float) $s['margin'],
       'winner_2024' => $s['winner'], 'deck' => $s['deck'], 'big' => $s['deck'] === 'large', 'sides' => $sides,
+      'house_seats' => (int) $s['house_seats'], 'house_cost' => (int) $s['house_cost'],
       'knock' => $side ? $sides[$side]['knock'] : null,
       'reveal' => ['kind' => $s['reveal_kind'], 'n' => (int) ($s['reveal_n'] ?? 1), 'title' => $s['reveal_title'],
                    'outlet' => $s['reveal_outlet'], 'url' => $s['reveal_url'], 'date' => $s['reveal_date'],
@@ -415,6 +420,15 @@ function e24_tally($game) {
   $ev = ['trump' => 0, 'harris' => 0];
   foreach ($game['state']['claims'] ?? [] as $k => $c) $ev[$c['side']] += (int) e24_state($k)['ev'];
   return $ev;
+}
+
+/** House seats bought for each side (the 269-269 tiebreaker). */
+function e24_house_tally($game) {
+  $seats = ['trump' => 0, 'harris' => 0];
+  foreach ($game['state']['claims'] ?? [] as $k => $c) {
+    if (!empty($c['house'])) $seats[$c['side']] += (int) e24_state($k)['house_seats'];
+  }
+  return $seats;
 }
 
 function e24_winner_side($game) {
@@ -821,7 +835,7 @@ function e24_choose(&$game, &$players, $pick, $mysqli = null) {
 }
 
 /** Buy a story or plank off the exchange, a face-up state (for a side), or an Editorial. */
-function e24_buy(&$game, &$players, $cardId, $side, $mysqli) {
+function e24_buy(&$game, &$players, $cardId, $side, $mysqli, $house = false) {
   $t = $game['state']['turn'];
   if ($t['staked']) throw new Exception('You staked this turn.');
   $seat = $t['seat'];
@@ -841,8 +855,11 @@ function e24_buy(&$game, &$players, $cardId, $side, $mysqli) {
       $deck = $s ? $s['deck'] : null;
       if (!$s || ($game['state']['up'][$deck] ?? null) !== $key) throw new Exception('That state is not face up.');
       $need = (int) $s[$side . '_threshold'];
-      if (!e24_pay($game, e24_pools($game, $players), $need, e24_side_order($players[$seat], $side, true))) {
-        throw new Exception($s['state'] . ' for ' . e24_side_name($side) . ' costs ' . $need . ' ('
+      $house = $house && (int) $s['house_cost'] > 0;
+      $total = $need + ($house ? (int) $s['house_cost'] : 0);
+      if (!e24_pay($game, e24_pools($game, $players), $total, e24_side_order($players[$seat], $side, true))) {
+        throw new Exception($s['state'] . ' for ' . e24_side_name($side) . ' costs ' . $need
+          . ($house ? ' + ' . $s['house_cost'] . ' for its House delegation' : '') . ' ('
           . ($side === 'trump' ? 'Republican' : 'Democratic') . ', Campaign or neutral).');
       }
       $id = 'st#' . $key . ':' . $side;
@@ -856,6 +873,15 @@ function e24_buy(&$game, &$players, $cardId, $side, $mysqli) {
       }
       $players[$seat]['private_state']['discard'][] = $id;
       e24_claim($game, $players, $seat, $key, $side, 'buy', $mysqli);
+      if ($house) {
+        $game['state']['claims'][$key]['house'] = true;
+        $players[$seat]['public_state']['house_seats'] = (int) $s['house_seats'] + (int) ($players[$seat]['public_state']['house_seats'] ?? 0);
+        if ($mysqli) {
+          engine_log($mysqli, $game, $seat, 'house', $players[$seat]['player_name'] . ' takes ' . $s['state'] . "'s House delegation ("
+            . $s['house_seats'] . ' seats) for ' . e24_side_name($side) . '.', ['state' => $key, 'side' => $side, 'seats' => (int) $s['house_seats']],
+            $players[$seat]['player_name']);
+        }
+      }
       // The next state on that deck turns up, and its reveal hits everyone.
       $next = $game['state']['decks'][$deck] ? array_pop($game['state']['decks'][$deck]) : null;
       $game['state']['up'][$deck] = $next;
@@ -990,9 +1016,16 @@ function e24_end_turn(&$game, &$players, $mysqli) {
     engine_end_game($game, $players, 'all_humans_left', $mysqli);
     return;
   }
-  // Deadlock: every state is claimed and neither side has 270 (a 269-269 split): nothing can finish the race.
+  // Every state is claimed and neither side has 270 (269-269): the House decides, by the delegations
+  // bought; with no House majority the election is deadlocked.
   if (!$game['state']['final'] && !array_filter($game['state']['up'])) {
-    engine_end_game($game, $players, 'deadlock', $mysqli);
+    $h = e24_house_tally($game);
+    if ($h['trump'] !== $h['harris']) {
+      $game['state']['winner_side'] = $h['trump'] > $h['harris'] ? 'trump' : 'harris';
+      engine_end_game($game, $players, 'house', $mysqli);
+    } else {
+      engine_end_game($game, $players, 'deadlock', $mysqli);
+    }
     return;
   }
   $order = $game['state']['order'];
@@ -1033,7 +1066,8 @@ function e24_next_seat($game, $players, $seat) {
  *   play      {card, framing?}  use one card from your hand: framing 'top' (default) or 'bottom'
  *   play_all  {}              use every card in your hand on its top (stops at a prompt)
  *   choose    {card|null}     answer the pending prompt (destroy / gain / knock out); null declines
- *   buy       {card, side?}   a story or plank on the exchange, a face-up state ('st#pa', with a side), or 'editorial'
+ *   buy       {card, side?, house?}  a story or plank on the exchange, a face-up state ('st#pa', with a side;
+ *                             house: true also buys its House delegation), or 'editorial'
  *   stake     {card, side}    in place of the turn: one card from your hand, face down, on a side
  *   paper     {}              your outlet's ability (the Sun, the Herald)
  *   end_turn  {}
@@ -1074,7 +1108,7 @@ function engine_apply_action(&$game, &$players, $seat, $action, $params, $mysqli
       $msg = 'Done.';
       break;
     case 'buy':
-      e24_buy($game, $players, (string) ($params['card'] ?? ''), (string) ($params['side'] ?? ''), $mysqli);
+      e24_buy($game, $players, (string) ($params['card'] ?? ''), (string) ($params['side'] ?? ''), $mysqli, !empty($params['house']));
       $msg = 'Bought.';
       break;
     case 'stake':
@@ -1387,7 +1421,16 @@ function e24_bot_turn(&$game, &$players, $mysqli) {
     }
     $pick = e24_bot_choose($game, $players, $seat, $style, $options, true, e24_pools($game, $players));
     if ($pick === null) break;
-    if (e24_is_state($pick)) e24_buy($game, $players, 'st#' . e24_state_key($pick), e24_card_side($pick), $mysqli);
+    if (e24_is_state($pick)) {
+      $key = e24_state_key($pick);
+      $side = e24_card_side($pick);
+      $s = e24_state($key);
+      // The House delegation: late in the race, for the side this outlet backs (or any, before it has bet).
+      $house = (int) $s['house_cost'] > 0 && e24_bot_late($game)
+        && in_array(e24_bot_leaning($style, $players[$seat]), [null, $side], true)
+        && e24_have(e24_pools($game, $players), e24_side_order($players[$seat], $side, true)) >= (int) $s[$side . '_threshold'] + (int) $s['house_cost'];
+      e24_buy($game, $players, 'st#' . $key, $side, $mysqli, $house);
+    }
     else e24_buy($game, $players, $pick, null, $mysqli);
   }
   if ($paper === 'herald' && !$game['state']['turn']['used']['herald'] && e24_top_story($game) !== null
@@ -1435,6 +1478,25 @@ function e24_affordable($game, $players) {
   return $out;
 }
 
+/** The face-up state buys ('st#pa:trump') that can take the House delegation too. */
+function e24_house_affordable($game, $players) {
+  $t = $game['state']['turn'];
+  if ($t['staked']) return [];
+  $pools = e24_pools($game, $players);
+  $out = [];
+  foreach (E24_DECKS as $d) {
+    $key = $game['state']['up'][$d] ?? null;
+    if (!$key || !(int) e24_state($key)['house_cost']) continue;
+    $s = e24_state($key);
+    foreach (E24_SIDES as $side) {
+      if (e24_have($pools, e24_side_order($players[$t['seat']], $side, true)) >= (int) $s[$side . '_threshold'] + (int) $s['house_cost']) {
+        $out[] = 'st#' . $key . ':' . $side;
+      }
+    }
+  }
+  return $out;
+}
+
 // ---------------------------------------------------------------------
 // Ending and scoring
 // ---------------------------------------------------------------------
@@ -1475,7 +1537,8 @@ function engine_ended_text($reason) {
     'race_called'     => 'A candidate reached 270; the stakes are revealed.',
     'all_humans_left' => 'The last editor walked away.',
     'stalled'         => 'No one would finish the race; the game is called with no winner.',
-    'deadlock'        => 'Every state is claimed and neither side has 270: the election is deadlocked, and no stake scores.',
+    'deadlock'        => 'Every state is claimed and neither side has 270, and the House is tied: the election is deadlocked, and no stake scores.',
+    'house'           => 'Every state is claimed and neither side has 270: the House decides, by the delegations bought.',
     'rules_changed'   => 'This game was started under other rules.',
   ];
   return $text[$reason] ?? 'The game ended.';
@@ -1508,6 +1571,7 @@ function engine_score_player($players, $seat, $game = null) {
     'ev_claimed' => (int) ($p['public_state']['ev_claimed'] ?? 0),
     'bought' => (int) ($p['public_state']['bought'] ?? 0),
     'knocks' => (int) ($p['public_state']['knocks'] ?? 0),
+    'house_seats' => (int) ($p['public_state']['house_seats'] ?? 0),
     'attacks' => (int) ($p['public_state']['attacks'] ?? 0),
     'scandals_taken' => (int) ($p['public_state']['scandals_taken'] ?? 0),
   ]];
@@ -1550,6 +1614,7 @@ function engine_public_state($game, $players, $viewerSeat = null) {
       'attacks' => (int) ($p['public_state']['attacks'] ?? 0),
       'scandals_taken' => (int) ($p['public_state']['scandals_taken'] ?? 0),
       'knocks' => (int) ($p['public_state']['knocks'] ?? 0),
+      'house_seats' => (int) ($p['public_state']['house_seats'] ?? 0),
       'hand_count' => (int) ($p['public_state']['hand_count'] ?? 0),
       'deck_count' => (int) ($p['public_state']['deck_count'] ?? 0),
       'discard_count' => (int) ($p['public_state']['discard_count'] ?? 0),
@@ -1583,7 +1648,8 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     $map[] = ['key' => $k, 'abbr' => $s['abbr'], 'state' => $s['state'], 'ev' => (int) $s['ev'], 'vp' => (int) $s['vp'],
               'deck' => $s['deck'], 'tier' => $s['tier'], 'margin' => (float) $s['margin'], 'winner_2024' => $s['winner'],
               'trump_cost' => (int) $s['trump_threshold'], 'harris_cost' => (int) $s['harris_threshold'],
-              'side' => $cl['side'] ?? null, 'seat' => $cl['seat'] ?? null, 'how' => $cl['how'] ?? null];
+              'side' => $cl['side'] ?? null, 'seat' => $cl['seat'] ?? null, 'how' => $cl['how'] ?? null,
+              'house_seats' => (int) $s['house_seats'], 'house' => !empty($cl['house']) ? $cl['side'] : null];
   }
 
   $turnPublic = null;
@@ -1639,7 +1705,8 @@ function engine_public_state($game, $players, $viewerSeat = null) {
     ],
     'race' => ['trump' => $ev['trump'], 'harris' => $ev['harris'], 'win_at' => (int) ($game['config']['win_at'] ?? 270),
                'final' => (bool) ($state['final'] ?? false), 'winner_side' => $state['winner_side'] ?? null,
-               'trigger_seat' => $state['trigger_seat'] ?? null],
+               'trigger_seat' => $state['trigger_seat'] ?? null,
+               'house' => $current ? e24_house_tally($game) : ['trump' => 0, 'harris' => 0]],
     'state_decks' => $decksPublic,
     'last_reveal' => $lastReveal,
     'set' => ($state['switched'] ?? null) !== null ? 'harris' : 'biden',
@@ -1678,6 +1745,7 @@ function engine_available_actions($game, $players, $seat) {
     'play' => e24_usable($players[$seat]),
     'framings' => $framings,
     'play_all' => !empty(e24_usable($players[$seat])),
+    'buy_house' => e24_house_affordable($game, $players),
     'buy' => e24_affordable($game, $players),
     'stake' => $fresh ? array_values($players[$seat]['private_state']['hand']) : [],
     'paper' => $paperOk,

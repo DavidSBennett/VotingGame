@@ -70,8 +70,8 @@ def load():
     with open(os.path.join(DOCS, "states-2024.csv"), encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             s = dict(r)
-            for f in ("ev", "order"):
-                s[f] = int(r[f])
+            for f in ("ev", "order", "house_seats", "house_cost"):
+                s[f] = int(r.get(f) or 0)
             s["margin"] = float(r["margin"])
             for side in SIDES:
                 for f in ("threshold", "gen", "party", "draw", "trash", "strike"):
@@ -204,6 +204,8 @@ class Game:
         self.scandals = CARDS["scandal"]["copies"]
         self.ended, self.rounds = None, 0
         self.trigger = self.current = None
+        self.house = {}                 # state key -> the side that bought its House delegation
+        self.house_winner = None        # a 269-269 deadlock decided by the House
         self.log = []                   # (state, seat, side, round, 'call' / 'buy')
 
     def refill(self):
@@ -246,7 +248,15 @@ class Game:
                 ev[s] += unclaimed[s]
         return ev, unclaimed
 
+    def house_seats(self):
+        seats = {s: 0 for s in SIDES}
+        for key, side in self.house.items():
+            seats[side] += STATES[key]["house_seats"]
+        return seats
+
     def winner(self):
+        if self.house_winner:
+            return self.house_winner
         ev, _ = self.tally()
         won = [s for s in SIDES if ev[s] >= self.cfg["win_at"]]
         return won[0] if won else None
@@ -393,6 +403,11 @@ class Game:
                 p.stats["ev"] += c["vp"]
                 p.stats["unhistorical"] += side != STATES[state_key(pick)]["winner"]
                 self.log.append((state_key(pick), p.seat, side, self.rounds, "buy"))
+                # The House delegation, bought with the state or never (the user, 2026-10-07).
+                hc = STATES[key]["house_cost"]
+                if hc and self.affordable(p, pool, side, hc, campaign=True) and bot.house(self, p, key, side):
+                    self.pay(p, pool, side, hc, campaign=True)
+                    self.house[key] = side
             else:
                 cost = c["cost"]
                 if c["lean"]:
@@ -547,7 +562,14 @@ class Game:
                 self.turn(p)
                 self.check_270()
                 if not self.ended and not any(self.up.values()):
-                    self.ended = "deadlock"      # every state claimed, neither side at 270: nothing can finish
+                    # Every state claimed, neither side at 270 (269-269): the House decides, by the
+                    # delegations bought; with no House majority the election is deadlocked.
+                    seats = self.house_seats()
+                    if seats["trump"] != seats["harris"]:
+                        self.house_winner = max(SIDES, key=lambda x: seats[x])
+                        self.ended = "house"
+                    else:
+                        self.ended = "deadlock"
                     break
         if not self.ended:
             self.ended = "stalled"
@@ -718,6 +740,11 @@ class Bot:
             p.last_stake = p.stats["turns"]
             return best, lead
         return None
+
+    def house(self, game, p, key, side):
+        """Buy a state's House delegation late in the race, for the side this
+        outlet has bet on (or for any side, before it has bet)."""
+        return self.late(game) and self.leaning(game, p) in (None, side)
 
     def scoop(self, game, p):
         return not self.late(game)

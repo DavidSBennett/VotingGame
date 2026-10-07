@@ -44,10 +44,11 @@ background:var(--paper2);border-left:1mm solid var(--gold7)}
 font-weight:700;font-size:9.5pt;display:flex;align-items:center;justify-content:center}
 .trump .price{background:var(--rep)} .harris .price{background:var(--dem)}
 .half .who-name{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:9pt;line-height:1.05;margin-top:.3mm}
-.half .power{font-size:5.8pt;line-height:1.2;margin-top:auto;padding-top:.5mm}
+.half .power{font-size:5.4pt;line-height:1.15;margin-top:auto;padding-top:.4mm}
 .state.large{border-color:#3b2a0c} .state .deckmark{font-family:'JetBrains Mono',monospace;font-size:4.4pt;letter-spacing:.12em;
 text-transform:uppercase;color:var(--muted)}
 .placeholder .headline{color:var(--muted)}
+.house{font-size:4.8pt;font-weight:500;margin-top:.6mm;padding:.3mm 1mm;border:.2mm solid var(--gold);border-radius:1mm;text-align:center}
 """
 
 FIT_STATES = FIT.replace("el.closest('.side')", "el.closest('.side,.reveal,.half')")
@@ -82,6 +83,9 @@ def card(r):
     else:
         reveal = ('<div class="reveal placeholder"><div class="tag">When revealed</div><div class="headline">The state\'s '
                   'own press: article to come.</div><div class="does">%s</div></div>' % e(effect))
+    seats, hc = int(r["house_seats"] or 0), int(r["house_cost"] or 0)
+    house = ("House: %d seat%s · +%d with the state (269-269 tiebreak)" % (seats, "" if seats == 1 else "s", hc)
+             if seats else "No House seats")
     halves = ""
     for side, who in (("trump", "Trump"), ("harris", "Harris")):
         halves += ('<div class="half %s"><div class="row"><div class="who">For %s%s</div><div class="price" title="Cost">%s</div></div>'
@@ -90,8 +94,8 @@ def card(r):
                       e(r[side + "_name"]), e(r[side + "_text"])))
     return ('<div class="card state %s"><div class="head"><div class="ev"><b>%s</b><span>EV</span></div><div class="name">'
             '<div class="eyebrow">%s</div><div class="title">%s</div></div><div class="wealth" title="Wealth">$%s</div></div>'
-            '%s%s<div class="foot">%s</div></div>'
-            % (r["deck"], e(r["ev"]), e(eyebrow), e(r["state"]), e(r["vp"]), reveal, halves, e(r["flavor"])))
+            '%s%s<div class="house">%s</div><div class="foot">%s</div></div>'
+            % (r["deck"], e(r["ev"]), e(eyebrow), e(r["state"]), e(r["vp"]), reveal, halves, e(house), e(r["flavor"])))
 
 
 def main():

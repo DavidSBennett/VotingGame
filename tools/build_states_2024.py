@@ -123,6 +123,19 @@ POWER_FIELDS = ("gen", "party", "draw", "trash", "strike")
 SWING = {"AZ", "GA", "MI", "NV", "NC", "PA", "WI"}
 
 
+# The House tiebreaker (the user, 2026-10-07): when a state is bought for a
+# side, its House delegation may be bought with it, for that side. Its seats
+# are the state's representatives (electoral votes - 2; D.C. has none). If
+# every state is claimed and neither side has 270 (269-269), the side with
+# more House seats wins. A delegation costs 1 per HOUSE_PER seats, at least 1.
+HOUSE_PER = 4
+
+
+def house(abbr, ev):
+    seats = 0 if abbr == "DC" else ev - 2
+    return seats, (max(1, math.ceil(seats / HOUSE_PER)) if seats else 0)
+
+
 def story_value(c):
     """The simulator's value() for a story row of docs/deck-2024.csv."""
     n = lambda f: int(c[f] or 0)
@@ -135,7 +148,7 @@ def story_value(c):
 
 
 def best_by_cost():
-    rows = [r for r in csv.DictReader(open(os.path.join(DOCS, "deck-2024.csv"), encoding="utf-8-sig")) if r["step"]]
+    rows = [r for r in csv.DictReader(open(os.path.join(DOCS, "deck-2024.csv"), encoding="utf-8-sig")) if r["era"] in ("biden", "harris")]
     best, top = {}, 0.0
     for cost in range(1, max(int(r["cost"]) for r in rows) + 1):
         top = max([top] + [story_value(r) for r in rows if int(r["cost"]) == cost])
@@ -237,6 +250,7 @@ def main():
                    winner=winner, tier=tier(margin), deck=size, vp=prestige(ev),
                    trump_name=names[abbr.lower()]["trump_name"], harris_name=names[abbr.lower()]["harris_name"],
                    flavor=flavor(state, ev, t, h))
+        row["house_seats"], row["house_cost"] = house(abbr, ev)
         for side in ("trump", "harris"):
             p = dict(side_power[side], strike=1 if abbr in SWING else 0)
             row[side + "_threshold"] = won if side == winner else lost
@@ -256,7 +270,7 @@ def main():
     rows.sort(key=lambda r: (ORDER[r["tier"]], -abs(r["margin"])))
     for n, r in enumerate(rows, 1):
         r["order"] = n
-    fields = ["key", "abbr", "state", "ev", "vp", "trump_name", "harris_name", "flavor", "trump_pct", "harris_pct", "margin", "winner", "tier", "order", "deck"]
+    fields = ["key", "abbr", "state", "ev", "vp", "trump_name", "harris_name", "flavor", "trump_pct", "harris_pct", "margin", "winner", "tier", "order", "deck", "house_seats", "house_cost"]
     for side in ("trump", "harris"):
         fields += [side + "_threshold"] + ["%s_%s" % (side, f) for f in POWER_FIELDS] + [side + "_text", side + "_worth"]
     fields.append("best_story")

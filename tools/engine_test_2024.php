@@ -359,6 +359,75 @@ face_up($g, 'mi');
 set_pools($g, ['dem' => 20]);
 ok(throws(function () use (&$g, &$P) { act($g, $P, 'buy', ['card' => 'st#mi', 'side' => 'trump']); }) !== false, 'without the Globe it cannot');
 
+// ---- the House delegation, bought with the state -------------------------------
+eq([(int) e24_state('ca')['house_seats'], (int) e24_state('ca')['house_cost']], [52, 13], 'House: California 52 seats, 13 to buy');
+eq([(int) e24_state('dc')['house_seats'], (int) e24_state('dc')['house_cost']], [0, 0], 'House: D.C. has no delegation');
+$seats = 0;
+foreach (e24_states() as $s) $seats += (int) $s['house_seats'];
+eq($seats, 435, 'House: 435 seats in all');
+list($g, $P) = new_game(2);
+give_hand($g, $P, []);
+face_up($g, 'pa');
+set_pools($g, ['gen' => 13]);
+ok(throws(function () use (&$g, &$P) { act($g, $P, 'buy', ['card' => 'st#pa', 'side' => 'trump', 'house' => true]); }) !== false, 'House: refused when the state and its delegation cost more than you have');
+set_pools($g, ['gen' => 14]);
+ok(in_array('st#pa:trump', engine_available_actions($g, $P, 0)['buy_house'], true), 'House: offered when affordable');
+act($g, $P, 'buy', ['card' => 'st#pa', 'side' => 'trump', 'house' => true]);
+eq($g['state']['turn']['spent']['gen'], 9 + 5, 'House: Pennsylvania 9 + its delegation 5');
+ok(!empty($g['state']['claims']['pa']['house']), 'House: the delegation is claimed with the state');
+eq(e24_house_tally($g), ['trump' => 17, 'harris' => 0], 'House: 17 seats for Trump');
+eq(engine_public_state($g, $P, 0)['race']['house'], ['trump' => 17, 'harris' => 0], 'House: in the view');
+check_invariants($g, $P, 'house buy');
+
+/** Claim every state (by hand) for the given sides, leaving one face up; return the game ready to buy it. */
+function nearly_all(&$g, &$P, $last, $lastSide, $trumpKeys, $house = []) {
+  foreach (E24_DECKS as $d) {
+    foreach (array_merge($g['state']['decks'][$d], [$g['state']['up'][$d]]) as $k) {
+      if ($k === null || $k === $last) continue;
+      $side = in_array($k, $trumpKeys, true) ? 'trump' : 'harris';
+      $P[1]['private_state']['discard'][] = 'st#' . $k . ':' . $side;
+      $g['state']['claims'][$k] = ['side' => $side, 'seat' => 1, 'how' => 'buy', 'round' => 1];
+      if (in_array($k, $house, true)) $g['state']['claims'][$k]['house'] = true;
+    }
+    $g['state']['decks'][$d] = [];
+    $g['state']['up'][$d] = null;
+  }
+  $g['state']['up'][e24_state($last)['deck']] = $last;
+  foreach ($P as $s => $_) e24_count($P[$s]);
+}
+// A 269-269 split: Trump holds every Republican state of 2024 but Nevada (306 - 6 = 300) ... build exactly 269 instead.
+// Trump states adding to exactly 266 (Wyoming, 3, is bought last for him): a subset sum.
+$reach = [0 => []];
+foreach (array_keys(e24_states()) as $k) {
+  if ($k === 'wy') continue;
+  $e = (int) e24_state($k)['ev'];
+  foreach (array_keys($reach) as $sum) {
+    if ($sum + $e <= 266 && !isset($reach[$sum + $e])) $reach[$sum + $e] = array_merge($reach[$sum], [$k]);
+  }
+}
+$trump = $reach[266] ?? [];
+$ev = 0;
+foreach ($trump as $k) $ev += (int) e24_state($k)['ev'];
+ok($ev === 266, 'House setup: Trump 266 before Wyoming (' . $ev . ')');
+list($g, $P) = new_game(2);
+nearly_all($g, $P, 'wy', 'trump', $trump, ['ca']);     // Harris holds California's delegation (52)
+give_hand($g, $P, []);
+set_pools($g, ['gen' => 20]);
+act($g, $P, 'buy', ['card' => 'st#wy', 'side' => 'trump', 'house' => true]);
+eq(e24_tally($g), ['trump' => 269, 'harris' => 269], 'House: 269-269');
+act($g, $P, 'end_turn');
+eq($g['status'], 'ended', 'House: the game ends when every state is claimed');
+eq($g['ended_reason'], 'house', 'House: the House decides');
+eq($g['state']['winner_side'], in_array('ca', $trump, true) ? 'trump' : 'harris', 'House: the side with more seats wins');
+list($g, $P) = new_game(2);
+nearly_all($g, $P, 'wy', 'trump', $trump, []);
+give_hand($g, $P, []);
+set_pools($g, ['gen' => 20]);
+act($g, $P, 'buy', ['card' => 'st#wy', 'side' => 'trump']);
+act($g, $P, 'end_turn');
+eq($g['ended_reason'], 'deadlock', 'House: no delegations bought, a tied House: deadlock');
+eq($g['state']['winner_side'], null, 'House: deadlock has no winner');
+
 // ---- planks: into play, paying each turn, knocked out ----------------------------
 $repPlank = find_card(function ($c) { return $c['type'] === 'Plank' && $c['lean'] === 'rep' && (int) $c['ongoing_gen'] === 2; });
 $demPlank = find_card(function ($c) { return $c['type'] === 'Plank' && $c['lean'] === 'dem' && (int) $c['ongoing_gen'] === 1 && !(int) $c['ongoing_draw']; });
@@ -592,7 +661,8 @@ for ($gi = 0; $gi < $games; $gi++) {
         }
       } elseif (!empty($av['buy']) && mt_rand(0, 4) > 0) {
         $b = $av['buy'][mt_rand(0, count($av['buy']) - 1)];
-        if (e24_is_state($b)) act($g, $P, 'buy', ['card' => 'st#' . e24_state_key($b), 'side' => e24_card_side($b)]);
+        if (e24_is_state($b)) act($g, $P, 'buy', ['card' => 'st#' . e24_state_key($b), 'side' => e24_card_side($b),
+                                                  'house' => in_array($b, $av['buy_house'], true) && mt_rand(0, 1)]);
         else act($g, $P, 'buy', ['card' => $b]);
       } elseif (!empty($av['paper']) && mt_rand(0, 1)) {
         act($g, $P, 'paper');
@@ -626,6 +696,11 @@ for ($gi = 0; $gi < $games; $gi++) {
     }
     $w = $g['state']['winner_side'];
     if ($g['ended_reason'] === 'race_called') ok(e24_tally($g)[$w] >= 270, "game $gi: the winner side has 270");
+    if ($g['ended_reason'] === 'house') {
+      $h = e24_house_tally($g);
+      ok($h[$w] > $h[e24_other($w)] && max(e24_tally($g)) < 270, "game $gi: the House winner has more seats, at 269-269");
+    }
+    if ($g['ended_reason'] === 'deadlock') ok($w === null, "game $gi: a deadlock has no winner");
     foreach ($P as $s => $p) {
       $want = 0;
       foreach ($p['private_state']['staked'] as $st) if ($st['side'] === $w) $want += (int) e24_view($st['card'])['vp'];
