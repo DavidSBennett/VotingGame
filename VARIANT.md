@@ -1114,3 +1114,39 @@ until the engine catches up).
   headlines (top outlet at the lower right, bottom outlet at the upper
   right), a plank's platform wording, a state's reveal and House seats;
   the race bar shows House seats; the rules sheet is rewritten.
+
+### 2026-10-07: a full balance pass (the user)
+
+Measured in the simulator (balanced bots; 400-1,200 games a test), mirrored
+in the engine; parity within noise afterwards.
+
+- **Turn order** (seat wins, before -> after): 2 outlets 58/42 -> 54/46;
+  3: 43/32/25 -> 34/35/31; 4: 35/22/25/18 -> 26/28/25/21; 5: 19/22/22/19/18.
+  Catch-up: the second outlet starts with one Editorial, the third to fifth
+  with two each, from the supply (`extra_editorials` 0/1/2/2/2).
+- **Trump v. Harris**: Harris won 47% / 45% / 39% at 2 / 3 / 4 outlets
+  (Trump's 312 historical votes are cheap). Flipping a state now costs 1
+  more per 5 points of 2024 margin, not 6: Harris 53-58% / 53% / 50% / 46%
+  at 2-5 outlets. (Cheaper flips, per 8, helped Trump: 41%.)
+- **Outlets** (win share among two balanced outlets, fair 33.3%; before ->
+  after): the AP 44.7 -> 36.3 (counts only large states bought for the
+  winner); the New York Times 39.0 -> 32.7 (a reveal's Scandal becomes a
+  discard of its cheapest card, in place of immunity); the New York Post
+  37.1 -> 35.4 (draws 2, not 3); CNN 25.8 -> 34.4 (+2 per bottom-side
+  story, and the bots now weigh it); Fox News 26.7 -> 32.8 (the first
+  Social story draws, not the second); the Wall Street Journal 27.7 ->
+  29.7 (+2 per Economic story, the first two); NewsNation 34.4 and
+  Politico 30.8 unchanged.
+- **Stories**: by value per cost the 4- and 5-cost stories were the
+  weakest and sold least; the three 2-cost stories with +2 party currency
+  (Trump Announces, Finish the Job, Trump Takes Iowa) were the strongest and
+  sold most. Those three now cost 3; the 25 stories more than 0.5 under the
+  value curve get +1 neutral (`COST_FIX`, `PLUS_NEUTRAL` in
+  `build_deck_2024.py`).
+- **Planks**: the 4- and 5-cost planks sold a fifth as often as the 6s and
+  7s; they are now worth 3 wealth (was 1). Buy rates by cost 0.18 / 0.17 /
+  0.94 / 1.00 -> 0.65 / 0.69 / 0.92 / ~1.0 per ten exchange views.
+- 18 state cards gain +1 neutral through the price rule (the strongest card
+  at its price) after the story and plank changes.
+- Not changed: game length (~15 rounds), the play styles (only "bigmoney"
+  lags, as expected), the House tiebreaker (~4-5% of games).

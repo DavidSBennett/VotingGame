@@ -87,16 +87,24 @@ function engine_default_config() {
     'office_div'       => 3,      // per-office stories: one office per this many states held
     'attack_reward'    => 1,
     'argus_vp'         => 1,
-    'sun_draw'         => 3,
-    'north_star_at'    => 2,
+    'argus_winner_only' => true,  // the AP counts only large states bought for the winning side
+    'journal_max'      => 2,      // the Journal: +journal_per neutral for each of the first this-many Economic stories
+    'journal_per'      => 2,
+    'nyt_discard'      => 'cheapest',  // the Times: a reveal's Scandal becomes a discard of its cheapest card
+    'sun_draw'         => 2,      // the balance pass of 2026-10-07: 3 -> 2
+    'north_star_at'    => 1,      // the first Social story (was the second)
     'north_star_draw'  => 1,
     'herald_cost'      => 2,
+    'aurora_per'       => 2,
     'power_choice'     => 0.5,
     'stake_eager'      => 6.0,
     'stake_floor'      => 2.0,
     'stake_gap'        => 1,
     'min_players'      => 1,
     'max_players'      => 5,
+    // Catch-up (the balance pass of 2026-10-07): Editorials, from the supply, in each seat's starting
+    // deck by turn order -- seat 2 one, seats 3-5 two.
+    'extra_editorials' => [0, 1, 2, 2, 2],
     'bots'             => 1,
     'bot_level'        => 'easy',
   ];
@@ -264,7 +272,7 @@ function engine_setup(&$game, &$players, $mysqli = null) {
     'last_reveal' => null,                   // the last state turned up: [key, deck, round]
     'main'       => $main,
     'exchange'   => [],
-    'editorials' => (int) $cards['editorial']['copies'],
+    'editorials' => (int) $cards['editorial']['copies'],     // less the catch-up Editorials dealt below
     'scandals'   => (int) $cards['scandal']['copies'],
     'trash'      => [],
     'order'      => engine_seat_list($players),
@@ -295,6 +303,11 @@ function engine_setup(&$game, &$players, $mysqli = null) {
     $deck = [];
     for ($i = 0; $i < (int) $cards['letter']['copies']; $i++) $deck[] = 'letter#' . $seat . '.' . $i;
     for ($i = 0; $i < (int) $cards['notice']['copies']; $i++) $deck[] = 'notice#' . $seat . '.' . $i;
+    $extra = (int) ($config['extra_editorials'][array_search((int) $seat, $game['state']['order'], true)] ?? 0);
+    for ($i = 0; $i < $extra && $game['state']['editorials'] > 0; $i++) {
+      $game['state']['editorials'] -= 1;
+      $deck[] = 'editorial#' . $game['state']['editorials'];
+    }
     shuffle($deck);
     $players[$seat]['public_state'] = [
       'paper'         => $paper,
@@ -552,7 +565,7 @@ function e24_pools($game, $players) {
     if (!$top) $bottoms[$c['kind']] = true;
   }
   // CNN's Debate Stage: +1 neutral for each different story used on its bottom side.
-  if (($p['public_state']['paper'] ?? null) === 'aurora') $total['gen'] += count($bottoms);
+  if (($p['public_state']['paper'] ?? null) === 'aurora') $total['gen'] += (int) ($game['config']['aurora_per'] ?? 1) * count($bottoms);
   $out = [];
   foreach ($total as $k => $v) $out[$k] = $v - (int) $t['spent'][$k];
   return $out;
@@ -614,7 +627,7 @@ function e24_play(&$game, &$players, $cardId, $mysqli, $framing = 'top') {
   $k = $c['story_kind'];
   if ($k) {
     $t['counts'][$k] += 1;
-    if ($paper === 'journal' && $k === 'Economic' && $t['counts']['Economic'] <= 2) $t['base']['gen'] += 1;
+    if ($paper === 'journal' && $k === 'Economic' && $t['counts']['Economic'] <= (int) ($game['config']['journal_max'] ?? 2)) $t['base']['gen'] += (int) ($game['config']['journal_per'] ?? 1);
     if ($paper === 'north_star' && $k === 'Social' && !$t['star_done']
         && $t['counts']['Social'] === (int) $game['config']['north_star_at']) {
       $t['star_done'] = true;
@@ -680,7 +693,25 @@ function e24_hit(&$game, &$q, $kind) {
     return true;
   }
   if ($kind === 'scandal') {
-    if (($q['public_state']['paper'] ?? null) === 'intelligencer') return false;
+    if (($q['public_state']['paper'] ?? null) === 'intelligencer') {
+      // The Times never takes a Scandal: it discards the cheapest card in its hand instead
+      // (the weakest of those), or at random with nyt_discard 'random'.
+      $mode = $game['config']['nyt_discard'] ?? 'cheapest';
+      if (!$mode || !$q['private_state']['hand']) return false;
+      if ($mode !== 'cheapest') return e24_hit($game, $q, 'discard');
+      $best = null;
+      $bestKey = null;
+      foreach ($q['private_state']['hand'] as $i => $id) {
+        $c = e24_view($id);
+        $k = [(int) $c['cost'], e24_bot_value($c)];
+        if ($bestKey === null || $k < $bestKey) { $best = $i; $bestKey = $k; }
+      }
+      $id = $q['private_state']['hand'][$best];
+      array_splice($q['private_state']['hand'], $best, 1);
+      $q['private_state']['discard'][] = $id;
+      e24_count($q);
+      return true;
+    }
     if ((int) $game['state']['scandals'] <= 0) return false;
     $game['state']['scandals'] -= 1;
     $q['private_state']['discard'][] = 'scandal#' . $game['state']['scandals'];
@@ -864,7 +895,10 @@ function e24_buy(&$game, &$players, $cardId, $side, $mysqli, $house = false) {
       }
       $id = 'st#' . $key . ':' . $side;
       $players[$seat]['public_state']['states_bought'] = 1 + (int) $players[$seat]['public_state']['states_bought'];
-      if ($deck === 'large') $players[$seat]['public_state']['called'] = 1 + (int) $players[$seat]['public_state']['called'];
+      if ($deck === 'large') {
+        $players[$seat]['public_state']['called'] = 1 + (int) $players[$seat]['public_state']['called'];
+        $players[$seat]['public_state']['large_sides'][] = $side;     // the AP may count only the winner's
+      }
       if ($mysqli) {
         engine_log($mysqli, $game, $seat, 'claim',
           $players[$seat]['player_name'] . ' buys ' . $s['state'] . ' (' . $s['ev'] . ') for ' . e24_side_name($side)
@@ -1215,6 +1249,8 @@ function e24_bot_frame($game, $players, $seat, $style, $c) {
   }
   $side = e24_bot_leaning($style, $players[$seat]);
   $bottom = 0.8 * (int) $c['bottom_party'] * (($side !== null && $side === ($c['lean'] === 'rep' ? 'trump' : 'harris')) ? 0.5 : 1.0);
+  // CNN's Debate Stage pays for each story used on its bottom.
+  if (($players[$seat]['public_state']['paper'] ?? null) === 'aurora') $bottom += (int) ($game['config']['aurora_per'] ?? 1);
   if ($c['bottom_attack'] === 'plank') {
     $best = null;
     foreach (e24_rival_planks($players, $seat, $c['strike']) as $loc) {
@@ -1558,8 +1594,14 @@ function engine_score_player($players, $seat, $game = null) {
     else $lost += (int) $c['vp'];
     $stakes[] = ['card' => $c['name'], 'vp' => (int) $c['vp'], 'side' => $st['side'], 'won' => $hit];
   }
-  $argus = (($p['public_state']['paper'] ?? null) === 'argus')
-    ? (int) ($game['config']['argus_vp'] ?? 1) * (int) ($p['public_state']['called'] ?? 0) : 0;
+  $argus = 0;
+  if (($p['public_state']['paper'] ?? null) === 'argus') {
+    $n = (int) ($p['public_state']['called'] ?? 0);
+    if (!empty($game['config']['argus_winner_only'])) {
+      $n = count(array_filter($p['public_state']['large_sides'] ?? [], function ($sd) use ($w) { return $sd === $w; }));
+    }
+    $argus = (int) ($game['config']['argus_vp'] ?? 1) * $n;
+  }
   $total = $won + $argus;
   return ['total' => $total, 'breakdown' => [
     'prestige' => $total, 'wealth' => $total, 'stakes_won' => $won, 'stakes_lost' => $lost, 'argus' => $argus, 'stakes' => $stakes,

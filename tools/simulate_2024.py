@@ -122,16 +122,24 @@ DEFAULTS = dict(hand=5, exchange_size=5, max_rounds=80,
                 office_div=3,               # per-office stories: one office per this many states held
                 papers=True,
                 power_choice=0.5,           # bots weigh a card's worth against the neutral it costs
-                sun_draw=3,
-                north_star_at=2, north_star_draw=1,
-                argus_vp=1,                 # the Argus: prestige per big state it called (stand-in)
+                sun_draw=2,                 # the Post (balance pass 2026-10-07: 3 -> 2)
+                north_star_at=1, north_star_draw=1,   # Fox: the first Social story (was the second)
+                argus_vp=1,                 # the AP: wealth per large state it bought
+                argus_winner_only=True,     # ... counting only those bought for the winning side
+                journal_max=2,              # the Journal: +journal_per neutral for each of the first this-many Economic stories
+                journal_per=2,              # (balance pass 2026-10-07: 1 -> 2)
+                nyt_discard="cheapest",     # the Times: a reveal's Scandal becomes a discard of its cheapest card
+                                            # (balance pass 2026-10-07: immune 39.8% of wins, fair 33.3%; this 32.8%)
+                nyt_draw=False,             # the Times: takes a reveal's Scandal like anyone, and draws a card
                 herald_cost=2,
-                aurora_per=1,
+                aurora_per=2,               # CNN: per story used on its bottom (balance pass 2026-10-07: 1 -> 2)
                 finish_round=True,          # when a candidate reaches 270, the round is played out
                 win_at=270,
                 smart_end=True,             # bots cross 270 only when it pays them, and block when it would not
                 news_cycle=True,            # each turn the oldest exchange card goes to the bottom of the main deck
-                extra_editorials=(0, 0, 0, 0),  # catch-up: Editorials in each seat's starting deck (none needed now)
+                # Catch-up (the balance pass of 2026-10-07): Editorials, from the supply, in each seat's
+                # starting deck. Seat wins without: 62/38, 40/34/26, 30/28/23/19; with: 49/51, 32/35/34, 24/25/26/24.
+                extra_editorials=(0, 1, 2, 2, 2),
                 stake=True,
                 stake_eager=6.0,            # bots: expected prestige a stake must promise at the start
                                             # (falling to stake_floor as a side nears 270)
@@ -148,6 +156,7 @@ class Player:
         self.deck = ["letter#%d.%d" % (seat, i) for i in range(7)] + ["notice#%d.%d" % (seat, i) for i in range(3)]
         self.hand, self.discard, self.locations, self.held = [], [], [], []
         self.playing = []           # the cards played this turn (they still count: a state played is still held)
+        self.large = []             # the side each large state was bought for (the AP)
         self.staked = []            # (card, side), face down
         self.last_stake = -99       # the turn of the last stake
         self.stats = dict(turns=0, called=0, bought=0, states_bought=0, attacks=0, scandals=0, trashed=0, knocks=0,
@@ -165,7 +174,8 @@ class Player:
         the winner."""
         vp = sum(card(c)["vp"] for c, side in self.staked if side == winner)
         if self.paper == "argus":
-            vp += cfg["argus_vp"] * self.stats["called"]
+            n = sum(1 for s in self.large if s == winner) if cfg["argus_winner_only"] else self.stats["called"]
+            vp += cfg["argus_vp"] * n
         return vp
 
 
@@ -200,7 +210,7 @@ class Game:
         self.switched = None            # the round the switch came up
         self.exchange = []
         self.refill()
-        self.editorials = CARDS["editorial"]["copies"]
+        self.editorials = CARDS["editorial"]["copies"] - sum(self.cfg["extra_editorials"][p.seat] for p in self.players)
         self.scandals = CARDS["scandal"]["copies"]
         self.ended, self.rounds = None, 0
         self.trigger = self.current = None
@@ -314,8 +324,8 @@ class Game:
             played.append(cid)
             if c["kind"]:
                 count[c["kind"]] += 1
-                if p.paper == "journal" and c["kind"] == "Economic" and count["Economic"] <= 2:
-                    gen += 1
+                if p.paper == "journal" and c["kind"] == "Economic" and count["Economic"] <= self.cfg["journal_max"]:
+                    gen += self.cfg["journal_per"]
                 if (p.paper == "north_star" and c["kind"] == "Social"
                         and count["Social"] == self.cfg["north_star_at"] and not star_done):
                     star_done = True
@@ -398,6 +408,7 @@ class Game:
                     self.reveal(self.up[deck])          # the next state turns over: its reveal hits everyone
                 if deck == "large":
                     p.stats["called"] += 1
+                    p.large.append(side)
                     self.big_bought += 1
                 p.stats["states_bought"] += 1
                 p.stats["ev"] += c["vp"]
@@ -460,6 +471,16 @@ class Game:
                     c = max(q.hand, key=lambda x: card(x)["cost"])
                     q.hand.remove(c)
                     q.discard.append(c)
+                elif kind == "scandal" and q.paper == "intelligencer" and self.cfg["nyt_discard"] and q.hand:
+                    c = (min(q.hand, key=lambda x: (card(x)["cost"], value(card(x)))) if self.cfg["nyt_discard"] == "cheapest"
+                         else self.rng.choice(q.hand))
+                    q.hand.remove(c)
+                    q.discard.append(c)
+                elif kind == "scandal" and q.paper == "intelligencer" and self.cfg["nyt_draw"] and self.scandals:
+                    self.scandals -= 1
+                    q.discard.append("scandal#%d" % self.scandals)
+                    q.stats["scandals"] += 1
+                    self.draw(q, 1)
                 elif kind == "scandal" and q.paper != "intelligencer" and self.scandals:
                     self.scandals -= 1
                     q.discard.append("scandal#%d" % self.scandals)
@@ -625,6 +646,8 @@ class Bot:
                    + 0.8 * c["per_same"] + 0.8 * c["retract"] + 0.8 * c["top_party"])
         side = self.leaning(game, p)
         bottom = 0.8 * c["bottom_party"] * (0.5 if side == SIDE[c["lean"]] else 1.0)
+        if p.paper == "aurora":               # CNN's Debate Stage pays for each story used on its bottom
+            bottom += game.cfg["aurora_per"]
         if c["bottom_attack"] == "plank":     # a knockout, if a plank of that party is there to hit
             hit = game.planks(p, c["strike"])
             if hit:

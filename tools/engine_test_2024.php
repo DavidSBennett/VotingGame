@@ -522,7 +522,7 @@ eq(engine_available_actions($g, $P, 0)['stake'], [], 'stake: not offered after p
 // ---- the race to 270 and the score -------------------------------------------
 list($g, $P) = new_game(3);
 $P[0]['private_state']['staked'][] = ['card' => 'editorial#99', 'side' => 'trump', 'round' => 1];
-$g['state']['editorials'] = 15;
+$g['state']['editorials'] -= 1;
 $P[1]['private_state']['staked'][] = ['card' => 'letter#1.6', 'side' => 'harris', 'round' => 1];
 $P[1]['private_state']['hand'] = array_values(array_diff($P[1]['private_state']['hand'], ['letter#1.6']));
 $P[1]['private_state']['deck'] = array_values(array_diff($P[1]['private_state']['deck'], ['letter#1.6']));
@@ -704,7 +704,7 @@ for ($gi = 0; $gi < $games; $gi++) {
     foreach ($P as $s => $p) {
       $want = 0;
       foreach ($p['private_state']['staked'] as $st) if ($st['side'] === $w) $want += (int) e24_view($st['card'])['vp'];
-      if (($p['public_state']['paper'] ?? null) === 'argus') $want += (int) $p['public_state']['called'];
+      if (($p['public_state']['paper'] ?? null) === 'argus') $want += count(array_filter($p['public_state']['large_sides'] ?? [], function ($sd) use ($w) { return $sd === $w; }));
       eq($p['final_score'], $want, "game $gi seat $s: final score is the stakes on the winner");
     }
   }

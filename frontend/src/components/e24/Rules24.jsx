@@ -48,6 +48,12 @@ function Body() {
         switch comes up it is set aside, and the Harris stories begin.
       </p>
 
+      <H>Setting up</H>
+      <p>
+        Each outlet starts with 7 Letters to the Editor and 3 Local Notices. To even out the turn order, the second outlet also starts with one
+        Editorial, and the third, fourth and fifth with two each, from the supply.
+      </p>
+
       <H>Your turn: use and spend, or stake</H>
       <ul className="list-none space-y-1 pl-0">
         <li>
@@ -74,9 +80,9 @@ function Body() {
 
       <H>Prices</H>
       <p>
-        A state costs more the more votes it has. Flipping it costs 1 more for every 6 points it was won by in 2024: Pennsylvania, Georgia, North
-        Carolina, Michigan, Arizona, Wisconsin and Nevada (and New Hampshire, Minnesota, Virginia, New Jersey) cost the same either way; D.C. for
-        Trump is very dear. The seven swing states also knock out a plank when used.
+        A state costs more the more votes it has. Flipping it costs 1 more for every 5 points it was won by in 2024: Pennsylvania, Georgia, North
+        Carolina, Michigan, Arizona, Wisconsin and Nevada (and New Hampshire and Minnesota) cost the same either way; D.C. for Trump is very dear.
+        The seven swing states also knock out a plank when used.
       </p>
 
       <H>The House</H>

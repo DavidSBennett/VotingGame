@@ -90,9 +90,9 @@ def tier(margin):
 # Thresholds. History's winner: BASE + PER_EV * EV ** EV_POWER. The other
 # side costs 1 more for every full PER_POINT points of 2024 margin (the
 # user, 2026-10-03: the gap reflects how close the state was to flipping),
-# so the seven swing states -- and NH, MN, VA, NJ, as close -- cost the
-# same either way; Texas +2, California +3, D.C. +13.
-BASE, PER_EV, EV_POWER, PER_POINT = 1.0, 1.8, 0.5, 6.0
+# so the seven swing states -- and New Hampshire and Minnesota, as close -- cost the
+# same either way; Virginia and New Jersey +1, Texas +2, California +4, D.C. +16.
+BASE, PER_EV, EV_POWER, PER_POINT = 1.0, 1.8, 0.5, 5.0      # PER_POINT 6 -> 5: the balance pass of 2026-10-07 (Harris won 46% / 45% / 40% at 2 / 3 / 4 outlets; 55 / 54 / 48 after)
 
 
 def thresholds(ev, margin):

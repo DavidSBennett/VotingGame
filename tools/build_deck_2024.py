@@ -67,8 +67,22 @@ PLANK_SET = {"seal_the_border": "biden", "energy_dominance": "biden", "end_infla
              "voting_rights": "biden", "reproductive_freedom": "biden"}
 OTHER = {"rep": "dem", "dem": "rep"}
 STRIKERS = 10                            # stories per party whose bottom knocks out a plank
-# A plank's power by its cost: (ongoing neutral, ongoing draw, wealth).
-PLANK_TIER = {4: (1, 0, 1), 5: (0, 1, 1), 6: (2, 0, 3), 7: (1, 1, 3)}
+# A plank's power by its cost: (ongoing neutral, ongoing draw, wealth). The balance pass of
+# 2026-10-07 lifted the cheap tiers (bought a tenth as often as the dear ones) to 3 wealth, and
+# kept the 7s at 3 (at 4 they outsold the rest).
+PLANK_TIER = {4: (1, 0, 3), 5: (0, 1, 3), 6: (2, 0, 3), 7: (1, 1, 3)}
+
+# The balance pass of 2026-10-07 (tools/simulate_2024.py value() against a curve of
+# 3.6 / 4.6 / 5.4 / 6.4 / 7.6 / 8.4 / 10 for costs 2-8): the three 2-cost stories worth
+# ~4.3-4.9 cost 3; every story more than 0.5 under the curve gets +1 neutral.
+COST_FIX = {"trump_announces": 3, "finish_the_job": 3, "trump_takes_iowa": 3}
+PLUS_NEUTRAL = {
+    "the_price_of_groceries", "the_fed_signals_cuts", "out_of_reach", "loan_forgiveness", "no_tax_on_tips",
+    "no_tax_on_overtime", "the_mug_shot", "the_bitcoin_conference", "the_write_in", "eagle_pass", "the_coconut_tree",
+    "the_atlanta_debate", "abortion_on_the_ballot", "the_border_numbers", "the_hush_money_trial",
+    "the_hunter_biden_verdict", "the_civil_fraud_trial", "the_phillips_challenge", "childless_cat_ladies",
+    "the_border_czar", "springfield", "not_a_thing_comes_to_mind", "arlington", "the_2019_positions", "project_2025",
+}
 PLATFORM = {"rep": ("2024 Republican Platform", "https://www.presidency.ucsb.edu/documents/2024-republican-party-platform",
                     "2024-07-08"),
             "dem": ("2024 Democratic Platform", "https://www.presidency.ucsb.edu/documents/2024-democratic-party-platform",
@@ -261,6 +275,10 @@ def main():
             s = news[r["key"]]              # the 2024 story on this slot
             row.update(key=s["key"], name=s["name"], date=s["date"], year=s["date"][:4], flavor=s["flavor"],
                        released="")
+            if s["key"] in COST_FIX:
+                row["cost"] = COST_FIX[s["key"]]
+            if s["key"] in PLUS_NEUTRAL:
+                row["gen"] = int(row["gen"] or 0) + 1
             row["era"] = "harris" if s["date"] >= HARRIS_FROM or s["key"] in HARRIS_SET else "biden"
             frame(row, heads)
             if s["key"] == SWITCH:
