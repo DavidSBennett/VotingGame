@@ -25,6 +25,14 @@ def e(s):
     return html.escape(s or "", quote=True)
 
 
+def art(key, cls="", inner=""):
+    """The card's photograph (docs/print/art/<key>.jpg, picked in docs/art-2024.csv), if it has been fetched."""
+    name = key.replace(":", "-") + ".jpg"
+    if not os.path.exists(os.path.join(DOCS, "print", "art", name)):
+        return inner
+    return '<div class="art %s" style="background-image:url(art/%s)">%s</div>' % (cls, name, inner)
+
+
 def head(r, eyebrow):
     wealth = int(r["vp"] or 0)
     return ('<div class="head"><div class="cost" title="Cost">%s</div><div class="name"><div class="eyebrow">%s</div>'
@@ -40,35 +48,36 @@ def story(r):
             '<div class="side %s top"><div class="tag">%s side</div>'
             '<div class="headline fit">“%s”</div><div class="outlet">%s</div>'
             '<div class="does">%s</div></div>'
-            '<div class="or">or</div>'
+            '%s'
             '<div class="side %s bottom"><div class="row"><div class="tag">%s side</div><div class="outlet">%s</div></div>'
             '<div class="headline fit">“%s”</div>'
             '<div class="does">%s</div></div>'
             '<div class="foot">%s · %s</div></div>'
             % (head(r, "%s · %s" % (kind, SET[r["era"]])), e(r["card_text"]),
                top, PARTY[top], e(r["top_title"]), e(r["top_outlet"]), e(r["top_text"]),
+               art(r["key"], "mid", '<div class="or">or</div>'),
                bot, PARTY[bot], e(r["bottom_outlet"]), e(r["bottom_title"]), e(r["bottom_text"]),
                e(r["date"]), e(r["flavor"])))
 
 
 def plank(r):
-    return ('<div class="card plank %s">%s'
+    return ('<div class="card plank %s">%s%s'
             '<div class="side %s top tall"><div class="tag">From the platform</div>'
             '<div class="headline fit">“%s”</div><div class="outlet">%s</div>'
             '<div class="does">%s</div></div>'
             '<div class="flavor fit">%s</div>'
             '<div class="foot">%s · Plank · stays in play</div></div>'
-            % (r["lean"], head(r, "%s plank · %s" % (PARTY[r["lean"]], SET[r["era"]])), r["lean"],
+            % (r["lean"], head(r, "%s plank · %s" % (PARTY[r["lean"]], SET[r["era"]])), art(r["key"], "band"), r["lean"],
                e(r["top_title"]), e(r["top_outlet"]), e(r["top_text"]), e(r["flavor"]), e(r["top_date"])))
 
 
 def switch(r):
-    return ('<div class="card switch"><div class="eyebrow">Between the two sets</div><div class="big">%s</div>'
+    return ('<div class="card switch"><div class="eyebrow">Between the two sets</div><div class="big">%s</div>%s'
             '<div class="rule"></div><div class="date">%s</div><div class="flavor">%s</div>'
             '<div class="rule"></div><div class="does">%s</div>'
             '<div class="pair"><div><div class="headline">“%s”</div><div class="outlet">%s</div></div>'
             '<div><div class="headline">“%s”</div><div class="outlet">%s</div></div></div></div>'
-            % (e(r["name"]), e(r["date"]), e(r["flavor"]), e(r["top_text"]), e(r["top_title"]), e(r["top_outlet"]),
+            % (e(r["name"]), art(r["key"], "band"), e(r["date"]), e(r["flavor"]), e(r["top_text"]), e(r["top_title"]), e(r["top_outlet"]),
                e(r["bottom_title"]), e(r["bottom_outlet"])))
 
 
@@ -106,6 +115,12 @@ display:flex;flex-direction:column;overflow:hidden;position:relative;box-shadow:
 .does{font-size:6pt;line-height:1.2;margin-top:auto;padding-top:.6mm;border-top:.2mm dotted rgba(12,31,34,.35)}
 .or{text-align:center;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:7pt;color:var(--gold7);line-height:1;margin:.6mm 0}
 .foot{font-size:4.6pt;color:var(--muted);margin-top:1mm;line-height:1.2;max-height:5.6mm;overflow:hidden}
+.art{flex:none;background-size:cover;background-position:center 22%;border-radius:1.2mm;position:relative;
+box-shadow:inset 0 0 0 .2mm rgba(12,31,34,.45)}
+.art.mid{height:16mm;margin:.8mm 0;display:flex;align-items:flex-end;justify-content:flex-start}
+.art.mid .or{background:var(--paper);border:.2mm solid var(--gold7);border-radius:3mm;padding:.3mm 2mm;margin:0 0 1mm 1mm}
+.art.band{height:19mm;margin:1mm 0}
+.switch .art.band{height:17mm;margin:0 0 1mm}
 .plank .side.tall{flex:1.6}
 .plank .flavor{flex:.5;min-height:0;font-size:6.2pt;font-style:italic;color:var(--muted);margin-top:1.2mm;overflow:hidden}
 .plank.rep{border-color:var(--rep)} .plank.dem{border-color:var(--dem)}
@@ -142,29 +157,24 @@ if(document.fonts&&document.fonts.ready){document.fonts.ready.then(fit);}else{wi
 """
 
 
-def main():
+def sections():
+    """The deck as [(section title, [card html])] and the count of each card type."""
     rows = [r for r in csv.DictReader(open(os.path.join(DOCS, "deck-2024.csv"), encoding="utf-8-sig")) if r["era"]]
     rows.sort(key=lambda r: (ORDER[r["era"]], r["type"] == "Plank", r["date"], r["name"]))
-    parts, counts = [], {}
-    current = None
-    cards = []
-    for r in rows:
-        group = SET[r["era"]]
-        if group != current:
-            if cards:
-                parts.append('<div class="sheet">%s</div>' % "".join(cards))
-                cards = []
-            n = sum(1 for x in rows if x["era"] == r["era"])
-            parts.append('<div class="section">%s · %d card%s</div>' % (group, n, "" if n == 1 else "s"))
-            current = group
-        if r["type"] == "Plank":
-            cards.append(plank(r))
-        elif r["type"] == "Switch":
-            cards.append(switch(r))
-        else:
-            cards.append(story(r))
-        counts[r["type"]] = counts.get(r["type"], 0) + 1
-    parts.append('<div class="sheet">%s</div>' % "".join(cards))
+    out, counts = [], {}
+    for era in sorted(ORDER, key=ORDER.get):
+        group = [r for r in rows if r["era"] == era]
+        cards = [plank(r) if r["type"] == "Plank" else switch(r) if r["type"] == "Switch" else story(r) for r in group]
+        out.append(("%s · %d card%s" % (SET[era], len(group), "" if len(group) == 1 else "s"), cards))
+        for r in group:
+            counts[r["type"]] = counts.get(r["type"], 0) + 1
+    return out, counts
+
+
+def main():
+    secs, counts = sections()
+    rows = [c for _, cs in secs for c in cs]
+    parts = ['<div class="section">%s</div><div class="sheet">%s</div>' % (t, "".join(cs)) for t, cs in secs]
     page = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>The Fourth Estate 2024: main deck</title>'
             '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'

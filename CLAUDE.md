@@ -35,7 +35,12 @@ winner score. The site opens on a launch page: 2024 (`"engine": "2024"`) or
   `tools/build_deck_2024.py` from the mechanics slots, `docs/stories-2024.csv`,
   the headlines in `docs/frames-2024.csv` and `docs/planks-2024.csv`), and
   `docs/outlets-2024.csv` (`docs/calendar-2024.csv` is no longer used).
-  Printable cards: `tools/build_print_*_2024.py` -> `docs/print/`. After editing, run
+  Printable cards: `tools/build_print_*_2024.py` -> `docs/print/`; their
+  photographs are picked in `docs/art-2024.csv` (Wikimedia Commons, found by
+  `tools/find_art_2024.py`, fetched by `tools/fetch_art_2024.py` into
+  `docs/print/art/`). `tools/build_pnp_2024.py` compiles the print-and-play
+  (rules from `docs/rules-2024.md`, a copy of the rules doc; race sheet,
+  player aids, every card, credits) as one page and a PDF. After editing, run
   `py -X utf8 tools/export_cards_2024_php.py` to regenerate
   `backend/cards_2024.php` (never edit it by hand); the deploy fails if they
   disagree (`--check`).

@@ -14,7 +14,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_print_deck_2024 import CSS, FIT, ROOT, DOCS  # noqa: E402
+from build_print_deck_2024 import CSS, FIT, ROOT, DOCS, art  # noqa: E402
 
 OUT = os.path.join(DOCS, "print", "outlets-starters-2024.html")
 MAX_OUTLETS = 5          # the most outlets at a table (backend/engine_2024.php max_players)
@@ -30,6 +30,8 @@ display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .outlet-card .power .ability{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:13pt;line-height:1.05;margin:.6mm 0}
 .outlet-card .power .text{font-size:7.4pt;line-height:1.25;margin-top:auto;margin-bottom:auto}
 .outlet-card .flavor{font-size:6.2pt;font-style:italic;color:#e6d4a8;line-height:1.25;flex:.55 1 0;min-height:0;overflow:hidden}
+.outlet-card .art.band{height:22mm;margin:1mm 0;box-shadow:inset 0 0 0 .3mm var(--gold)}
+.plain .art.band{height:26mm;margin:1.5mm 0 0}
 .plain .body{flex:1 1 0;display:flex;flex-direction:column;justify-content:center;text-align:center;border-radius:1.5mm;
 padding:2mm;margin-top:1mm;background:var(--paper2);min-height:0}
 .plain .body .text{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:12pt;line-height:1.1}
@@ -46,20 +48,22 @@ def e(s):
 
 def outlet_card(o):
     return ('<div class="card outlet-card"><div class="eyebrow">Your outlet</div><div class="big">%s</div>'
-            '<div class="rule"></div><div class="power"><div class="tag">Ability</div><div class="ability">%s</div>'
+            '%s<div class="power"><div class="tag">Ability</div><div class="ability">%s</div>'
             '<div class="text">%s</div></div><div class="flavor">%s</div></div>'
-            % (e(o["name"]), e(o["ability_name"]), e(o["ability"]), e(o["flavor"])))
+            % (e(o["name"]), art("outlet:" + o["key"], "band") or '<div class="rule"></div>', e(o["ability_name"]), e(o["ability"]), e(o["flavor"])))
 
 
 def plain_card(r, eyebrow, note):
     return ('<div class="card plain %s"><div class="head"><div class="cost" title="Cost">%s</div><div class="name">'
             '<div class="eyebrow">%s</div><div class="title">%s</div></div><div class="wealth" title="Wealth">%s$%d</div></div>'
-            '<div class="body"><div class="text">%s</div><div class="flavor">%s</div></div><div class="copies">%s</div></div>'
+            '%s<div class="body"><div class="text">%s</div><div class="flavor">%s</div></div><div class="copies">%s</div></div>'
             % (r["key"], e(r["cost"]), e(eyebrow), e(r["name"]), "−" if int(r["vp"]) < 0 else "", abs(int(r["vp"])),
+               art(r["key"], "band"),
                e(r["card_text"]), e(r["flavor"]), e(note)))
 
 
-def main():
+def sections():
+    """The outlet and starter cards as [(section title, [card html])] and the counts."""
     outlets = list(csv.DictReader(open(os.path.join(DOCS, "outlets-2024.csv"), encoding="utf-8-sig")))
     deck = {r["key"]: r for r in csv.DictReader(open(os.path.join(DOCS, "deck-2024.csv"), encoding="utf-8-sig"))}
     groups = [("Outlets · 8 cards · one per player", [outlet_card(o) for o in outlets])]
@@ -75,6 +79,11 @@ def main():
         groups.append(("%s · %d cards" % (plural, n),
                        [plain_card(r, eyebrow, note)] * n))
         counts[key] = n
+    return groups, counts
+
+
+def main():
+    groups, counts = sections()
     parts = "".join('<div class="section">%s</div><div class="sheet">%s</div>' % (t, "".join(cs)) for t, cs in groups)
     total = sum(counts.values())
     page = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'

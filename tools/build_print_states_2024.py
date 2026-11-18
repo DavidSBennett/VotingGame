@@ -48,10 +48,15 @@ font-weight:700;font-size:9.5pt;display:flex;align-items:center;justify-content:
 .state.large{border-color:#3b2a0c} .state .deckmark{font-family:'JetBrains Mono',monospace;font-size:4.4pt;letter-spacing:.12em;
 text-transform:uppercase;color:var(--muted)}
 .placeholder .headline{color:var(--muted)}
+.state .head.photo{background-size:cover;background-position:center 35%;border-radius:1.2mm;padding:1.2mm 1.4mm;
+margin-bottom:1mm;align-items:flex-end;min-height:11mm}
+.state .head.photo .eyebrow{color:#f4ead0} .state .head.photo .title{color:#fff;text-shadow:0 0 1mm rgba(0,0,0,.8)}
+.state .head.photo .wealth{color:#f1d48a;text-shadow:0 0 1mm rgba(0,0,0,.8)}
+.state .head.photo .ev{background:var(--paper);color:var(--ink)}
 .house{font-size:4.8pt;font-weight:500;margin-top:.6mm;padding:.3mm 1mm;border:.2mm solid var(--gold);border-radius:1mm;text-align:center}
 """
 
-FIT_STATES = FIT.replace("el.closest('.side')", "el.closest('.side,.reveal,.half')")
+FIT_STATES = FIT.replace("el.closest('.side')", "el.closest('.side,.reveal,.half')").replace("size>7.3", "size>6.2")
 
 
 def e(s):
@@ -92,20 +97,30 @@ def card(r):
                    '<div class="who-name">%s</div><div class="power">%s</div></div>'
                    % (side, who, " · won 2024" if r["winner"] == side else "", e(r[side + "_threshold"]),
                       e(r[side + "_name"]), e(r[side + "_text"])))
-    return ('<div class="card state %s"><div class="head"><div class="ev"><b>%s</b><span>EV</span></div><div class="name">'
+    photo = "art/state-%s.jpg" % r["key"]
+    has = os.path.exists(os.path.join(DOCS, "print", photo))
+    head = ('<div class="head photo" style="background-image:linear-gradient(rgba(12,31,34,.25),rgba(12,31,34,.78)),url(%s)">' % photo
+            if has else '<div class="head">')
+    return ('<div class="card state %s">%s<div class="ev"><b>%s</b><span>EV</span></div><div class="name">'
             '<div class="eyebrow">%s</div><div class="title">%s</div></div><div class="wealth" title="Wealth">$%s</div></div>'
             '%s%s<div class="house">%s</div><div class="foot">%s</div></div>'
-            % (r["deck"], e(r["ev"]), e(eyebrow), e(r["state"]), e(r["vp"]), reveal, halves, e(house), e(r["flavor"])))
+            % (r["deck"], head, e(r["ev"]), e(eyebrow), e(r["state"]), e(r["vp"]), reveal, halves, e(house), e(r["flavor"])))
 
 
-def main():
+def sections():
+    """The state cards as [(section title, [card html])] and the rows."""
     rows = list(csv.DictReader(open(os.path.join(DOCS, "states-2024.csv"), encoding="utf-8-sig")))
-    parts = []
+    out = []
     for deck, label in DECKS:
         group = sorted((r for r in rows if r["deck"] == deck), key=lambda r: (-int(r["ev"]), r["state"]))
         ev = sum(int(r["ev"]) for r in group)
-        parts.append('<div class="section">%s · %d states · %d electoral votes</div>' % (label, len(group), ev))
-        parts.append('<div class="sheet">%s</div>' % "".join(card(r) for r in group))
+        out.append(("%s · %d states · %d electoral votes" % (label, len(group), ev), [card(r) for r in group]))
+    return out, rows
+
+
+def main():
+    secs, rows = sections()
+    parts = ['<div class="section">%s</div><div class="sheet">%s</div>' % (t, "".join(cs)) for t, cs in secs]
     page = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>The Fourth Estate 2024: state cards</title>'
             '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'

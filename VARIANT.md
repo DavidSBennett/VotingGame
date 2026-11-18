@@ -1150,3 +1150,22 @@ in the engine; parity within noise afterwards.
   at its price) after the story and plank changes.
 - Not changed: game length (~15 rounds), the play styles (only "bigmoney"
   lags, as expected), the House tiebreaker (~4-5% of games).
+
+### 2026-11-18: photographs on the printable cards; the print-and-play (the user)
+
+- Every card has a photograph: the 80 main-deck cards, the 51 states (each
+  state's capitol), the 8 outlets and the 4 starter/supply cards, 143 in
+  all, picked from Wikimedia Commons searches (`tools/find_art_2024.py`,
+  picks and credits in `docs/art-2024.csv`, files in `docs/print/art/`). All
+  are public domain or Creative Commons; the credits are printed with the
+  print-and-play. Weak fits to replace by hand: South Carolina (a collage of
+  the primary field), The Joe Rogan Experience (a podcast studio), The
+  Economy Gap (a drawing), Eagle Pass (the town's welcome sign), The Bronx
+  Rally (Crotona Park), The Write-In (voting booths).
+- On a story the photograph sits between the two headlines; on a plank and
+  on the outlet and starter cards it is a band under the name; on a state it
+  is behind the name.
+- `docs/print/print-and-play-2024.pdf` (38 US-letter pages, from
+  `tools/build_pnp_2024.py`): cover and printing notes, the rules, a race
+  sheet (in place of the map board, cubes, discs and markers), five player
+  aids, all 225 cards, the photograph credits. No rule changed.
