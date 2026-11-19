@@ -998,8 +998,8 @@ until the engine catches up).
   and that state's **reveal** hits every outlet. Each reveal is a real
   article from the state's own press criticizing the national media, or
   (loosened 2026-10-04) outraged at bias of any kind
-  (`docs/state-reveals-2024.csv`; 49 of 51, New York and South Dakota
-  still placeholders). Effects are placeholders by deck: large, every
+  (`docs/state-reveals-2024.csv`; 49 of 51 at first; New York and South Dakota
+  added 2026-11-18). Effects are placeholders by deck: large, every
   outlet takes a Scandal; medium, every outlet discards a card at random;
   small, the exchange is swept and dealt fresh.
 - **Two framings on every story**: the top is the positive one (the card's
@@ -1075,7 +1075,7 @@ until the engine catches up).
   On top, the reveal: the state's own-press headline with its outlet at the
   lower right, a one-line summary and what it does to every outlet; below,
   the card bought for Trump and for Harris (cost, name, power). New York
-  and South Dakota show "article to come".
+  and South Dakota showed "article to come" until 2026-11-18.
 - `tools/build_print_outlets_2024.py` builds `docs/print/outlets-starters-2024.html`:
   the eight outlet cards (name, ability, flavor) and the starters for a
   table of five (35 Letters to the Editor, 15 Local Notices), 16 Editorials
@@ -1169,3 +1169,26 @@ in the engine; parity within noise afterwards.
   `tools/build_pnp_2024.py`): cover and printing notes, the rules, a race
   sheet (in place of the map board, cubes, discs and markers), five player
   aids, all 225 cards, the photograph credits. No rule changed.
+
+### 2026-11-18: the last two reveal articles, New York and South Dakota (the user)
+
+- **New York** (large deck, every outlet takes a Scandal): "MAGA Media Learns
+  in Real-Time That NYC Isn't a Dystopian Hellscape", The Daily Beast (New
+  York), 2024-04-17 -- pro-Trump hosts in town for the hush-money trial
+  found the city calmer than their own coverage had made it. A New
+  York-based outlet with a national audience, not a local paper; the more
+  local candidates were Hell Gate, "How To Manufacture a 'Migrant Crime
+  Wave'" (2024-02-07, behind a paywall, so its text could not be checked)
+  and the Amsterdam News, "Migrant crime wave or tsunami of
+  sensationalism?" (2024-02-22, whose text is about the crime figures, not
+  the press).
+- **South Dakota** (small deck, the exchange is swept): "Noem blames 'fake
+  news' for backlash against her killing a dog and goat", South Dakota
+  Searchlight (Pierre), 2024-05-02 -- the governor told Hannity the press
+  had spun her book; Searchlight read the passages and found the coverage
+  accurate. This is the state's press answering a charge of bias, not
+  making one; no South Dakota column attacking the national press in the
+  2024 campaign turned up.
+- All 51 states now carry an article. The effects are unchanged (they were
+  already the deck defaults), so no simulator run was needed; engine tests
+  pass (16,042,299 checks, 0 failed).
