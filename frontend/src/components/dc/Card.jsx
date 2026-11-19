@@ -12,7 +12,11 @@
  * `onMiddle` a middle-button click sends it there too. Every number comes from the
  * server's card view. Literal class strings only (Tailwind cannot see
  * interpolated names).
+ *
+ * A card of the 2024 game is drawn like its print-and-play card instead
+ * (e24/Card24.jsx): the same button, a different face.
  */
+import { Tile24, frame24, is24 } from '../e24/Card24.jsx';
 
 /** Each theme's ink, as literal class strings. */
 export const THEME = {
@@ -173,6 +177,7 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
   const t = typeStyle(card);
   const xs = size === 'xs';
   const tip = [card.name, card.card_text].filter(Boolean).join('\n\n');
+  const e24 = is24(card);
   return (
     <div className="flex shrink-0 flex-col items-center">
       <button
@@ -209,10 +214,14 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
             : undefined
         }
         style={dragKey ? { cursor: 'grab' } : undefined}
-        className={`group relative flex flex-col overflow-hidden border border-gold-700 text-center surface-paper shadow-card transition-all duration-200 ease-desk hover:shadow-card-hover ${
-          xs ? 'h-28 w-20' : 'h-44 w-28'
-        } ${dim ? 'opacity-50' : 'hover:-translate-y-1'} ${lifted ? '-translate-y-1 ring-2 ring-gold-300' : ''}`}
+        className={`group relative flex flex-col overflow-hidden text-center shadow-card transition-all duration-200 ease-desk hover:shadow-card-hover ${
+          e24 ? `rounded-md border-[3px] ${frame24(card)}` : 'border border-gold-700 surface-paper'
+        } ${xs ? 'h-28 w-20' : 'h-44 w-28'} ${dim ? 'opacity-50' : 'hover:-translate-y-1'} ${lifted ? '-translate-y-1 ring-2 ring-gold-300' : ''}`}
       >
+        {e24 ? (
+          <Tile24 card={card} xs={xs} />
+        ) : (
+          <>
         <div className="pointer-events-none absolute inset-1 border border-gold-500/20" />
         <div className={`h-1 w-full shrink-0 ${t.stripe}`} />
         {/* Cost at the top left; the wealth seal at the top right. */}
@@ -243,6 +252,8 @@ export default function Card({ card, onOpen, footer = null, dim = false, tag = n
         <div className="px-1 pb-1.5">
           <Abilities card={card} />
         </div>
+          </>
+        )}
         {tag && (
           <span className="absolute right-1 top-2 bg-oxblood-500 px-1 font-mono text-[7px] uppercase tracking-[0.15em] text-cream-50">{tag}</span>
         )}

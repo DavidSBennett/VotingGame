@@ -60,7 +60,10 @@ winner score. The site opens on a launch page: 2024 (`"engine": "2024"`) or
   games through the endpoints and checks invariants after every action.
 - Frontend: `frontend/` (Vite + React + Tailwind; literal class strings
   only). The game screen is `views/Shell2024.jsx` + `components/e24/` (it
-  reuses the card tile, modal and prompts in `components/dc/`).
+  reuses the card tile, modal and prompts in `components/dc/`). The cards
+  are drawn like the print-and-play ones (`components/e24/Card24.jsx`), with
+  the same photographs: `frontend/scripts/copy-art.mjs` copies
+  `docs/print/art/` to `public/art24/` before every dev and build run.
   `npm run build` in `frontend/` to check it compiles; `npm run dev`
   (`.claude/launch.json`: "frontend") talks to the live 2024 site.
 

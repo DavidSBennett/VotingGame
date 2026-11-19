@@ -29,3 +29,7 @@ backend/uploads/
 
 # Python
 __pycache__/
+
+# The 2024 cards' photographs: copied from docs/print/art by
+# frontend/scripts/copy-art.mjs before every dev and build run.
+frontend/public/art24/

@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { PrestigeSeal } from '../dc/Card.jsx';
+import { artUrl } from './Card24.jsx';
+
+/** "KQED (San Francisco)" -> "KQED": the card has no room for the city. */
+const shortOutlet = (o) => String(o || '').split(' (')[0];
 
 const DECKS = [
   ['large', 'Large'],
@@ -13,6 +16,10 @@ const DECKS = [
  * for NewsNation either party's); buying it turns up the next, whose reveal
  * hits every outlet. Tick "+ House" to buy the state's House delegation with
  * it (the 269-269 tiebreaker): only then, never later.
+ *
+ * Each face-up state is drawn like its print-and-play card: the capitol
+ * behind the name, the reveal article, then the Trump half and the Harris
+ * half with their prices.
  *
  * The buttons light only when the server lists the buy ('st#pa:trump' in
  * buy, and in buy_house with the delegation).
@@ -28,23 +35,41 @@ export default function StateDecks24({ decks, lastReveal, myTurn, canBuy = [], c
     const id = `${up.key}:${side}`;
     const withHouse = house[up.key] && up.house_cost > 0;
     const can = withHouse ? canHouse.includes(id) : canBuy.includes(id);
-    const frame = trump ? 'border-oxblood-500/50 bg-oxblood-900/30' : 'border-federal-500/50 bg-federal-900/30';
+    const panel = trump ? 'border-l-oxblood-700 bg-[#f6e3dc]' : 'border-l-federal-700 bg-[#e1e9f2]';
     return (
-      <div key={side} className={`flex flex-1 flex-col border px-2 py-1 ${frame}`}>
-        <div className="flex items-baseline justify-between gap-1 font-mono text-[8px] uppercase tracking-[0.15em]">
-          <span className={trump ? 'text-oxblood-300' : 'text-federal-300'}>for {trump ? 'Trump' : 'Harris'}</span>
-          {s.historical && <span className="text-cream-200/50">won 2024</span>}
+      <div key={side} className={`flex flex-1 flex-col rounded border-l-4 px-2 py-1 ${panel}`}>
+        <div className="flex items-center justify-between gap-1">
+          <span className={trump ? 'font-mono text-[8px] uppercase tracking-[0.14em] text-oxblood-700' : 'font-mono text-[8px] uppercase tracking-[0.14em] text-federal-700'}>
+            For {trump ? 'Trump' : 'Harris'}
+            {s.historical ? ' · won 2024' : ''}
+          </span>
+          <span
+            className={
+              trump
+                ? 'flex h-6 w-6 flex-none items-center justify-center rounded-full bg-oxblood-700 font-display text-sm font-bold leading-none text-cream-50'
+                : 'flex h-6 w-6 flex-none items-center justify-center rounded-full bg-federal-700 font-display text-sm font-bold leading-none text-cream-50'
+            }
+            title="Cost"
+          >
+            {s.cost}
+          </span>
         </div>
-        <div className="font-display text-[13px] font-semibold leading-tight text-cream-50">{up.half_names[side]}</div>
-        <div className="mt-0.5 font-serif text-[11px] leading-snug text-cream-200/80">{s.text}</div>
+        <div className="font-display text-[15px] font-bold leading-tight">{up.half_names[side]}</div>
+        <div className="font-serif text-[11px] leading-snug">{s.text}</div>
         {myTurn && (
           <button
             type="button"
             disabled={busy || !can}
             onClick={() => onBuy(`st#${up.state}`, side, withHouse)}
-            className={can ? 'btn-solid mt-1 px-2 py-0.5 text-[11px]' : 'btn mt-1 px-2 py-0.5 text-[11px] opacity-40'}
+            className={
+              !can
+                ? 'mt-1 cursor-not-allowed border border-ink-950/25 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-950/35'
+                : trump
+                  ? 'mt-1 bg-oxblood-700 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-cream-50 shadow-card transition hover:bg-oxblood-500'
+                  : 'mt-1 bg-federal-700 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-cream-50 shadow-card transition hover:bg-federal-500'
+            }
           >
-            Buy ◆{s.cost + (withHouse ? up.house_cost : 0)}
+            Buy for {s.cost + (withHouse ? up.house_cost : 0)}
           </button>
         )}
       </div>
@@ -77,38 +102,69 @@ export default function StateDecks24({ decks, lastReveal, myTurn, canBuy = [], c
           const deck = decks[d];
           const up = deck && deck.up;
           return (
-            <div key={d} className="flex flex-col border border-gold-500/30 bg-ink-950/30 px-2 py-1.5">
-              <div className="flex items-baseline justify-between font-mono text-[8px] uppercase tracking-[0.18em] text-cream-200/60">
+            <div key={d} className="flex flex-col">
+              <div className="flex items-baseline justify-between px-1 font-mono text-[8px] uppercase tracking-[0.18em] text-cream-200/60">
                 <span>{label} deck</span>
                 <span>{deck ? deck.left : 0} face down</span>
               </div>
               {!up ? (
                 <p className="mt-2 text-center font-serif text-sm italic text-cream-200/50">Every state claimed.</p>
               ) : (
-                <>
-                  <button type="button" onClick={() => open([up], 0, 'decks')} className="mt-0.5 flex items-center justify-between gap-2 text-left">
-                    <span>
-                      <span className="font-display text-lg font-bold leading-none text-cream-50">{up.state_name}</span>
-                      <span className="ml-1 font-mono text-sm text-gold-300">{up.ev}</span>
-                      <span className="block font-mono text-[8px] uppercase tracking-[0.12em] text-cream-200/60">
+                <div
+                  className={
+                    d === 'large'
+                      ? 'mt-0.5 flex flex-1 flex-col gap-1 rounded-lg border-4 border-[#3b2a0c] bg-cream-50 p-1.5 text-ink-950'
+                      : 'mt-0.5 flex flex-1 flex-col gap-1 rounded-lg border-4 border-gold-700 bg-cream-50 p-1.5 text-ink-950'
+                  }
+                  style={{ boxShadow: 'inset 0 0 0 1px #b8923a, 0 6px 14px rgba(0,0,0,.35)' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => open([up], 0, 'decks')}
+                    title="Open the card"
+                    className="flex min-h-[52px] items-end gap-1.5 rounded p-1 text-left"
+                    style={{
+                      backgroundImage: `linear-gradient(rgba(12,31,34,.25),rgba(12,31,34,.78)),url("${artUrl(up)}")`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center 35%',
+                    }}
+                  >
+                    <span className="flex h-8 w-8 flex-none flex-col items-center justify-center rounded bg-cream-50 leading-none text-ink-950">
+                      <b className="font-display text-base leading-none">{up.ev}</b>
+                      <span className="font-mono text-[5px] tracking-[0.1em]">EV</span>
+                    </span>
+                    <span className="min-w-0 flex-1 text-center">
+                      <span className="block font-mono text-[7px] uppercase tracking-[0.12em] text-cream-100">
                         {up.tier} · 2024 {up.winner_2024 === 'trump' ? 'Trump' : 'Harris'} by {Math.abs(up.margin).toFixed(1)}
                       </span>
+                      <span className="block font-display text-xl font-bold leading-none text-white" style={{ textShadow: '0 0 5px rgba(0,0,0,.85)' }}>
+                        {up.state_name}
+                      </span>
                     </span>
-                    <PrestigeSeal vp={up.vp} />
+                    <span className="flex-none font-display text-base font-bold leading-none text-[#f1d48a]" style={{ textShadow: '0 0 5px rgba(0,0,0,.85)' }} title="Wealth">
+                      ${up.vp}
+                    </span>
                   </button>
-                  <div className="mt-1 flex flex-col gap-1">
+                  {up.reveal && up.reveal.title && (
+                    <div className="rounded border-l-4 border-l-gold-700 bg-cream-100 px-2 py-1" title={up.reveal.text}>
+                      <div className="font-mono text-[7px] uppercase tracking-[0.14em] text-gold-700">When revealed</div>
+                      <p className="line-clamp-2 font-display text-[13px] font-semibold italic leading-[1.1]">“{up.reveal.title}”</p>
+                      <p className="text-right font-mono text-[8px] uppercase tracking-[0.06em] text-gold-700">{shortOutlet(up.reveal.outlet)}</p>
+                    </div>
+                  )}
+                  <div className="flex flex-1 flex-col gap-1">
                     {half(up, 'trump')}
                     {half(up, 'harris')}
                   </div>
                   {up.house_seats > 0 ? (
-                    <label className="mt-1 flex cursor-pointer items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-cream-200/70">
-                      <input type="checkbox" checked={Boolean(house[up.key])} onChange={() => toggle(up.key)} className="accent-gold-500" />
-                      + House: {up.house_seats} seat{up.house_seats === 1 ? '' : 's'} for ◆{up.house_cost}
+                    <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded border border-gold-500 px-1 py-0.5 font-serif text-[11px] font-medium">
+                      <input type="checkbox" checked={Boolean(house[up.key])} onChange={() => toggle(up.key)} className="accent-gold-700" />
+                      + House: {up.house_seats} seat{up.house_seats === 1 ? '' : 's'} for {up.house_cost} more
                     </label>
                   ) : (
-                    <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-cream-200/40">No House seats</p>
+                    <p className="rounded border border-gold-500 px-1 py-0.5 text-center font-serif text-[11px] font-medium text-ink-950/60">No House seats</p>
                   )}
-                </>
+                </div>
               )}
             </div>
           );

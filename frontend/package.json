@@ -5,7 +5,9 @@
   "type": "module",
   "description": "VotingGame — browser board game. Presentation layer; the server owns the rules.",
   "scripts": {
+    "predev": "node scripts/copy-art.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-art.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

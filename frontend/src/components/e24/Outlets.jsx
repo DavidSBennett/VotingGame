@@ -1,3 +1,5 @@
+import { outletArtUrl } from './Card24.jsx';
+
 /**
  * Every outlet at the table: its newspaper and ability, how many cards it
  * has staked (never which, or on whom), the votes it has claimed, its
@@ -28,8 +30,15 @@ export default function Outlets({ players, botLevel }) {
             </span>
           </div>
           {p.paper && (
-            <div className="font-serif text-[12px] leading-snug text-cream-200/80" title={p.paper.ability}>
-              <span className="italic text-gold-400">{p.paper.name}</span> — {p.paper.ability}
+            <div className="mt-0.5 flex items-start gap-1.5" title={p.paper.ability}>
+              {/* The outlet's photograph, as on its print-and-play card. */}
+              <span
+                className="mt-0.5 h-9 w-12 flex-none rounded-sm border border-gold-500"
+                style={{ backgroundImage: `url("${outletArtUrl(p.paper.key)}")`, backgroundSize: 'cover', backgroundPosition: 'center 22%' }}
+              />
+              <span className="font-serif text-[12px] leading-snug text-cream-200/80">
+                <span className="italic text-gold-400">{p.paper.name}</span> — {p.paper.ability}
+              </span>
             </div>
           )}
           <div className="mt-0.5 flex flex-wrap gap-x-3 font-mono text-[9px] uppercase tracking-[0.12em] text-cream-200/60">

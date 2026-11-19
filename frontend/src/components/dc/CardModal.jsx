@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import CornerOrnament from './CornerOrnament.jsx';
 import FleuronDivider from './FleuronDivider.jsx';
 import { Abilities, PrestigeSeal, typeStyle } from './Card.jsx';
+import { Face24, is24 } from '../e24/Card24.jsx';
 
 /**
  * CardModal -- the open card, ported from The Historians' CardModal
@@ -156,7 +157,7 @@ export default function CardModal({ card, onClose, actions = null, onPrev = null
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink-950/80 p-6 backdrop-blur-sm animate-fade" onClick={onClose}>
-      <div className="relative w-full max-w-xl" onClick={(e) => e.stopPropagation()}>
+      <div className={is24(card) ? 'relative w-full max-w-md' : 'relative w-full max-w-xl'} onClick={(e) => e.stopPropagation()}>
         {onPrev && chevron('Previous card', onPrev, 'left')}
         {onNext && chevron('Next card', onNext, 'right')}
 
@@ -166,12 +167,28 @@ export default function CardModal({ card, onClose, actions = null, onPrev = null
             e.stopPropagation();
             onClose();
           }}
-          className="absolute right-4 top-4 z-30 border border-gold-500 bg-cream-50 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-ink-900 shadow-md transition-colors hover:border-oxblood-500 hover:bg-oxblood-500 hover:text-cream-50"
+          className={
+            is24(card)
+              ? 'absolute -top-9 right-0 z-30 border border-gold-500 bg-cream-50 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-ink-900 shadow-md transition-colors hover:border-oxblood-500 hover:bg-oxblood-500 hover:text-cream-50'
+              : 'absolute right-4 top-4 z-30 border border-gold-500 bg-cream-50 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-ink-900 shadow-md transition-colors hover:border-oxblood-500 hover:bg-oxblood-500 hover:text-cream-50'
+          }
           aria-label="Close"
         >
           ✕ Close
         </button>
 
+        {is24(card) ? (
+          /* A 2024 card opens as its print-and-play card. */
+          <div className="max-h-[82vh] overflow-y-auto animate-rise">
+            {position && position.total > 1 && (
+              <p className="mb-1 text-center font-mono text-[10px] uppercase tracking-widest text-cream-200">
+                {position.current} of {position.total}
+              </p>
+            )}
+            <Face24 card={card} />
+            {actions && <div className="mt-3 flex flex-wrap justify-center gap-2">{actions}</div>}
+          </div>
+        ) : (
         <article
           className="relative max-h-[90vh] overflow-y-auto surface-paper animate-rise"
           style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(184, 146, 58, 0.5)' }}
@@ -220,6 +237,7 @@ export default function CardModal({ card, onClose, actions = null, onPrev = null
             {actions && <div className="mt-6 flex flex-wrap justify-center gap-2 border-t border-gold-500/30 pt-4">{actions}</div>}
           </div>
         </article>
+        )}
       </div>
     </div>
   );

@@ -1192,3 +1192,25 @@ in the engine; parity within noise afterwards.
 - All 51 states now carry an article. The effects are unchanged (they were
   already the deck defaults), so no simulator run was needed; engine tests
   pass (16,042,299 checks, 0 failed).
+
+### 2026-11-19: the site's cards drawn like the print-and-play (the user)
+
+- The 2024 game screen now shows each card as its printed card
+  (`frontend/src/components/e24/Card24.jsx`): a rounded cream card with the
+  dark gilt border, the cost in a round ink disc, the wealth at the top
+  right, the photograph, and the oxblood / federal-blue party panels.
+- The tile (hand, exchange, prompts): a story shows "In hand", its top
+  side, the photograph with the "or" pill, its bottom side; a plank its
+  photograph and standing effects under a party-coloured border; starters,
+  Editorials and Scandals a photograph over their text. The headlines do
+  not fit a tile; they are on the opened card.
+- The opened card is the whole printed card: both headlines with their
+  outlets, the photograph between them, the date and flavour.
+- The three state decks show each face-up state as its card: the capitol
+  behind the name, the reveal article, the Trump and Harris halves with
+  price discs and Buy buttons, the House line.
+- Each outlet in the side panel shows its photograph.
+- The photographs are the print edition's: `frontend/scripts/copy-art.mjs`
+  copies `docs/print/art/` (143 files, 11 MB) to `public/art24/` before
+  `npm run dev` and `npm run build`; the copy is not committed. The
+  1796-1860 game's cards are unchanged. No rule changed.
